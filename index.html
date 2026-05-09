@@ -53,7 +53,15 @@
         </section>
 
         <section class="tree-panel" aria-label="Folder tree">
-          <ol class="folder-tree" data-folder-tree></ol>
+          <div class="tree-toolbar" data-tree-toolbar hidden>
+            <button class="tree-action" type="button" data-expand-all aria-label="Expand all folders">
+              Expand all
+            </button>
+            <button class="tree-action" type="button" data-collapse-all aria-label="Collapse all folders">
+              Collapse all
+            </button>
+          </div>
+          <ol class="folder-tree" data-folder-tree role="tree" aria-label="Scanned folder tree"></ol>
         </section>
       </section>
 

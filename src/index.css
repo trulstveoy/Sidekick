@@ -186,6 +186,31 @@ li {
   overflow: auto;
 }
 
+.tree-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tree-toolbar[hidden] {
+  display: none;
+}
+
+.tree-action {
+  min-width: 0;
+  border: 1px solid #cfc7b8;
+  padding: 6px 10px;
+  color: #365f5c;
+  background: transparent;
+  font-size: 12px;
+}
+
+.tree-action:hover:not(:disabled) {
+  background: #ede9df;
+  transform: none;
+}
+
 .folder-tree,
 .folder-tree ol {
   display: grid;
@@ -202,7 +227,7 @@ li {
 
 .tree-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto auto;
+  grid-template-columns: 24px minmax(180px, 1fr) auto auto;
   align-items: center;
   gap: 10px;
   min-height: 32px;
@@ -210,8 +235,44 @@ li {
   padding: 6px 8px;
 }
 
+.tree-row--interactive {
+  cursor: pointer;
+}
+
 .tree-row:hover {
   background: #ede9df;
+}
+
+.tree-toggle,
+.tree-toggle-spacer {
+  width: 24px;
+  height: 24px;
+}
+
+.tree-toggle {
+  display: grid;
+  min-width: 0;
+  place-items: center;
+  border-radius: 4px;
+  padding: 0;
+  color: #544e43;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tree-toggle:hover:not(:disabled) {
+  background: #ded6c7;
+  transform: none;
+}
+
+.tree-toggle:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.tree-toggle-spacer {
+  display: block;
 }
 
 .tree-name {

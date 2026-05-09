@@ -22,7 +22,10 @@ const selectedPathTarget = document.querySelector<HTMLElement>('[data-selected-p
 const folderSignalsTarget = document.querySelector<HTMLUListElement>('[data-folder-signals]');
 const stateTitleTarget = document.querySelector<HTMLElement>('[data-state-title]');
 const stateMessageTarget = document.querySelector<HTMLElement>('[data-state-message]');
+const treeToolbarTarget = document.querySelector<HTMLElement>('[data-tree-toolbar]');
 const treeTarget = document.querySelector<HTMLOListElement>('[data-folder-tree]');
+const expandAllButton = document.querySelector<HTMLButtonElement>('[data-expand-all]');
+const collapseAllButton = document.querySelector<HTMLButtonElement>('[data-collapse-all]');
 const summaryTarget = document.querySelector<HTMLElement>('[data-summary]');
 const artifactCountsTarget = document.querySelector<HTMLUListElement>('[data-artifact-counts]');
 const recentFilesTarget = document.querySelector<HTMLUListElement>('[data-recent-files]');
@@ -54,6 +57,9 @@ const signalLabels: Record<FolderSignal, string> = {
 };
 
 let state: ViewState = { status: 'empty' };
+let expandedPaths = new Set<string>();
+
+const ROOT_PATH = '.';
 
 const setText = (target: Element | null, value: string) => {
   if (target) {
@@ -99,6 +105,79 @@ const formatDate = (value?: string) => {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
+};
+
+const getActiveScan = () =>
+  state.status === 'ready' || state.status === 'partial' ? state.scan : undefined;
+
+const isFolderNode = (node: FolderTreeNode) => node.kind === 'folder';
+
+const getChildren = (node: FolderTreeNode) => node.children ?? [];
+
+const hasChildren = (node: FolderTreeNode) => getChildren(node).length > 0;
+
+const getDirectChildSummary = (node: FolderTreeNode) => {
+  const children = getChildren(node);
+  const folderCount = children.filter(isFolderNode).length;
+  const fileCount = children.length - folderCount;
+  const parts = [];
+
+  if (folderCount > 0) {
+    parts.push(`${folderCount} ${folderCount === 1 ? 'folder' : 'folders'}`);
+  }
+
+  if (fileCount > 0) {
+    parts.push(`${fileCount} ${fileCount === 1 ? 'file' : 'files'}`);
+  }
+
+  return parts.length > 0 ? parts.join(' / ') : 'Empty';
+};
+
+const collectFolderPaths = (node: FolderTreeNode, paths = new Set<string>()) => {
+  if (isFolderNode(node)) {
+    paths.add(node.relativePath);
+  }
+
+  getChildren(node).filter(isFolderNode).forEach((child) => {
+    collectFolderPaths(child, paths);
+  });
+
+  return paths;
+};
+
+const resetExpandedPaths = () => {
+  expandedPaths = new Set([ROOT_PATH]);
+};
+
+const toggleFolder = (relativePath: string) => {
+  const nextExpandedPaths = new Set(expandedPaths);
+
+  if (nextExpandedPaths.has(relativePath)) {
+    nextExpandedPaths.delete(relativePath);
+  } else {
+    nextExpandedPaths.add(relativePath);
+  }
+
+  expandedPaths = nextExpandedPaths;
+  render();
+};
+
+const expandAllFolders = () => {
+  const scan = getActiveScan();
+
+  if (!scan) {
+    return;
+  }
+
+  expandedPaths = collectFolderPaths(scan.tree);
+  render();
+};
+
+const collapseAllFolders = () => {
+  const scan = getActiveScan();
+
+  expandedPaths = scan ? new Set([ROOT_PATH]) : new Set();
+  render();
 };
 
 const renderSummary = (scan?: ProjectFolderScan) => {
@@ -197,19 +276,68 @@ const renderWarnings = (warnings: ScanWarning[] = []) => {
   );
 };
 
-const renderTreeNode = (node: FolderTreeNode) => {
+const renderTreeToolbar = (scan?: ProjectFolderScan) => {
+  const hasScan = Boolean(scan);
+
+  treeToolbarTarget?.toggleAttribute('hidden', !hasScan);
+  expandAllButton?.toggleAttribute('disabled', !hasScan);
+  collapseAllButton?.toggleAttribute('disabled', !hasScan);
+};
+
+const renderTreeNode = (node: FolderTreeNode, level = 1) => {
   const item = document.createElement('li');
   item.className = `tree-node tree-node--${node.kind}`;
+  item.setAttribute('role', 'treeitem');
+  item.setAttribute('aria-level', level.toString());
 
   const row = document.createElement('div');
   row.className = 'tree-row';
+
+  if (isFolderNode(node)) {
+    const isExpanded = expandedPaths.has(node.relativePath);
+    const canExpand = hasChildren(node);
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'tree-toggle';
+    toggle.textContent = canExpand ? (isExpanded ? 'v' : '>') : '';
+    toggle.disabled = !canExpand;
+    toggle.setAttribute(
+      'aria-label',
+      canExpand
+        ? `${isExpanded ? 'Collapse' : 'Expand'} ${node.name}`
+        : `${node.name} has no child items`,
+    );
+
+    if (canExpand) {
+      item.setAttribute('aria-expanded', isExpanded.toString());
+      row.classList.add('tree-row--interactive');
+      row.addEventListener('click', () => {
+        toggleFolder(node.relativePath);
+      });
+      toggle.addEventListener('click', (event) => {
+        event.stopPropagation();
+        toggleFolder(node.relativePath);
+      });
+    }
+
+    row.append(toggle);
+  } else {
+    const spacer = document.createElement('span');
+    spacer.className = 'tree-toggle-spacer';
+    row.append(spacer);
+  }
 
   const name = document.createElement('span');
   name.className = 'tree-name';
   name.textContent = node.kind === 'folder' ? `${node.name}/` : node.name;
   row.append(name);
 
-  if (node.kind === 'file' && node.artifactType) {
+  if (isFolderNode(node)) {
+    const meta = document.createElement('span');
+    meta.className = 'tree-meta';
+    meta.textContent = getDirectChildSummary(node);
+    row.append(meta);
+  } else if (node.artifactType) {
     const meta = document.createElement('span');
     meta.className = 'tree-meta';
     meta.textContent = `${artifactLabels[node.artifactType]} ${formatBytes(node.size)}`.trim();
@@ -225,9 +353,10 @@ const renderTreeNode = (node: FolderTreeNode) => {
 
   item.append(row);
 
-  if (node.children && node.children.length > 0) {
+  if (isFolderNode(node) && expandedPaths.has(node.relativePath) && hasChildren(node)) {
     const children = document.createElement('ol');
-    children.append(...node.children.map(renderTreeNode));
+    children.setAttribute('role', 'group');
+    children.append(...getChildren(node).map((child) => renderTreeNode(child, level + 1)));
     item.append(children);
   }
 
@@ -236,13 +365,13 @@ const renderTreeNode = (node: FolderTreeNode) => {
 
 const renderTree = (scan?: ProjectFolderScan) => {
   clear(treeTarget);
+  renderTreeToolbar(scan);
 
   if (!treeTarget || !scan) {
     return;
   }
 
-  const children = scan.tree.children ?? [];
-  treeTarget.append(...children.map(renderTreeNode));
+  treeTarget.append(renderTreeNode(scan.tree));
 };
 
 const render = () => {
@@ -265,6 +394,7 @@ const render = () => {
   if (state.status === 'loading') {
     setText(stateTitleTarget, 'Scanning folder');
     setText(stateMessageTarget, 'Reading structure and metadata. Files will not be changed.');
+    renderTree();
     return;
   }
 
@@ -316,14 +446,17 @@ const chooseFolder = async () => {
     const scan = await window.sidekick.chooseProjectFolder();
 
     if (!scan) {
+      expandedPaths = new Set();
       state = { status: 'empty' };
       render();
       return;
     }
 
+    resetExpandedPaths();
     state = scan.status === 'partial' ? { status: 'partial', scan } : { status: 'ready', scan };
     render();
   } catch (error) {
+    expandedPaths = new Set();
     state = {
       status: 'error',
       message: error instanceof Error ? error.message : 'Unable to inspect the selected folder.',
@@ -343,5 +476,8 @@ if (window.sidekick) {
 chooseFolderButton?.addEventListener('click', () => {
   void chooseFolder();
 });
+
+expandAllButton?.addEventListener('click', expandAllFolders);
+collapseAllButton?.addEventListener('click', collapseAllFolders);
 
 render();
