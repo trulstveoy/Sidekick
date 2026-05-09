@@ -1,12 +1,14 @@
 # Sidekick
 
-Sidekick is an agentic desktop workspace built on Electron, Electron Forge, Vite, and TypeScript.
+Sidekick is a local-first desktop app for inspecting and organizing project folders. It is built on Electron, Electron Forge, Vite, and TypeScript.
 
 ## Scripts
 
 - `npm start` starts the Electron app in development.
 - `npm run package` creates an unpacked local app build.
 - `npm run make` creates platform-specific distributables.
+- `npm run test` runs unit and integration tests.
+- `npm run test:ui` runs Playwright UI smoke tests.
 - `npm run lint` runs ESLint.
 - `npm run typecheck` runs TypeScript without emitting files.
 - `npm run check` runs lint and typecheck together.
@@ -14,6 +16,7 @@ Sidekick is an agentic desktop workspace built on Electron, Electron Forge, Vite
 ## Architecture
 
 - `src/main.ts` owns the Electron main process, window creation, application lifecycle, and IPC handlers.
+- `src/main/folder-scanner.ts` owns read-only project folder scanning and artifact classification.
 - `src/preload.ts` is the only bridge between the renderer and privileged Electron APIs.
 - `src/shared/sidekick-api.ts` defines the typed contract exposed from preload to renderer.
 - `src/renderer.ts`, `index.html`, and `src/index.css` own the first renderer workspace.

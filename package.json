@@ -2,7 +2,7 @@
   "name": "sidekick",
   "productName": "Sidekick",
   "version": "1.0.0",
-  "description": "Agentic desktop workspace built with Electron.",
+  "description": "Local project folder intelligence workspace built with Electron.",
   "main": ".vite/build/main.js",
   "private": true,
   "scripts": {
@@ -10,13 +10,18 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
+    "dev:renderer": "vite --config vite.renderer.config.ts --host 127.0.0.1 --port 5173",
     "lint": "eslint --ext .ts,.tsx .",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run tests/unit tests/integration",
+    "test:watch": "vitest tests/unit tests/integration",
+    "test:ui": "playwright test",
     "check": "npm run lint && npm run typecheck"
   },
   "keywords": [
     "electron",
-    "agentic",
+    "folders",
+    "notes",
     "desktop"
   ],
   "author": "trutve",
@@ -31,6 +36,7 @@
     "@electron-forge/plugin-fuses": "^7.11.1",
     "@electron-forge/plugin-vite": "^7.11.1",
     "@electron/fuses": "^1.8.0",
+    "@playwright/test": "^1.59.1",
     "@types/electron-squirrel-startup": "^1.0.2",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
@@ -38,7 +44,8 @@
     "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.32.0",
     "typescript": "^6.0.3",
-    "vite": "^5.4.21"
+    "vite": "^5.4.21",
+    "vitest": "^4.1.5"
   },
   "dependencies": {
     "electron-squirrel-startup": "^1.0.1"

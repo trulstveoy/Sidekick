@@ -1,7 +1,7 @@
 # Task: Inspect Local Folder
 
 ID: TASK-0001
-Status: Building
+Status: Done
 Class: Standard
 Owner: Pair
 Created: 2026-05-09
@@ -13,7 +13,7 @@ Sidekick should let the user choose one local project folder and show a simple, 
 
 ## Current Phase
 
-Build
+Close
 
 ## Progress Checklist
 
@@ -21,11 +21,11 @@ Build
 - [x] Spec complete
 - [x] Plan complete
 - [x] Human approval received, if required
-- [ ] Build complete
-- [ ] Verification complete
-- [ ] Review complete
-- [ ] Documentation complete
-- [ ] Closeout complete
+- [x] Build complete
+- [x] Verification complete
+- [x] Review complete
+- [x] Documentation complete
+- [x] Closeout complete
 
 ## Links
 
@@ -34,18 +34,28 @@ Related files:
 - `docs/workflows/agentic-development.md`
 - `AGENTS.md`
 - `package.json`
+- `package-lock.json`
+- `.gitignore`
+- `playwright.config.ts`
 - `src/main.ts`
+- `src/main/folder-scanner.ts`
 - `src/preload.ts`
 - `src/shared/sidekick-api.ts`
 - `src/renderer.ts`
 - `index.html`
 - `src/index.css`
+- `tests/unit/folder-classification.test.ts`
+- `tests/integration/folder-scanner.test.ts`
+- `tests/e2e/renderer-smoke.spec.ts`
+- `tests/fixtures/project-folder-basic/`
+- `README.md`
 
 Related decisions:
 - None yet.
 
 Related docs:
 - `docs/product/vision.md`
+- `docs/architecture/application-architecture.md`
 
 ## Explore Notes
 
@@ -531,28 +541,102 @@ Decision record:
 
 ## Build Log
 
-Not started.
+Implemented:
+- Added Vitest and Playwright test tooling and scripts.
+- Added shared folder-inspection types in `src/shared/sidekick-api.ts`.
+- Added a read-only scanner in `src/main/folder-scanner.ts`.
+- Added artifact classification, folder signals, recent files, scan limits, excluded folders, symlink skipping, and scan warnings.
+- Added fixture-based unit and integration tests.
+- Added `project-folder:choose-and-scan` IPC in the main process.
+- Added `chooseProjectFolder()` to the preload API.
+- Replaced the scaffold renderer with a three-column folder-inspection work surface.
+- Added a Playwright smoke test for the renderer empty state.
+- Added architecture documentation for the current Electron process boundaries and folder-inspection flow.
+- Updated README with the current Sidekick direction and test scripts.
+
+Plan deviations:
+- The noisy-folder fixture uses `dist/` instead of `node_modules/` so the fixture can be tracked by Git. The scanner still excludes both.
+- Folder exclusion is applied only after confirming an entry is a directory, so hidden files are not incorrectly reported as excluded folders.
 
 ## Verification Log
 
-Not run yet.
+Passed:
+- `npm run test`
+  - 2 test files passed.
+  - 5 tests passed.
+- `npm run test:ui`
+  - 1 Playwright smoke test passed.
+- `npm run check`
+  - ESLint passed.
+  - TypeScript typecheck passed.
+- `npm run package`
+  - Electron Forge packaged the app for Linux x64.
+- `npm start`
+  - Electron Forge launched the development app.
+- `npm audit --omit=dev`
+  - Found 0 production dependency vulnerabilities.
+
+Observed warnings:
+- Electron startup printed GPU/WebGL blocklist messages in this environment. The app still launched.
+- Native folder selection through the OS dialog was not interactively completed from this tool session. Scanner behavior is covered by integration tests, and Electron startup was verified.
 
 ## Review Notes
 
-Not reviewed yet.
+Security and architecture review:
+- Renderer does not receive raw filesystem access.
+- Renderer does not receive raw IPC access.
+- Preload exposes only `getAppInfo()` and `chooseProjectFolder()`.
+- Filesystem scanning is read-only.
+- Symlinks are skipped by default.
+- The scanner uses bounded recursion and file count limits.
+- External navigation restrictions remain in the main process.
+- No persistent storage was introduced.
+
+Residual risk:
+- Artifact classification is intentionally heuristic and will need refinement after real folder examples.
+- Very large or unusual folders may still need better progress reporting or cancellation in a later task.
+
+Decision record needed:
+- No
+- Reason: the implementation follows the already documented Electron security boundary and does not introduce persistence, packaging, or data-model decisions beyond this first feature.
 
 ## Documentation Notes
 
 Docs updated:
 - `docs/tasks/TASK-0001-inspect-local-folder.md`
+- `docs/architecture/application-architecture.md`
+- `README.md`
 
 Docs intentionally not updated:
-- No README or architecture updates yet because implementation has not started.
+- `docs/product/vision.md` because the product terminology did not change during implementation.
 
 Decision record needed:
 - No
-- Reason: this is an initial task description, not a durable architecture decision yet.
+- Reason: no durable decision beyond the current task implementation was introduced.
 
 ## Closeout
 
-Not closed.
+Changed:
+- Implemented read-only local folder inspection from Electron.
+- Added scanner, IPC, preload API, renderer state, folder tree rendering, summary panels, warnings, and recent files.
+- Added unit, integration, and UI smoke tests.
+- Added architecture documentation and updated README.
+
+Verified:
+- `npm run test`
+- `npm run test:ui`
+- `npm run check`
+- `npm run package`
+- `npm start`
+- `npm audit --omit=dev`
+
+Known gaps:
+- Full native folder-dialog selection was not interactively completed in this tool session.
+- The first version does not include scan cancellation, progress updates, expand/collapse, persistence, or deep file parsing.
+
+Next:
+- Manually select a representative local project folder in the Electron app.
+- Use the result to refine artifact labels, folder signals, and tree interaction.
+
+Final status:
+- Done

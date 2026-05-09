@@ -10,61 +10,92 @@
     <title>Sidekick</title>
   </head>
   <body>
-    <main class="shell" aria-label="Sidekick workspace">
-      <aside class="sidebar">
+    <main class="shell" aria-label="Sidekick folder inspection workspace">
+      <aside class="sidebar" aria-label="Selected project">
         <div>
-          <p class="eyebrow">Desktop agent</p>
+          <p class="eyebrow">Local folders</p>
           <h1>Sidekick</h1>
         </div>
-        <nav aria-label="Workspace">
-          <a class="nav-item nav-item--active" href="#mission">Mission</a>
-          <a class="nav-item" href="#context">Context</a>
-          <a class="nav-item" href="#runs">Runs</a>
-          <a class="nav-item" href="#settings">Settings</a>
-        </nav>
+
+        <section class="selected-project" aria-label="Selected project folder">
+          <p class="section-label">Selected project</p>
+          <h2 data-selected-name>No folder selected</h2>
+          <p class="path" data-selected-path>Choose a local project folder to inspect.</p>
+        </section>
+
+        <section aria-label="Folder signals">
+          <p class="section-label">Folder signals</p>
+          <ul class="signal-list" data-folder-signals>
+            <li>No signals yet</li>
+          </ul>
+        </section>
+
         <div class="runtime">
           <span>Runtime</span>
           <strong data-app-info>Loading...</strong>
         </div>
       </aside>
 
-      <section class="workspace" id="mission">
+      <section class="workspace" aria-label="Folder structure">
         <header class="workspace-header">
           <div>
-            <p class="eyebrow">Active plan</p>
-            <h2>Build the first usable Sidekick loop</h2>
+            <p class="eyebrow">Read-only inspection</p>
+            <h2>Folder structure</h2>
           </div>
-          <button type="button">Start run</button>
+          <button type="button" data-choose-folder>Choose folder</button>
         </header>
 
-        <section class="plan" aria-label="Plan">
-          <article>
-            <span class="step-status step-status--done">Done</span>
-            <h3>Initialize Electron baseline</h3>
-            <p>Forge, Vite, TypeScript, sandboxed renderer, and controlled preload API.</p>
-          </article>
-          <article>
-            <span class="step-status step-status--active">Next</span>
-            <h3>Define Sidekick capabilities</h3>
-            <p>Capture the agent workflow, local data model, and first integrations.</p>
-          </article>
-          <article>
-            <span class="step-status">Queued</span>
-            <h3>Wire durable task state</h3>
-            <p>Persist plans, run logs, decisions, and verification evidence locally.</p>
-          </article>
+        <section class="state-banner" data-state-banner>
+          <h3 data-state-title>Choose a project folder</h3>
+          <p data-state-message>
+            Sidekick will inspect folder names, file metadata, and artifact types without changing files.
+          </p>
+        </section>
+
+        <section class="tree-panel" aria-label="Folder tree">
+          <ol class="folder-tree" data-folder-tree></ol>
         </section>
       </section>
 
-      <aside class="inspector" id="context" aria-label="Context">
-        <p class="eyebrow">Context stack</p>
-        <h2>Agentic standards</h2>
-        <ul>
-          <li>Inspect before editing.</li>
-          <li>Expose narrow IPC methods only.</li>
-          <li>Verify with lint, typecheck, and a running app.</li>
-          <li>Record decisions that affect architecture.</li>
-        </ul>
+      <aside class="inspector" aria-label="Project summary">
+        <section>
+          <p class="eyebrow">Project summary</p>
+          <dl class="summary-grid" data-summary>
+            <div>
+              <dt>Files</dt>
+              <dd>0</dd>
+            </div>
+            <div>
+              <dt>Folders</dt>
+              <dd>0</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd>Waiting</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section>
+          <p class="section-label">Artifact counts</p>
+          <ul class="metric-list" data-artifact-counts>
+            <li>No artifacts yet</li>
+          </ul>
+        </section>
+
+        <section>
+          <p class="section-label">Recent files</p>
+          <ul class="file-list" data-recent-files>
+            <li>No recent files yet</li>
+          </ul>
+        </section>
+
+        <section>
+          <p class="section-label">Warnings</p>
+          <ul class="warning-list" data-warnings>
+            <li>No warnings</li>
+          </ul>
+        </section>
       </aside>
     </main>
     <script type="module" src="/src/renderer.ts"></script>

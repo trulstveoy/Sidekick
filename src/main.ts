@@ -1,7 +1,8 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import type { AppInfo } from './shared/sidekick-api';
+import { scanProjectFolder } from './main/folder-scanner';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -18,6 +19,23 @@ const getAppInfo = (): AppInfo => ({
 });
 
 ipcMain.handle('app:get-info', getAppInfo);
+
+ipcMain.handle('project-folder:choose-and-scan', async (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  const dialogOptions: Electron.OpenDialogOptions = {
+    title: 'Choose project folder',
+    properties: ['openDirectory'],
+  };
+  const result = window
+    ? await dialog.showOpenDialog(window, dialogOptions)
+    : await dialog.showOpenDialog(dialogOptions);
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+
+  return scanProjectFolder(result.filePaths[0]);
+});
 
 const isAllowedNavigation = (targetUrl: string) => {
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
