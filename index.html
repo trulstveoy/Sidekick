@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: http://localhost:* http://127.0.0.1:*;"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sidekick</title>
+  </head>
+  <body>
+    <main class="shell" aria-label="Sidekick workspace">
+      <aside class="sidebar">
+        <div>
+          <p class="eyebrow">Desktop agent</p>
+          <h1>Sidekick</h1>
+        </div>
+        <nav aria-label="Workspace">
+          <a class="nav-item nav-item--active" href="#mission">Mission</a>
+          <a class="nav-item" href="#context">Context</a>
+          <a class="nav-item" href="#runs">Runs</a>
+          <a class="nav-item" href="#settings">Settings</a>
+        </nav>
+        <div class="runtime">
+          <span>Runtime</span>
+          <strong data-app-info>Loading...</strong>
+        </div>
+      </aside>
+
+      <section class="workspace" id="mission">
+        <header class="workspace-header">
+          <div>
+            <p class="eyebrow">Active plan</p>
+            <h2>Build the first usable Sidekick loop</h2>
+          </div>
+          <button type="button">Start run</button>
+        </header>
+
+        <section class="plan" aria-label="Plan">
+          <article>
+            <span class="step-status step-status--done">Done</span>
+            <h3>Initialize Electron baseline</h3>
+            <p>Forge, Vite, TypeScript, sandboxed renderer, and controlled preload API.</p>
+          </article>
+          <article>
+            <span class="step-status step-status--active">Next</span>
+            <h3>Define Sidekick capabilities</h3>
+            <p>Capture the agent workflow, local data model, and first integrations.</p>
+          </article>
+          <article>
+            <span class="step-status">Queued</span>
+            <h3>Wire durable task state</h3>
+            <p>Persist plans, run logs, decisions, and verification evidence locally.</p>
+          </article>
+        </section>
+      </section>
+
+      <aside class="inspector" id="context" aria-label="Context">
+        <p class="eyebrow">Context stack</p>
+        <h2>Agentic standards</h2>
+        <ul>
+          <li>Inspect before editing.</li>
+          <li>Expose narrow IPC methods only.</li>
+          <li>Verify with lint, typecheck, and a running app.</li>
+          <li>Record decisions that affect architecture.</li>
+        </ul>
+      </aside>
+    </main>
+    <script type="module" src="/src/renderer.ts"></script>
+  </body>
+</html>
