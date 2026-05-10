@@ -88,7 +88,8 @@ The scanner does not write, move, rename, delete, or parse file contents.
 
 ## Context Package Service
 
-The context package service lives in `src/main/context-package.ts`.
+The context package service lives in `src/main/context-package.ts`. Repomix execution details
+live in `src/main/repomix-runner.ts`.
 
 The first version is a Sidekick-owned wrapper around Repomix:
 
@@ -97,6 +98,7 @@ The first version is a Sidekick-owned wrapper around Repomix:
 - output location is the selected project folder root
 - compression is disabled
 - Repomix security checks remain enabled
+- Repomix token counting and security checks run in-process so packaged Electron builds do not depend on worker files inside `app.asar`
 - generated context-package files are ignored during generation
 - noisy folders such as `.git`, `node_modules`, `out`, `dist`, `.vite`, and `.cache` are ignored
 - binary files are reported as skipped when Repomix cannot include them as text content

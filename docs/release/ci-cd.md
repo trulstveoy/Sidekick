@@ -12,8 +12,9 @@ Every push to `main` runs the CI workflow:
 - production dependency audit
 - Linux package build
 - Windows package build
+- packaged context-package smoke verification
 
-The CI workflow uploads Linux and Windows packages as GitHub Actions artifacts. These artifacts are attached to the workflow run and are useful for testing builds from a specific commit.
+The CI workflow verifies packaged context-package generation before uploading Linux and Windows packages as GitHub Actions artifacts. These artifacts are attached to the workflow run and are useful for testing builds from a specific commit.
 
 To find them:
 

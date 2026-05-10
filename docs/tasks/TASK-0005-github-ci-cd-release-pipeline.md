@@ -531,11 +531,14 @@ Additional checks:
 - GitHub Actions CI run `#10` passed for commit `029dd72`; verify, Linux packaging, Windows packaging, and CI artifact uploads all passed.
 - Release tag `v0.1.1` was pushed for commit `029dd72`.
 - GitHub Actions Release run `#3` passed for `v0.1.1` and published the GitHub prerelease with Linux and Windows assets.
+- Added packaged context-package generation verification to CI and Release package jobs after `npm run make`.
 - `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-registry-test --prefer-online`
 - `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-https-test --prefer-online`
 - `node --check scripts/ci/stage-make-artifacts.mjs`
+- `node --check scripts/ci/verify-packaged-context-package.mjs`
 - `node scripts/ci/stage-make-artifacts.mjs --platform linux --source out/make --target /tmp/sidekick-staged-artifacts`
 - `app.asar` inspection confirmed packaged `.vite/build/main.js` no longer contains `require("repomix")`.
+- Packaged `app.asar` context-package smoke verification passed locally.
 - `git diff --check`
 
 Local Linux package output:

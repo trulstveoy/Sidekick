@@ -1,12 +1,12 @@
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
-import { runCli } from 'repomix';
 import type {
   ContextPackagePreview,
   ContextPackageResult,
   ContextPackageSkippedFile,
   ContextPackageWarning,
 } from '../shared/sidekick-api';
+import { runRepomixContextPackage } from './repomix-runner';
 
 export const CONTEXT_PACKAGE_SUFFIX = 'context-package.md';
 
@@ -114,25 +114,13 @@ export const generateContextPackage = async (
   rootPath: string,
 ): Promise<ContextPackageResult> => {
   const preview = await getContextPackagePreview(rootPath);
-  const result = await runCli(['.'], rootPath, {
-    output: preview.outputPath,
-    style: 'markdown',
-    compress: false,
-    quiet: true,
-    copy: false,
-    securityCheck: true,
-    gitignore: true,
-    dotIgnore: true,
-    defaultPatterns: true,
-    ignore: CONTEXT_PACKAGE_IGNORE_PATTERNS.join(','),
+  const { packResult } = await runRepomixContextPackage({
+    rootPath,
+    outputPath: preview.outputPath,
+    ignorePatterns: CONTEXT_PACKAGE_IGNORE_PATTERNS,
   });
 
-  if (!result || !('packResult' in result)) {
-    throw new Error('Context package generation did not return a package result.');
-  }
-
   const outputStats = await stat(preview.outputPath);
-  const { packResult } = result;
 
   return {
     status: 'complete',

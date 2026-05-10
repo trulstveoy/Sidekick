@@ -36,6 +36,7 @@ Related files:
 - `docs/architecture/application-architecture.md`
 - `src/main/folder-scanner.ts`
 - `src/main/context-package.ts`
+- `src/main/repomix-runner.ts`
 - `src/shared/sidekick-api.ts`
 - `src/main.ts`
 - `src/preload.ts`
@@ -598,9 +599,11 @@ Implemented:
 - Added `previewContextPackage` and `generateContextPackage` to the preload bridge.
 - Added `context-package:preview` and `context-package:generate` IPC handlers in `src/main.ts`.
 - Added session validation so context-package generation only works for folders selected through Sidekick.
+- Added `src/main/repomix-runner.ts` so Repomix token counting and security checks run in-process in packaged Electron builds instead of relying on worker files inside `app.asar`.
 - Added the context-package UI area in the right inspector.
 - Added renderer states for unavailable, ready, previewing, confirming, generating, complete, and error.
 - Added unit, integration, and Playwright smoke tests for the new workflow.
+- Added a packaged-app context generation verification script and wired it into CI/release package jobs.
 - Updated the application architecture document.
 
 ## Verification Log
@@ -610,6 +613,7 @@ Passed:
 - `npm run check`
 - `npm run test:ui`
 - `npm run package`
+- `npm run verify:packaged-context`
 - `npm audit --omit=dev`
 - `timeout 15s npm start`
 
@@ -618,6 +622,7 @@ Notes:
 - The integration test verifies that an existing generated context-package file is overwritten but not included in the new package.
 - The integration test verifies that binary fixture artifacts are reported as skipped.
 - The Playwright smoke test verifies the confirmation and successful result states with a mocked Sidekick API.
+- The packaged-app verification extracts `app.asar`, stubs Electron IPC, and generates a real context package through the packaged main-process handlers.
 
 ## Review Notes
 
@@ -627,6 +632,7 @@ Reviewed against the task acceptance criteria:
 - Existing generated packages are ignored during regeneration.
 - Binary files are reported as skipped instead of hidden.
 - Repomix runs only in the main process.
+- Packaged Electron builds do not rely on Repomix/Tinypool worker files being present in `.vite/build`.
 - Renderer access uses typed preload methods.
 - Main process owns output path and filename generation.
 - Existing Electron security settings remain unchanged.

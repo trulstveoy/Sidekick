@@ -92,6 +92,9 @@ jobs:
       - name: Make distributables
         run: npm run make
 
+      - name: Verify packaged context package generation
+        run: npm run verify:packaged-context
+
       - name: Stage distributable artifacts
         shell: bash
         run: |
