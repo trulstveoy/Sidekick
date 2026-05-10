@@ -505,6 +505,9 @@ Passed locally:
 Additional checks:
 - Confirmed no local `v0.1.0` Git tag was created.
 - Confirmed `package.json` now reports version `0.1.0`.
+- GitHub Actions CI run `#1` started from commit `c832fda` and failed in the `Install dependencies` step before tests or packaging started.
+- Updated `package-lock.json` so `@electron/node-gyp` resolves through `git+https://github.com/electron/node-gyp.git` instead of `git+ssh://git@github.com/electron/node-gyp.git`, avoiding SSH authentication during `npm ci` on GitHub-hosted runners.
+- `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-https-test --prefer-online`
 - `node --check scripts/ci/stage-make-artifacts.mjs`
 - `node scripts/ci/stage-make-artifacts.mjs --platform linux --source out/make --target /tmp/sidekick-staged-artifacts`
 - `git diff --check`
@@ -514,7 +517,7 @@ Local Linux package output:
 - `out/make/rpm/x64/sidekick-0.1.0-1.x86_64.rpm`
 
 Pending remote verification:
-- GitHub Actions CI workflow must run after commit and push to `main`.
+- GitHub Actions CI workflow must pass after the package lock fix is committed and pushed to `main`.
 - Linux package artifact must be uploaded by the CI workflow.
 - Windows package artifact must be uploaded by the CI workflow.
 - Release workflow must be tested after CI passes by pushing tag `v0.1.0`.
