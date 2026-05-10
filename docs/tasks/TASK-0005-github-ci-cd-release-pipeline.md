@@ -523,21 +523,25 @@ Additional checks:
 - Release tag `v0.1.0` was pushed for commit `36c73df`.
 - GitHub Actions Release run `#1` verified the release tag and built/uploaded Linux and Windows artifacts, but the publish job failed in `gh release create`.
 - Updated the release publish command to pass `--repo "${GITHUB_REPOSITORY}"` explicitly because the publish job does not check out the repository before invoking GitHub CLI.
+- GitHub Actions Release run `#2` passed for `v0.1.0` and published the GitHub prerelease with Linux and Windows assets.
+- Windows installer `v0.1.0` failed at startup because `vite.main.config.ts` externalized `repomix`, leaving `require("repomix")` in the packaged main process without packaging `node_modules/repomix`.
+- Removed the `repomix` external from the main Vite config so it is bundled into the packaged main process.
+- Added a regression test that prevents `repomix` from being externalized in main bundle config.
+- Bumped package version to `0.1.1` for a fixed patch release instead of mutating the already published `v0.1.0` prerelease.
 - `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-registry-test --prefer-online`
 - `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-https-test --prefer-online`
 - `node --check scripts/ci/stage-make-artifacts.mjs`
 - `node scripts/ci/stage-make-artifacts.mjs --platform linux --source out/make --target /tmp/sidekick-staged-artifacts`
+- `app.asar` inspection confirmed packaged `.vite/build/main.js` no longer contains `require("repomix")`.
 - `git diff --check`
 
 Local Linux package output:
-- `out/make/deb/x64/sidekick_0.1.0_amd64.deb`
-- `out/make/rpm/x64/sidekick-0.1.0-1.x86_64.rpm`
+- `out/make/deb/x64/sidekick_0.1.1_amd64.deb`
+- `out/make/rpm/x64/sidekick-0.1.1-1.x86_64.rpm`
 
 Pending remote verification:
-- GitHub Actions CI workflow must pass after the package lock fix is committed and pushed to `main`.
-- Linux package artifact must be uploaded by the CI workflow.
-- Windows package artifact must be uploaded by the CI workflow.
-- Release workflow must be tested after CI passes by pushing tag `v0.1.0`.
+- GitHub Actions CI workflow must pass for the `v0.1.1` packaging fix.
+- Release workflow must be tested by pushing tag `v0.1.1`.
 
 ## Review Notes
 
