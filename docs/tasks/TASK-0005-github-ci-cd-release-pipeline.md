@@ -512,6 +512,8 @@ Additional checks:
 - GitHub Actions CI run `#3` started from commit `c88dfe6` and still failed in the `Install dependencies` step.
 - Added npm override for `@electron/node-gyp` to use the published npm registry package `10.2.0-electron.2` instead of the transitive git dependency from `@electron/rebuild`.
 - Confirmed `package-lock.json` now resolves `node_modules/@electron/node-gyp` from `https://registry.npmjs.org/@electron/node-gyp/-/node-gyp-10.2.0-electron.2.tgz`.
+- GitHub Actions CI run `#4` started from commit `957b036` and still failed in the `Install dependencies` step.
+- Added `scripts/ci/run-npm-ci.mjs` so npm install failures are emitted as GitHub annotations that are readable through the public Checks API.
 - `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-registry-test --prefer-online`
 - `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-https-test --prefer-online`
 - `node --check scripts/ci/stage-make-artifacts.mjs`

@@ -54,7 +54,7 @@ jobs:
           fi
 
       - name: Install dependencies
-        run: npm ci
+        run: node scripts/ci/run-npm-ci.mjs
 
       - name: Install Playwright browser dependencies
         run: npx playwright install --with-deps chromium
@@ -102,7 +102,7 @@ jobs:
           git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Install dependencies
-        run: npm ci
+        run: node scripts/ci/run-npm-ci.mjs
 
       - name: Install Linux packaging prerequisites
         if: runner.os == 'Linux'
