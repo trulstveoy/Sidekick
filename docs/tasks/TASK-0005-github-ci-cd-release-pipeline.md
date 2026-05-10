@@ -514,6 +514,7 @@ Additional checks:
 - Confirmed `package-lock.json` now resolves `node_modules/@electron/node-gyp` from `https://registry.npmjs.org/@electron/node-gyp/-/node-gyp-10.2.0-electron.2.tgz`.
 - GitHub Actions CI run `#4` started from commit `957b036` and still failed in the `Install dependencies` step.
 - Added `scripts/ci/run-npm-ci.mjs` so npm install failures are emitted as GitHub annotations that are readable through the public Checks API.
+- GitHub Actions CI run `#5` started from commit `aedfe13`; the annotation showed npm usage output, but GitHub only retained the last annotation lines. Expanded the wrapper to emit cwd, lockfile existence, and combined npm output chunks.
 - `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-registry-test --prefer-online`
 - `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-https-test --prefer-online`
 - `node --check scripts/ci/stage-make-artifacts.mjs`

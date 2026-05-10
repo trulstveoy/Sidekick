@@ -1,13 +1,25 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const diagnostics = [
+  `cwd: ${process.cwd()}`,
+  `package.json exists: ${existsSync('package.json')}`,
+  `package-lock.json exists: ${existsSync('package-lock.json')}`,
+  `npm command: ${npmCommand} ci`,
+];
+
+for (const line of diagnostics) {
+  console.log(line);
+}
+
 const npmCi = spawn(npmCommand, ['ci'], {
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 
-const recentLines = [];
+const capturedLines = [];
 
 function remember(chunk, stream) {
   const text = chunk.toString();
@@ -18,9 +30,9 @@ function remember(chunk, stream) {
       continue;
     }
 
-    recentLines.push(line);
-    if (recentLines.length > 40) {
-      recentLines.shift();
+    capturedLines.push(line);
+    if (capturedLines.length > 200) {
+      capturedLines.shift();
     }
   }
 }
@@ -40,9 +52,15 @@ npmCi.on('close', (code) => {
     process.exit(0);
   }
 
-  const lines = recentLines.length > 0 ? recentLines : [`npm ci exited with code ${code}`];
-  for (const line of lines) {
-    console.error(`::error title=npm ci failed::${annotationEscape(line)}`);
+  const outputLines =
+    capturedLines.length > 100
+      ? [...capturedLines.slice(0, 30), '... output truncated ...', ...capturedLines.slice(-70)]
+      : capturedLines;
+  const lines = outputLines.length > 0 ? outputLines : [`npm ci exited with code ${code}`];
+  const message = [...diagnostics, ...lines].join('\n');
+
+  for (const chunk of message.match(/[\s\S]{1,3500}/g) ?? [message]) {
+    console.error(`::error title=npm ci failed::${annotationEscape(chunk)}`);
   }
 
   process.exit(code ?? 1);
