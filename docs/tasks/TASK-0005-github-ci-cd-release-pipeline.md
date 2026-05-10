@@ -515,6 +515,8 @@ Additional checks:
 - GitHub Actions CI run `#4` started from commit `957b036` and still failed in the `Install dependencies` step.
 - Added `scripts/ci/run-npm-ci.mjs` so npm install failures are emitted as GitHub annotations that are readable through the public Checks API.
 - GitHub Actions CI run `#5` started from commit `aedfe13`; the annotation showed npm usage output, but GitHub only retained the last annotation lines. Expanded the wrapper to emit cwd, lockfile existence, and combined npm output chunks.
+- GitHub Actions CI run `#6` started from commit `6bc8a7e`; diagnostics showed `package-lock.json` existed, but GitHub npm rejected it as out of sync because `encoding@0.1.13` was referenced by optional dependencies and missing as a package entry.
+- Added the missing `node_modules/encoding` lockfile entry for `encoding@0.1.13`.
 - `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-registry-test --prefer-online`
 - `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-https-test --prefer-online`
 - `node --check scripts/ci/stage-make-artifacts.mjs`
