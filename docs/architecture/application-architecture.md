@@ -128,6 +128,22 @@ The current architecture preserves the Electron security boundary:
 - symlinks are skipped by default during folder scans.
 - external windows are denied, with HTTPS links opened through Electron only after protocol checking.
 
+## Release Automation
+
+GitHub Actions owns repository verification and package publishing automation.
+
+The first release pipeline targets Linux and Windows only:
+
+- pushes to `main` run verification and upload Linux/Windows packages as workflow artifacts
+- tags matching `v*` run verification, build Linux/Windows packages, and publish a GitHub prerelease
+- release tags must match `v<package.json version>`
+- release tag commits must be reachable from `main`
+- Linux output includes DEB and RPM packages
+- Windows output uses the existing unsigned Squirrel Windows maker
+- macOS packaging, code signing, notarization, and auto-update are deferred
+
+The release pipeline uses the built-in GitHub token. Read-only jobs use `contents: read`; the publish job uses `contents: write` only when creating a GitHub prerelease.
+
 ## Verification
 
 Automated verification is split by responsibility:
@@ -135,7 +151,9 @@ Automated verification is split by responsibility:
 - Unit tests cover artifact classification and folder-name signals.
 - Integration tests cover scanner behavior against a fixture project folder.
 - Unit and integration tests cover context-package filename rules, ignore rules, preview behavior, generation, skipped binary files, and self-ignore behavior.
+- Unit tests cover CI artifact staging rules for release package files.
 - Playwright smoke tests cover the renderer empty state, folder tree behavior, and mocked context-package confirmation/result states.
 - Electron packaging verifies the main, preload, and renderer bundles.
+- GitHub Actions runs verification and package builds before publishing release assets.
 
 Native folder dialog behavior is verified manually in Electron because full native dialog automation is out of scope for the first implementation.
