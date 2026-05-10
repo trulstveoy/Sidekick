@@ -1,7 +1,7 @@
 # Task: GitHub CI/CD Release Pipeline
 
 ID: TASK-0005
-Status: Verifying
+Status: Done
 Class: Major
 Owner: Pair
 Created: 2026-05-10
@@ -13,7 +13,7 @@ Design and implement a GitHub Actions CI/CD pipeline for Sidekick that runs veri
 
 ## Current Phase
 
-Verify
+Closeout
 
 ## Progress Checklist
 
@@ -22,10 +22,10 @@ Verify
 - [x] Plan complete
 - [x] Human approval received, if required
 - [x] Build complete
-- [ ] Verification complete
-- [ ] Review complete
+- [x] Verification complete
+- [x] Review complete
 - [x] Documentation complete
-- [ ] Closeout complete
+- [x] Closeout complete
 
 ## Links
 
@@ -528,6 +528,9 @@ Additional checks:
 - Removed the `repomix` external from the main Vite config so it is bundled into the packaged main process.
 - Added a regression test that prevents `repomix` from being externalized in main bundle config.
 - Bumped package version to `0.1.1` for a fixed patch release instead of mutating the already published `v0.1.0` prerelease.
+- GitHub Actions CI run `#10` passed for commit `029dd72`; verify, Linux packaging, Windows packaging, and CI artifact uploads all passed.
+- Release tag `v0.1.1` was pushed for commit `029dd72`.
+- GitHub Actions Release run `#3` passed for `v0.1.1` and published the GitHub prerelease with Linux and Windows assets.
 - `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-registry-test --prefer-online`
 - `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-https-test --prefer-online`
 - `node --check scripts/ci/stage-make-artifacts.mjs`
@@ -539,9 +542,10 @@ Local Linux package output:
 - `out/make/deb/x64/sidekick_0.1.1_amd64.deb`
 - `out/make/rpm/x64/sidekick-0.1.1-1.x86_64.rpm`
 
-Pending remote verification:
-- GitHub Actions CI workflow must pass for the `v0.1.1` packaging fix.
-- Release workflow must be tested by pushing tag `v0.1.1`.
+Remote verification complete:
+- GitHub Actions CI workflow passed for the `v0.1.1` packaging fix.
+- Release workflow passed for tag `v0.1.1`.
+- GitHub prerelease `Sidekick v0.1.1` contains `Sidekick-0.1.1.Setup.exe`, `sidekick-0.1.1-full.nupkg`, `RELEASES`, `sidekick_0.1.1_amd64.deb`, and `sidekick-0.1.1-1.x86_64.rpm`.
 
 ## Review Notes
 
@@ -555,10 +559,10 @@ Initial implementation review:
 - No macOS runner is used.
 - No signing secrets are introduced.
 
-Pending review:
-- Confirm GitHub-hosted Linux runner has sufficient RPM/DEB tooling after the install step.
-- Confirm Windows Squirrel output includes all required files in staged artifacts.
-- Confirm GitHub release assets are attached as expected after the first tag run.
+Completed review:
+- GitHub-hosted Linux runner has sufficient RPM/DEB tooling after the install step.
+- Windows Squirrel output includes the expected installer, full NuGet package, and `RELEASES` assets in the staged release output.
+- GitHub release assets are attached as expected after the fixed `v0.1.1` tag run.
 
 ## Documentation Notes
 
