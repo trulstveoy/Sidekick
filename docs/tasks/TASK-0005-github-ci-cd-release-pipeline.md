@@ -519,6 +519,10 @@ Additional checks:
 - Added the missing `node_modules/encoding` lockfile entry for `encoding@0.1.13`.
 - GitHub Actions CI run `#7` started from commit `c3be7cd`; verify passed and Linux packaging passed, including artifact upload. Windows packaging failed while starting/running the install wrapper.
 - Updated the npm install wrapper to run through shell on Windows and emit annotations for process spawn failures.
+- GitHub Actions CI run `#8` started from commit `36c73df`; verify, Linux packaging, Windows packaging, and CI artifact uploads all passed.
+- Release tag `v0.1.0` was pushed for commit `36c73df`.
+- GitHub Actions Release run `#1` verified the release tag and built/uploaded Linux and Windows artifacts, but the publish job failed in `gh release create`.
+- Updated the release publish command to pass `--repo "${GITHUB_REPOSITORY}"` explicitly because the publish job does not check out the repository before invoking GitHub CLI.
 - `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-registry-test --prefer-online`
 - `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-https-test --prefer-online`
 - `node --check scripts/ci/stage-make-artifacts.mjs`
