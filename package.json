@@ -51,5 +51,8 @@
   "dependencies": {
     "electron-squirrel-startup": "^1.0.1",
     "repomix": "^1.14.0"
+  },
+  "overrides": {
+    "@electron/node-gyp": "10.2.0-electron.2"
   }
 }

@@ -509,6 +509,10 @@ Additional checks:
 - Updated `package-lock.json` so `@electron/node-gyp` resolves through `git+https://github.com/electron/node-gyp.git` instead of `git+ssh://git@github.com/electron/node-gyp.git`, avoiding SSH authentication during `npm ci` on GitHub-hosted runners.
 - GitHub Actions CI run `#2` started from commit `0962d3b` and still failed in the `Install dependencies` step. Public API exposed the failing step but not the private job log details.
 - Added workflow Git configuration before `npm ci` so GitHub SSH dependency URLs are rewritten to HTTPS on GitHub-hosted runners.
+- GitHub Actions CI run `#3` started from commit `c88dfe6` and still failed in the `Install dependencies` step.
+- Added npm override for `@electron/node-gyp` to use the published npm registry package `10.2.0-electron.2` instead of the transitive git dependency from `@electron/rebuild`.
+- Confirmed `package-lock.json` now resolves `node_modules/@electron/node-gyp` from `https://registry.npmjs.org/@electron/node-gyp/-/node-gyp-10.2.0-electron.2.tgz`.
+- `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-registry-test --prefer-online`
 - `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-https-test --prefer-online`
 - `node --check scripts/ci/stage-make-artifacts.mjs`
 - `node scripts/ci/stage-make-artifacts.mjs --platform linux --source out/make --target /tmp/sidekick-staged-artifacts`
