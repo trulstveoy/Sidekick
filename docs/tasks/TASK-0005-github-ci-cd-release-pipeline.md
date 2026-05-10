@@ -517,6 +517,8 @@ Additional checks:
 - GitHub Actions CI run `#5` started from commit `aedfe13`; the annotation showed npm usage output, but GitHub only retained the last annotation lines. Expanded the wrapper to emit cwd, lockfile existence, and combined npm output chunks.
 - GitHub Actions CI run `#6` started from commit `6bc8a7e`; diagnostics showed `package-lock.json` existed, but GitHub npm rejected it as out of sync because `encoding@0.1.13` was referenced by optional dependencies and missing as a package entry.
 - Added the missing `node_modules/encoding` lockfile entry for `encoding@0.1.13`.
+- GitHub Actions CI run `#7` started from commit `c3be7cd`; verify passed and Linux packaging passed, including artifact upload. Windows packaging failed while starting/running the install wrapper.
+- Updated the npm install wrapper to run through shell on Windows and emit annotations for process spawn failures.
 - `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-registry-test --prefer-online`
 - `GIT_SSH_COMMAND=false npm ci --cache /tmp/sidekick-npm-cache-https-test --prefer-online`
 - `node --check scripts/ci/stage-make-artifacts.mjs`

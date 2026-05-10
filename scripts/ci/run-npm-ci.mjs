@@ -6,6 +6,7 @@ import { existsSync } from 'node:fs';
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const diagnostics = [
   `cwd: ${process.cwd()}`,
+  `platform: ${process.platform}`,
   `package.json exists: ${existsSync('package.json')}`,
   `package-lock.json exists: ${existsSync('package-lock.json')}`,
   `npm command: ${npmCommand} ci`,
@@ -17,6 +18,7 @@ for (const line of diagnostics) {
 
 const npmCi = spawn(npmCommand, ['ci'], {
   stdio: ['ignore', 'pipe', 'pipe'],
+  shell: process.platform === 'win32',
 });
 
 const capturedLines = [];
@@ -47,16 +49,22 @@ function annotationEscape(value) {
 npmCi.stdout.on('data', (chunk) => remember(chunk, process.stdout));
 npmCi.stderr.on('data', (chunk) => remember(chunk, process.stderr));
 
-npmCi.on('close', (code) => {
-  if (code === 0) {
-    process.exit(0);
+let finished = false;
+
+function fail(code, extraLines = []) {
+  if (finished) {
+    return;
   }
+  finished = true;
 
   const outputLines =
     capturedLines.length > 100
       ? [...capturedLines.slice(0, 30), '... output truncated ...', ...capturedLines.slice(-70)]
       : capturedLines;
-  const lines = outputLines.length > 0 ? outputLines : [`npm ci exited with code ${code}`];
+  const lines =
+    outputLines.length > 0 || extraLines.length > 0
+      ? [...extraLines, ...outputLines]
+      : [`npm ci exited with code ${code}`];
   const message = [...diagnostics, ...lines].join('\n');
 
   for (const chunk of message.match(/[\s\S]{1,3500}/g) ?? [message]) {
@@ -64,4 +72,17 @@ npmCi.on('close', (code) => {
   }
 
   process.exit(code ?? 1);
+}
+
+npmCi.on('error', (error) => {
+  fail(1, [`failed to start npm ci: ${error.message}`]);
+});
+
+npmCi.on('close', (code) => {
+  if (code === 0) {
+    finished = true;
+    process.exit(0);
+  }
+
+  fail(code);
 });
