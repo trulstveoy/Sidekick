@@ -95,9 +95,45 @@ export type ScanOptions = {
   followSymlinks: boolean;
 };
 
+export type ContextPackageSkippedFile = {
+  path: string;
+  reason: string;
+};
+
+export type ContextPackageWarning = {
+  path?: string;
+  message: string;
+};
+
+export type ContextPackagePreview = {
+  rootPath: string;
+  outputPath: string;
+  outputFileName: string;
+  willOverwrite: boolean;
+  binaryFileWarning: string;
+  selfIgnoreWarning: string;
+};
+
+export type ContextPackageResult = {
+  status: 'complete';
+  rootPath: string;
+  outputPath: string;
+  outputFileName: string;
+  overwritten: boolean;
+  totalFiles: number;
+  totalCharacters: number;
+  totalTokens: number;
+  outputBytes: number;
+  processedFiles: string[];
+  skippedFiles: ContextPackageSkippedFile[];
+  warnings: ContextPackageWarning[];
+};
+
 export type SidekickApi = {
   getAppInfo: () => Promise<AppInfo>;
   chooseProjectFolder: () => Promise<ProjectFolderScan | null>;
+  previewContextPackage: (rootPath: string) => Promise<ContextPackagePreview>;
+  generateContextPackage: (rootPath: string) => Promise<ContextPackageResult>;
 };
 
 declare global {

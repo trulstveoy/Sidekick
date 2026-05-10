@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
-import type { ArtifactType, FolderSignal, ProjectFolderScan } from '../../src/shared/sidekick-api';
+import type {
+  ArtifactType,
+  ContextPackagePreview,
+  ContextPackageResult,
+  FolderSignal,
+  ProjectFolderScan,
+} from '../../src/shared/sidekick-api';
 
 const createArtifactCounts = () =>
   ({
@@ -104,29 +110,70 @@ const mockScan: ProjectFolderScan = {
   warnings: [],
 };
 
+const mockContextPackagePreview: ContextPackagePreview = {
+  rootPath: '/tmp/sidekick-project',
+  outputPath: '/tmp/sidekick-project/sidekick-project.context-package.md',
+  outputFileName: 'sidekick-project.context-package.md',
+  willOverwrite: true,
+  binaryFileWarning:
+    'Binary files such as PDF, DOCX, PPTX, images, audio, and video are not included as full text content.',
+  selfIgnoreWarning: 'Generated context-package files are ignored during generation.',
+};
+
+const mockContextPackageResult: ContextPackageResult = {
+  status: 'complete',
+  rootPath: '/tmp/sidekick-project',
+  outputPath: '/tmp/sidekick-project/sidekick-project.context-package.md',
+  outputFileName: 'sidekick-project.context-package.md',
+  overwritten: true,
+  totalFiles: 2,
+  totalCharacters: 4096,
+  totalTokens: 523,
+  outputBytes: 8192,
+  processedFiles: ['01-bakgrunn/notes.md', '02-transkripsjoner/intervju-01.txt'],
+  skippedFiles: [
+    { path: '01-bakgrunn/brief.pdf', reason: 'binary-extension' },
+    { path: '02-transkripsjoner/intervju-01.docx', reason: 'binary-extension' },
+  ],
+  warnings: [],
+};
+
 test('renders the folder inspection empty state', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.getByRole('heading', { name: 'Sidekick' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Choose folder' })).toBeVisible();
   await expect(page.getByText('Choose a project folder')).toBeVisible();
-  await expect(page.getByText('No folder selected')).toBeVisible();
+  await expect(
+    page.getByLabel('Selected project folder').getByRole('heading', {
+      name: 'No folder selected',
+    }),
+  ).toBeVisible();
   await expect(page.getByText('Browser preview')).toBeVisible();
   await expect(page.getByText('No warnings')).toBeVisible();
 });
 
 test('expands and collapses scanned folders', async ({ page }) => {
-  await page.addInitScript((scan) => {
-    window.sidekick = {
-      getAppInfo: async () => ({
-        name: 'Sidekick',
-        version: '1.0.0',
-        platform: 'linux',
-        isPackaged: false,
-      }),
-      chooseProjectFolder: async () => scan,
-    };
-  }, mockScan);
+  await page.addInitScript(
+    ({ scan, preview, result }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        previewContextPackage: async () => preview,
+        generateContextPackage: async () => result,
+      };
+    },
+    {
+      scan: mockScan,
+      preview: mockContextPackagePreview,
+      result: mockContextPackageResult,
+    },
+  );
 
   await page.goto('/');
   await page.getByRole('button', { name: 'Choose folder' }).click();
@@ -146,17 +193,26 @@ test('expands and collapses scanned folders', async ({ page }) => {
 });
 
 test('expands and collapses all scanned folders', async ({ page }) => {
-  await page.addInitScript((scan) => {
-    window.sidekick = {
-      getAppInfo: async () => ({
-        name: 'Sidekick',
-        version: '1.0.0',
-        platform: 'linux',
-        isPackaged: false,
-      }),
-      chooseProjectFolder: async () => scan,
-    };
-  }, mockScan);
+  await page.addInitScript(
+    ({ scan, preview, result }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        previewContextPackage: async () => preview,
+        generateContextPackage: async () => result,
+      };
+    },
+    {
+      scan: mockScan,
+      preview: mockContextPackagePreview,
+      result: mockContextPackageResult,
+    },
+  );
 
   await page.goto('/');
   await page.getByRole('button', { name: 'Choose folder' }).click();
@@ -169,4 +225,54 @@ test('expands and collapses all scanned folders', async ({ page }) => {
   await expect(page.getByRole('treeitem', { name: /01-bakgrunn/ })).toBeVisible();
   await expect(page.getByText('brief.pdf')).toHaveCount(0);
   await expect(page.getByText('intervju-01.docx')).toHaveCount(0);
+});
+
+test('confirms and displays a generated context package', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan, preview, result }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        previewContextPackage: async () => preview,
+        generateContextPackage: async () => result,
+      };
+    },
+    {
+      scan: mockScan,
+      preview: mockContextPackagePreview,
+      result: mockContextPackageResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Choose folder' }).click();
+
+  await expect(page.getByRole('button', { name: 'Create context package' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Create context package' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Confirm generation' })).toBeVisible();
+  const contextPackageDetails = page.locator('[data-context-package-details]');
+  await expect(contextPackageDetails).toContainText('sidekick-project.context-package.md');
+  await expect(contextPackageDetails).toContainText(
+    '/tmp/sidekick-project/sidekick-project.context-package.md',
+  );
+  await expect(contextPackageDetails).toContainText('Overwrite');
+  await expect(contextPackageDetails).toContainText('Yes');
+  await expect(page.getByText(/Binary files such as PDF/)).toBeVisible();
+  await expect(page.getByText(/Generated context-package files are ignored/)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Generate package' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Package created' })).toBeVisible();
+  await expect(contextPackageDetails).toContainText('Included');
+  await expect(contextPackageDetails).toContainText('2');
+  await expect(contextPackageDetails).toContainText('Skipped');
+  await expect(contextPackageDetails).toContainText('Tokens');
+  await expect(contextPackageDetails).toContainText('523');
+  await expect(page.getByText('01-bakgrunn/brief.pdf: binary-extension')).toBeVisible();
 });

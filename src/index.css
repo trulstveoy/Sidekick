@@ -325,6 +325,87 @@ li {
   font-weight: 700;
 }
 
+.context-package-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.context-package-panel h3 {
+  margin-bottom: 0;
+  font-size: 16px;
+}
+
+.context-package-panel p {
+  margin-bottom: 0;
+  font-size: 13px;
+}
+
+.context-package-details {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.context-package-details div {
+  border-top: 1px solid #d8d1c3;
+  padding-top: 8px;
+}
+
+.context-package-details dt {
+  color: #6d6658;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.context-package-details dd {
+  margin: 3px 0 0;
+  color: #201f1b;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.context-package-list {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.context-package-list li {
+  color: #75490f;
+  font-size: 13px;
+}
+
+.context-package-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.context-package-primary,
+.context-package-secondary {
+  min-width: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.context-package-secondary {
+  border: 1px solid #cfc7b8;
+  color: #365f5c;
+  background: transparent;
+}
+
+.context-package-secondary:hover:not(:disabled) {
+  background: #ede9df;
+  transform: none;
+}
+
+.context-package-secondary[hidden] {
+  display: none;
+}
+
 .signal-list,
 .metric-list,
 .file-list,

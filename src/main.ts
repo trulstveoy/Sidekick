@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import type { AppInfo } from './shared/sidekick-api';
+import { generateContextPackage, getContextPackagePreview } from './main/context-package';
 import { scanProjectFolder } from './main/folder-scanner';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -20,6 +21,8 @@ const getAppInfo = (): AppInfo => ({
 
 ipcMain.handle('app:get-info', getAppInfo);
 
+const selectedProjectRoots = new Set<string>();
+
 ipcMain.handle('project-folder:choose-and-scan', async (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   const dialogOptions: Electron.OpenDialogOptions = {
@@ -34,8 +37,29 @@ ipcMain.handle('project-folder:choose-and-scan', async (event) => {
     return null;
   }
 
+  selectedProjectRoots.add(result.filePaths[0]);
   return scanProjectFolder(result.filePaths[0]);
 });
+
+const assertKnownProjectRoot = (rootPath: unknown) => {
+  if (typeof rootPath !== 'string' || !path.isAbsolute(rootPath)) {
+    throw new Error('A selected project folder is required.');
+  }
+
+  if (!selectedProjectRoots.has(rootPath)) {
+    throw new Error('Context package generation requires a folder selected in Sidekick.');
+  }
+
+  return rootPath;
+};
+
+ipcMain.handle('context-package:preview', (_event, rootPath) =>
+  getContextPackagePreview(assertKnownProjectRoot(rootPath)),
+);
+
+ipcMain.handle('context-package:generate', (_event, rootPath) =>
+  generateContextPackage(assertKnownProjectRoot(rootPath)),
+);
 
 const isAllowedNavigation = (targetUrl: string) => {
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {

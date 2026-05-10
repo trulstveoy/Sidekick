@@ -2,6 +2,8 @@ import './index.css';
 import './shared/sidekick-api';
 import type {
   ArtifactType,
+  ContextPackagePreview,
+  ContextPackageResult,
   FolderSignal,
   FolderTreeNode,
   ProjectFolderScan,
@@ -13,6 +15,15 @@ type ViewState =
   | { status: 'loading' }
   | { status: 'ready'; scan: ProjectFolderScan }
   | { status: 'partial'; scan: ProjectFolderScan }
+  | { status: 'error'; message: string };
+
+type ContextPackageState =
+  | { status: 'unavailable' }
+  | { status: 'ready' }
+  | { status: 'previewing' }
+  | { status: 'confirming'; preview: ContextPackagePreview }
+  | { status: 'generating'; preview: ContextPackagePreview }
+  | { status: 'complete'; result: ContextPackageResult }
   | { status: 'error'; message: string };
 
 const appInfoTarget = document.querySelector<HTMLSpanElement>('[data-app-info]');
@@ -27,6 +38,12 @@ const treeTarget = document.querySelector<HTMLOListElement>('[data-folder-tree]'
 const expandAllButton = document.querySelector<HTMLButtonElement>('[data-expand-all]');
 const collapseAllButton = document.querySelector<HTMLButtonElement>('[data-collapse-all]');
 const summaryTarget = document.querySelector<HTMLElement>('[data-summary]');
+const contextPackageTitleTarget = document.querySelector<HTMLElement>('[data-context-package-title]');
+const contextPackageMessageTarget = document.querySelector<HTMLElement>('[data-context-package-message]');
+const contextPackageDetailsTarget = document.querySelector<HTMLElement>('[data-context-package-details]');
+const contextPackageListTarget = document.querySelector<HTMLUListElement>('[data-context-package-list]');
+const contextPackagePrimaryButton = document.querySelector<HTMLButtonElement>('[data-context-package-primary]');
+const contextPackageSecondaryButton = document.querySelector<HTMLButtonElement>('[data-context-package-secondary]');
 const artifactCountsTarget = document.querySelector<HTMLUListElement>('[data-artifact-counts]');
 const recentFilesTarget = document.querySelector<HTMLUListElement>('[data-recent-files]');
 const warningsTarget = document.querySelector<HTMLUListElement>('[data-warnings]');
@@ -58,6 +75,7 @@ const signalLabels: Record<FolderSignal, string> = {
 
 let state: ViewState = { status: 'empty' };
 let expandedPaths = new Set<string>();
+let contextPackageState: ContextPackageState = { status: 'unavailable' };
 
 const ROOT_PATH = '.';
 
@@ -105,6 +123,10 @@ const formatDate = (value?: string) => {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
+};
+
+const setContextPackageStateForScan = (scan?: ProjectFolderScan) => {
+  contextPackageState = scan && window.sidekick ? { status: 'ready' } : { status: 'unavailable' };
 };
 
 const getActiveScan = () =>
@@ -276,6 +298,136 @@ const renderWarnings = (warnings: ScanWarning[] = []) => {
   );
 };
 
+const renderContextPackageDetails = (rows: Array<[string, string]>) => {
+  clear(contextPackageDetailsTarget);
+
+  contextPackageDetailsTarget?.append(
+    ...rows.map(([label, value]) => {
+      const wrapper = document.createElement('div');
+      const term = document.createElement('dt');
+      const description = document.createElement('dd');
+      term.textContent = label;
+      description.textContent = value;
+      wrapper.append(term, description);
+
+      return wrapper;
+    }),
+  );
+};
+
+const renderContextPackageList = (items: string[]) => {
+  clear(contextPackageListTarget);
+  contextPackageListTarget?.append(...items.map(createListItem));
+};
+
+const renderContextPackageActions = (
+  primaryLabel: string,
+  primaryDisabled: boolean,
+  secondaryVisible = false,
+) => {
+  if (contextPackagePrimaryButton) {
+    contextPackagePrimaryButton.textContent = primaryLabel;
+    contextPackagePrimaryButton.disabled = primaryDisabled;
+  }
+
+  contextPackageSecondaryButton?.toggleAttribute('hidden', !secondaryVisible);
+};
+
+const renderContextPackage = (scan?: ProjectFolderScan) => {
+  if (!scan || !window.sidekick || contextPackageState.status === 'unavailable') {
+    setText(contextPackageTitleTarget, 'No folder selected');
+    setText(contextPackageMessageTarget, window.sidekick ? 'Choose a project folder before creating a context package.' : 'Open in Electron to create context packages.');
+    renderContextPackageDetails([]);
+    renderContextPackageList([]);
+    renderContextPackageActions('Create context package', true);
+    return;
+  }
+
+  if (contextPackageState.status === 'ready') {
+    setText(contextPackageTitleTarget, 'Ready');
+    setText(contextPackageMessageTarget, 'Create one Repomix Markdown file in the selected folder root.');
+    renderContextPackageDetails([
+      ['Scope', 'Full selected folder'],
+      ['Format', 'Markdown'],
+    ]);
+    renderContextPackageList([]);
+    renderContextPackageActions('Create context package', false);
+    return;
+  }
+
+  if (contextPackageState.status === 'previewing') {
+    setText(contextPackageTitleTarget, 'Preparing');
+    setText(contextPackageMessageTarget, 'Checking output path and overwrite status.');
+    renderContextPackageDetails([]);
+    renderContextPackageList([]);
+    renderContextPackageActions('Preparing...', true);
+    return;
+  }
+
+  if (contextPackageState.status === 'confirming') {
+    const { preview } = contextPackageState;
+    setText(contextPackageTitleTarget, 'Confirm generation');
+    setText(contextPackageMessageTarget, 'The context package will be written to the selected folder root.');
+    renderContextPackageDetails([
+      ['Output file', preview.outputFileName],
+      ['Overwrite', preview.willOverwrite ? 'Yes' : 'No'],
+      ['Output path', preview.outputPath],
+    ]);
+    renderContextPackageList([preview.binaryFileWarning, preview.selfIgnoreWarning]);
+    renderContextPackageActions('Generate package', false, true);
+    return;
+  }
+
+  if (contextPackageState.status === 'generating') {
+    const { preview } = contextPackageState;
+    setText(contextPackageTitleTarget, 'Generating');
+    setText(contextPackageMessageTarget, 'Creating the Repomix Markdown package.');
+    renderContextPackageDetails([
+      ['Output file', preview.outputFileName],
+      ['Output path', preview.outputPath],
+    ]);
+    renderContextPackageList([]);
+    renderContextPackageActions('Generating...', true);
+    return;
+  }
+
+  if (contextPackageState.status === 'complete') {
+    const { result } = contextPackageState;
+    const skippedPreview = result.skippedFiles
+      .slice(0, 5)
+      .map((file) => `${file.path}: ${file.reason}`);
+    const warningPreview = result.warnings.map((warning) =>
+      warning.path ? `${warning.path}: ${warning.message}` : warning.message,
+    );
+    setText(contextPackageTitleTarget, 'Package created');
+    setText(contextPackageMessageTarget, result.overwritten ? 'Existing context package was overwritten.' : 'Context package was created.');
+    renderContextPackageDetails([
+      ['Output file', result.outputFileName],
+      ['Included', result.totalFiles.toString()],
+      ['Skipped', result.skippedFiles.length.toString()],
+      ['Tokens', result.totalTokens.toString()],
+      ['Characters', result.totalCharacters.toString()],
+      ['Size', formatBytes(result.outputBytes)],
+      ['Output path', result.outputPath],
+    ]);
+    renderContextPackageList([
+      ...warningPreview,
+      ...skippedPreview,
+      ...(result.skippedFiles.length > skippedPreview.length
+        ? [`${result.skippedFiles.length - skippedPreview.length} more skipped files`]
+        : []),
+    ]);
+    renderContextPackageActions('Create again', false);
+    return;
+  }
+
+  setText(contextPackageTitleTarget, 'Generation failed');
+  setText(contextPackageMessageTarget, contextPackageState.message);
+  renderContextPackageDetails([]);
+  renderContextPackageList([]);
+  renderContextPackageActions('Try again', false);
+};
+
 const renderTreeToolbar = (scan?: ProjectFolderScan) => {
   const hasScan = Boolean(scan);
 
@@ -387,6 +539,7 @@ const render = () => {
     renderFolderSignals();
     renderRecentFiles();
     renderWarnings();
+    renderContextPackage();
     renderTree();
     return;
   }
@@ -394,6 +547,7 @@ const render = () => {
   if (state.status === 'loading') {
     setText(stateTitleTarget, 'Scanning folder');
     setText(stateMessageTarget, 'Reading structure and metadata. Files will not be changed.');
+    renderContextPackage();
     renderTree();
     return;
   }
@@ -401,6 +555,7 @@ const render = () => {
   if (state.status === 'error') {
     setText(stateTitleTarget, 'Unable to inspect folder');
     setText(stateMessageTarget, state.message);
+    renderContextPackage();
     renderWarnings([
       {
         path: '.',
@@ -429,7 +584,66 @@ const render = () => {
   renderFolderSignals(scan);
   renderRecentFiles(scan);
   renderWarnings(scan.warnings);
+  renderContextPackage(scan);
   renderTree(scan);
+};
+
+const openContextPackageConfirmation = async () => {
+  const scan = getActiveScan();
+
+  if (!window.sidekick || !scan) {
+    contextPackageState = { status: 'unavailable' };
+    render();
+    return;
+  }
+
+  contextPackageState = { status: 'previewing' };
+  render();
+
+  try {
+    const preview = await window.sidekick.previewContextPackage(scan.rootPath);
+    contextPackageState = { status: 'confirming', preview };
+  } catch (error) {
+    contextPackageState = {
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unable to prepare context package.',
+    };
+  }
+
+  render();
+};
+
+const generateContextPackage = async () => {
+  const scan = getActiveScan();
+
+  if (!window.sidekick || !scan || contextPackageState.status !== 'confirming') {
+    return;
+  }
+
+  const { preview } = contextPackageState;
+  contextPackageState = { status: 'generating', preview };
+  render();
+
+  try {
+    const result = await window.sidekick.generateContextPackage(scan.rootPath);
+    contextPackageState = { status: 'complete', result };
+  } catch (error) {
+    contextPackageState = {
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unable to generate context package.',
+    };
+  }
+
+  render();
+};
+
+const handleContextPackagePrimary = () => {
+  if (contextPackageState.status === 'confirming') {
+    void generateContextPackage();
+    return;
+  }
+
+  void openContextPackageConfirmation();
 };
 
 const chooseFolder = async () => {
@@ -447,16 +661,19 @@ const chooseFolder = async () => {
 
     if (!scan) {
       expandedPaths = new Set();
+      setContextPackageStateForScan();
       state = { status: 'empty' };
       render();
       return;
     }
 
     resetExpandedPaths();
+    setContextPackageStateForScan(scan);
     state = scan.status === 'partial' ? { status: 'partial', scan } : { status: 'ready', scan };
     render();
   } catch (error) {
     expandedPaths = new Set();
+    setContextPackageStateForScan();
     state = {
       status: 'error',
       message: error instanceof Error ? error.message : 'Unable to inspect the selected folder.',
@@ -479,5 +696,10 @@ chooseFolderButton?.addEventListener('click', () => {
 
 expandAllButton?.addEventListener('click', expandAllFolders);
 collapseAllButton?.addEventListener('click', collapseAllFolders);
+contextPackagePrimaryButton?.addEventListener('click', handleContextPackagePrimary);
+contextPackageSecondaryButton?.addEventListener('click', () => {
+  contextPackageState = getActiveScan() ? { status: 'ready' } : { status: 'unavailable' };
+  render();
+});
 
 render();
