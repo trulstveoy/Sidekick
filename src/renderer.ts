@@ -336,7 +336,10 @@ const renderContextPackageActions = (
 const renderContextPackage = (scan?: ProjectFolderScan) => {
   if (!scan || !window.sidekick || contextPackageState.status === 'unavailable') {
     setText(contextPackageTitleTarget, 'No folder selected');
-    setText(contextPackageMessageTarget, window.sidekick ? 'Choose a project folder before creating a context package.' : 'Open in Electron to create context packages.');
+    setText(
+      contextPackageMessageTarget,
+      window.sidekick ? 'Choose a folder first.' : 'Open in Electron to create context packages.',
+    );
     renderContextPackageDetails([]);
     renderContextPackageList([]);
     renderContextPackageActions('Create context package', true);
@@ -345,7 +348,7 @@ const renderContextPackage = (scan?: ProjectFolderScan) => {
 
   if (contextPackageState.status === 'ready') {
     setText(contextPackageTitleTarget, 'Ready');
-    setText(contextPackageMessageTarget, 'Create one Repomix Markdown file in the selected folder root.');
+    setText(contextPackageMessageTarget, 'Create one Markdown package in the folder root.');
     renderContextPackageDetails([
       ['Scope', 'Full selected folder'],
       ['Format', 'Markdown'],
@@ -357,7 +360,7 @@ const renderContextPackage = (scan?: ProjectFolderScan) => {
 
   if (contextPackageState.status === 'previewing') {
     setText(contextPackageTitleTarget, 'Preparing');
-    setText(contextPackageMessageTarget, 'Checking output path and overwrite status.');
+    setText(contextPackageMessageTarget, 'Checking output path.');
     renderContextPackageDetails([]);
     renderContextPackageList([]);
     renderContextPackageActions('Preparing...', true);
@@ -367,7 +370,7 @@ const renderContextPackage = (scan?: ProjectFolderScan) => {
   if (contextPackageState.status === 'confirming') {
     const { preview } = contextPackageState;
     setText(contextPackageTitleTarget, 'Confirm generation');
-    setText(contextPackageMessageTarget, 'The context package will be written to the selected folder root.');
+    setText(contextPackageMessageTarget, 'Review the output before writing.');
     renderContextPackageDetails([
       ['Output file', preview.outputFileName],
       ['Overwrite', preview.willOverwrite ? 'Yes' : 'No'],
@@ -381,7 +384,7 @@ const renderContextPackage = (scan?: ProjectFolderScan) => {
   if (contextPackageState.status === 'generating') {
     const { preview } = contextPackageState;
     setText(contextPackageTitleTarget, 'Generating');
-    setText(contextPackageMessageTarget, 'Creating the Repomix Markdown package.');
+    setText(contextPackageMessageTarget, 'Writing context package.');
     renderContextPackageDetails([
       ['Output file', preview.outputFileName],
       ['Output path', preview.outputPath],
@@ -400,7 +403,7 @@ const renderContextPackage = (scan?: ProjectFolderScan) => {
       warning.path ? `${warning.path}: ${warning.message}` : warning.message,
     );
     setText(contextPackageTitleTarget, 'Package created');
-    setText(contextPackageMessageTarget, result.overwritten ? 'Existing context package was overwritten.' : 'Context package was created.');
+    setText(contextPackageMessageTarget, result.overwritten ? 'Existing package overwritten.' : 'Context package created.');
     renderContextPackageDetails([
       ['Output file', result.outputFileName],
       ['Included', result.totalFiles.toString()],
@@ -531,9 +534,9 @@ const render = () => {
 
   if (state.status === 'empty') {
     setText(selectedNameTarget, 'No folder selected');
-    setText(selectedPathTarget, window.sidekick ? 'Choose a local project folder to inspect.' : 'Open in Electron to inspect local folders.');
+    setText(selectedPathTarget, window.sidekick ? 'Choose a folder to inspect.' : 'Open in Electron to inspect local folders.');
     setText(stateTitleTarget, 'Choose a project folder');
-    setText(stateMessageTarget, 'Sidekick will inspect folder names, file metadata, and artifact types without changing files.');
+    setText(stateMessageTarget, 'Read-only scan of structure, metadata, and artifact types.');
     renderSummary();
     renderArtifactCounts();
     renderFolderSignals();
@@ -546,7 +549,7 @@ const render = () => {
 
   if (state.status === 'loading') {
     setText(stateTitleTarget, 'Scanning folder');
-    setText(stateMessageTarget, 'Reading structure and metadata. Files will not be changed.');
+    setText(stateMessageTarget, 'Reading structure and metadata.');
     renderContextPackage();
     renderTree();
     return;
