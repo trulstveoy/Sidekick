@@ -1,5 +1,5 @@
 param(
-  [string]$ArtifactsRoot = "out",
+  [string]$ArtifactsRoot = "out/make",
   [bool]$RequireSigned = (($env:SIDEKICK_REQUIRE_WINDOWS_SIGNING -eq "true") -or ($env:SIDEKICK_SIGNING_ENABLED -eq "true")),
   [bool]$RequireTrusted = ($env:SIDEKICK_REQUIRE_WINDOWS_TRUSTED_SIGNATURE -eq "true"),
   [string]$ExpectedSubject = $env:SIDEKICK_SIGNING_EXPECTED_SUBJECT,
@@ -28,7 +28,7 @@ function Test-RequiresSidekickSigner {
 
   $normalizedPath = $Path -replace "\\", "/"
 
-  return ($normalizedPath -match "/out/make/.+\.exe$") -or ($normalizedPath -match "/sidekick\.exe$")
+  return ($normalizedPath -match "/out/make/.+\.exe$")
 }
 
 function Get-SignatureInfo {

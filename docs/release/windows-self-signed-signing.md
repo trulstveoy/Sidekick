@@ -147,7 +147,7 @@ For the Windows package job:
 2. The workflow sets `SIDEKICK_SIGNING_PFX_PATH` and `SIDEKICK_SIGNING_PASSWORD`.
 3. `npm run make` runs with those variables set.
 4. Electron Forge/Squirrel.Windows signs Windows artifacts while creating them.
-5. `npm run verify:windows-signatures` checks every `.exe` under `out/`.
+5. `npm run verify:windows-signatures` checks every `.exe` under `out/make`.
 6. The temporary `.pfx` is deleted before artifacts are uploaded.
 
 If signing secrets are absent and `SIDEKICK_REQUIRE_WINDOWS_SIGNING` is not true, the workflow may still publish unsigned prerelease Windows artifacts.
@@ -161,7 +161,7 @@ On GitHub-hosted runners, signature verification has two levels:
 
 GitHub-hosted runners are fresh virtual machines. They do not automatically trust the Sidekick self-signed certificate. CI should always verify that artifacts are signed by the expected certificate. CI should expect `Status = Valid` only if the workflow also imports the public certificate into the runner's trust stores.
 
-The verification script scans every `.exe` under `out/`. It logs all executable signatures. It enforces the expected Sidekick signer on Sidekick/Squirrel artifacts, while allowing Electron helper executables to keep their original signer.
+The verification script scans every `.exe` under `out/make` by default. These are the release artifacts that GitHub uploads. It logs all executable signatures and enforces the expected Sidekick signer on Squirrel release executables.
 
 The final trust check is on the maintainer's Windows machine:
 

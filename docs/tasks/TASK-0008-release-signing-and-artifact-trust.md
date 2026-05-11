@@ -319,7 +319,7 @@ Resolved decisions:
 - Push-build artifacts may remain unsigned.
 - The first trust-installation procedure should target the current user's Windows certificate stores.
 - Release signing should be configured through Electron Forge/Squirrel.Windows during `npm run make`, not primarily by post-processing already generated Squirrel output.
-- The verification script should inspect every `.exe` under `out/`, log every file it checks, and enforce the Sidekick signer only for Sidekick/Squirrel artifacts.
+- The verification script should inspect every `.exe` under `out/make` by default, log every release executable it checks, and enforce the Sidekick signer only for Squirrel release artifacts.
 - Tag release signing should be controlled by `SIDEKICK_REQUIRE_WINDOWS_SIGNING`.
 - When `SIDEKICK_REQUIRE_WINDOWS_SIGNING=true`, the Windows release job must fail if signing secrets are missing or signing verification fails.
 - When `SIDEKICK_REQUIRE_WINDOWS_SIGNING` is not true, the Windows release job may publish unsigned prerelease artifacts if signing secrets are missing.
@@ -426,7 +426,7 @@ The configuration should:
 Add `scripts/signing/verify-windows-signatures.ps1`.
 
 The script should:
-- scan `out/` recursively for every `.exe`;
+- scan `out/make` recursively for release `.exe` artifacts by default;
 - use `Get-AuthenticodeSignature`;
 - log signature status, signer subject, and file path;
 - fail if any expected `.exe` is unsigned or invalid when signing is required;
@@ -525,7 +525,7 @@ Implemented changes:
 - Added optional Squirrel.Windows signing configuration in `forge.config.ts`.
 - Added a testable signing configuration helper for release-signing policy.
 - Added a PowerShell script for creating a self-signed code-signing certificate.
-- Added a PowerShell script for verifying Windows `.exe` Authenticode signatures under `out/`.
+- Added a PowerShell script for verifying Windows release `.exe` Authenticode signatures under `out/make`.
 - Added package scripts for certificate creation and Windows signature verification.
 - Updated the GitHub release workflow to prepare `.pfx` material before `npm run make`.
 - Updated the GitHub release workflow to verify Windows signatures before artifact upload.
@@ -559,7 +559,7 @@ Results:
 External verification still required:
 - Configure GitHub signing secrets and variables.
 - Bump `package.json` and `package-lock.json` to a new release version before tagging, because `v0.1.2` already exists.
-- Push a matching release tag, likely `v0.1.3` if the next version bump is `0.1.3`.
+- Push a matching release tag for the next retry version.
 - Confirm the Windows GitHub release job signs and verifies artifacts before upload.
 - Download the signed Windows installer from GitHub.
 - Install the public certificate into the maintainer's Windows CurrentUser trust stores.
@@ -589,9 +589,9 @@ GitHub configuration needed:
 - optional secret or variable `SIDEKICK_SIGNING_TIMESTAMP_URL`
 
 Expected external verification release:
-- Bump version to `0.1.3`.
+- Bump version to the next retry version.
 - Commit and push the version bump.
-- Push tag `v0.1.3`.
+- Push the matching version tag.
 - Confirm the GitHub release workflow signs and verifies Windows artifacts.
 - Download the Windows installer from the GitHub prerelease.
 - Run `Get-AuthenticodeSignature` locally and confirm `Status = Valid`.
