@@ -35,6 +35,8 @@ Run this on the Windows machine where you want to create and control the certifi
 npm run signing:create-self-signed-cert
 ```
 
+This can be run from Windows PowerShell or from WSL when Windows interop is enabled. The npm script calls `powershell.exe` because the certificate commands use the Windows certificate store.
+
 The script creates:
 
 - a code-signing certificate in `Cert:\CurrentUser\My`;
