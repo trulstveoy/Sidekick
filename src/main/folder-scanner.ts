@@ -1,5 +1,6 @@
 import { lstat, readdir } from 'node:fs/promises';
 import path from 'node:path';
+import type { Stats } from 'node:fs';
 import type {
   ArtifactType,
   FolderSignal,
@@ -11,7 +12,7 @@ import type {
   ScanWarning,
 } from '../shared/sidekick-api';
 
-export const DEFAULT_SCAN_OPTIONS: ScanOptions = {
+const DEFAULT_SCAN_OPTIONS: ScanOptions = {
   maxDepth: 5,
   maxFiles: 2000,
   excludedFolderNames: ['.git', 'node_modules', 'out', 'dist', '.vite', '.cache'],
@@ -71,6 +72,19 @@ const normalise = (value: string) =>
 
 const includesAny = (value: string, keywords: string[]) =>
   keywords.some((keyword) => value.includes(keyword));
+
+const artifactExtensionGroups: Array<{ extensions: string[]; type: ArtifactType }> = [
+  { extensions: ['.md', '.markdown', '.txt'], type: 'markdown-text' },
+  { extensions: ['.doc', '.docx', '.odt', '.rtf'], type: 'document' },
+  { extensions: ['.pdf'], type: 'pdf' },
+  { extensions: ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.heic'], type: 'image' },
+  { extensions: ['.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg'], type: 'audio' },
+  { extensions: ['.mp4', '.mov', '.mkv', '.webm'], type: 'video' },
+  { extensions: ['.csv', '.xlsx', '.xls', '.json'], type: 'spreadsheet-data' },
+  { extensions: ['.ppt', '.pptx', '.key'], type: 'presentation' },
+];
+
+const drawioFileSuffixes = ['.drawio', '.dio', '.drawio.svg', '.drawio.png'];
 
 export const getFolderSignals = (folderName: string): FolderSignal[] => {
   const value = normalise(folderName);
@@ -137,50 +151,14 @@ export const getFolderSignals = (folderName: string): FolderSignal[] => {
 const extensionType = (fileName: string): ArtifactType => {
   const lowerName = fileName.toLowerCase();
 
-  if (
-    lowerName.endsWith('.drawio') ||
-    lowerName.endsWith('.dio') ||
-    lowerName.endsWith('.drawio.svg') ||
-    lowerName.endsWith('.drawio.png')
-  ) {
+  if (drawioFileSuffixes.some((suffix) => lowerName.endsWith(suffix))) {
     return 'drawio';
   }
 
   const extension = path.extname(lowerName);
+  const match = artifactExtensionGroups.find((group) => group.extensions.includes(extension));
 
-  if (['.md', '.markdown', '.txt'].includes(extension)) {
-    return 'markdown-text';
-  }
-
-  if (['.doc', '.docx', '.odt', '.rtf'].includes(extension)) {
-    return 'document';
-  }
-
-  if (extension === '.pdf') {
-    return 'pdf';
-  }
-
-  if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.heic'].includes(extension)) {
-    return 'image';
-  }
-
-  if (['.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg'].includes(extension)) {
-    return 'audio';
-  }
-
-  if (['.mp4', '.mov', '.mkv', '.webm'].includes(extension)) {
-    return 'video';
-  }
-
-  if (['.csv', '.xlsx', '.xls', '.json'].includes(extension)) {
-    return 'spreadsheet-data';
-  }
-
-  if (['.ppt', '.pptx', '.key'].includes(extension)) {
-    return 'presentation';
-  }
-
-  return 'unclassified';
+  return match?.type ?? 'unclassified';
 };
 
 const canPromoteTextLike = (type: ArtifactType) =>
@@ -243,6 +221,31 @@ type ScanState = {
   fileLimitWarningAdded: boolean;
 };
 
+type ScanContext = {
+  rootPath: string;
+  options: ScanOptions;
+  state: ScanState;
+};
+
+type ScanNodeInput = {
+  entryPath: string;
+  depth: number;
+  inheritedHints: FolderSignal[];
+};
+
+type ScannedPath = ScanNodeInput & {
+  name: string;
+  relativePath: string;
+  stats: Stats;
+};
+
+type DirectoryChildrenInput = {
+  node: FolderTreeNode;
+  entryPath: string;
+  depth: number;
+  contextHints: FolderSignal[];
+};
+
 const createScanState = (): ScanState => ({
   fileCount: 0,
   folderCount: 0,
@@ -288,18 +291,12 @@ const addWarning = (state: ScanState, warning: ScanWarning) => {
   state.warnings.push(warning);
 };
 
-const scanNode = async (
-  rootPath: string,
+const readPathStats = async (
+  { rootPath, state }: ScanContext,
   entryPath: string,
-  depth: number,
-  inheritedHints: FolderSignal[],
-  options: ScanOptions,
-  state: ScanState,
-): Promise<FolderTreeNode | null> => {
-  let stats;
-
+): Promise<Stats | null> => {
   try {
-    stats = await lstat(entryPath);
+    return await lstat(entryPath);
   } catch (error) {
     addWarning(state, {
       path: toRelativePath(rootPath, entryPath),
@@ -310,139 +307,152 @@ const scanNode = async (
 
     return null;
   }
+};
 
-  const name = path.basename(entryPath);
-  const relativePath = toRelativePath(rootPath, entryPath);
+const addFolderSignals = (state: ScanState, signals: FolderSignal[]) => {
+  signals.forEach((signal) => {
+    state.folderSignalCounts[signal] += 1;
+  });
+};
 
-  if (stats.isSymbolicLink() && !options.followSymlinks) {
+const createFolderNode = ({ name, relativePath, stats }: ScannedPath, contextHints: FolderSignal[]) => ({
+  name,
+  relativePath,
+  kind: 'folder' as const,
+  children: [],
+  folderSignals: getFolderSignals(name),
+  contextHints,
+  modifiedAt: stats.mtime.toISOString(),
+});
+
+const addDepthLimitWarning = (
+  { options, state }: ScanContext,
+  relativePath: string,
+) => {
+  state.limitsReached.maxDepth = true;
+  addWarning(state, {
+    path: relativePath,
+    type: 'depth-limit',
+    severity: 'warning',
+    message: `Maximum scan depth of ${options.maxDepth} reached.`,
+  });
+};
+
+const readDirectoryEntries = async (
+  { state }: ScanContext,
+  entryPath: string,
+  relativePath: string,
+) => {
+  try {
+    return await readdir(entryPath);
+  } catch (error) {
     addWarning(state, {
       path: relativePath,
-      type: 'symlink-skipped',
+      type: 'read-error',
+      severity: 'warning',
+      message: error instanceof Error ? error.message : 'Unable to read folder.',
+    });
+
+    return null;
+  }
+};
+
+const addFileLimitWarning = ({ options, state }: ScanContext, relativePath: string) => {
+  state.limitsReached.maxFiles = true;
+
+  if (state.fileLimitWarningAdded) {
+    return;
+  }
+
+  state.fileLimitWarningAdded = true;
+  addWarning(state, {
+    path: relativePath,
+    type: 'file-limit',
+    severity: 'warning',
+    message: `Maximum file count of ${options.maxFiles} reached.`,
+  });
+};
+
+const scanDirectoryChildren = async (
+  context: ScanContext,
+  { node, entryPath, depth, contextHints }: DirectoryChildrenInput,
+) => {
+  const entries = await readDirectoryEntries(context, entryPath, node.relativePath);
+
+  if (!entries) {
+    return;
+  }
+
+  for (const entryName of entries) {
+    if (context.state.fileCount >= context.options.maxFiles) {
+      addFileLimitWarning(context, node.relativePath);
+      break;
+    }
+
+    const childNode = await scanNode(context, {
+      entryPath: path.join(entryPath, entryName),
+      depth: depth + 1,
+      inheritedHints: contextHints,
+    });
+
+    if (childNode) {
+      node.children?.push(childNode);
+    }
+  }
+
+  node.children = sortNodes(node.children ?? []);
+};
+
+const scanDirectory = async (
+  context: ScanContext,
+  scannedPath: ScannedPath,
+): Promise<FolderTreeNode | null> => {
+  const { entryPath, depth, inheritedHints, name, relativePath } = scannedPath;
+
+  if (relativePath !== '.' && shouldExcludeFolder(name, context.options)) {
+    addWarning(context.state, {
+      path: relativePath,
+      type: 'excluded-folder',
       severity: 'info',
-      message: 'Symbolic link skipped.',
+      message: 'Folder excluded from scan.',
     });
 
     return null;
   }
 
-  if (stats.isDirectory()) {
-    if (relativePath !== '.' && shouldExcludeFolder(name, options)) {
-      addWarning(state, {
-        path: relativePath,
-        type: 'excluded-folder',
-        severity: 'info',
-        message: 'Folder excluded from scan.',
-      });
+  const ownSignals = getFolderSignals(name);
+  const contextHints = [...new Set([...inheritedHints, ...ownSignals])];
+  const node = createFolderNode(scannedPath, contextHints);
 
-      return null;
-    }
+  if (relativePath !== '.') {
+    context.state.folderCount += 1;
+    addFolderSignals(context.state, ownSignals);
+  }
 
-    const ownSignals = getFolderSignals(name);
-    const contextHints = [...new Set([...inheritedHints, ...ownSignals])];
-
-    if (relativePath !== '.') {
-      state.folderCount += 1;
-      ownSignals.forEach((signal) => {
-        state.folderSignalCounts[signal] += 1;
-      });
-    }
-
-    const node: FolderTreeNode = {
-      name,
-      relativePath,
-      kind: 'folder',
-      children: [],
-      folderSignals: ownSignals,
-      contextHints,
-      modifiedAt: stats.mtime.toISOString(),
-    };
-
-    if (depth >= options.maxDepth) {
-      state.limitsReached.maxDepth = true;
-      addWarning(state, {
-        path: relativePath,
-        type: 'depth-limit',
-        severity: 'warning',
-        message: `Maximum scan depth of ${options.maxDepth} reached.`,
-      });
-
-      return node;
-    }
-
-    let entries;
-
-    try {
-      entries = await readdir(entryPath);
-    } catch (error) {
-      addWarning(state, {
-        path: relativePath,
-        type: 'read-error',
-        severity: 'warning',
-        message: error instanceof Error ? error.message : 'Unable to read folder.',
-      });
-
-      return node;
-    }
-
-    for (const entryName of entries) {
-      if (state.fileCount >= options.maxFiles) {
-        state.limitsReached.maxFiles = true;
-
-        if (!state.fileLimitWarningAdded) {
-          state.fileLimitWarningAdded = true;
-          addWarning(state, {
-            path: relativePath,
-            type: 'file-limit',
-            severity: 'warning',
-            message: `Maximum file count of ${options.maxFiles} reached.`,
-          });
-        }
-
-        break;
-      }
-
-      const childNode = await scanNode(
-        rootPath,
-        path.join(entryPath, entryName),
-        depth + 1,
-        contextHints,
-        options,
-        state,
-      );
-
-      if (childNode) {
-        node.children?.push(childNode);
-      }
-    }
-
-    node.children = sortNodes(node.children ?? []);
-
+  if (depth >= context.options.maxDepth) {
+    addDepthLimitWarning(context, relativePath);
     return node;
   }
 
-  if (!stats.isFile()) {
-    return null;
-  }
+  await scanDirectoryChildren(context, {
+    node,
+    entryPath,
+    depth,
+    contextHints,
+  });
 
-  state.fileCount += 1;
+  return node;
+};
 
+const scanFile = ({ state }: ScanContext, scannedPath: ScannedPath): FolderTreeNode => {
+  const { name, relativePath, inheritedHints, stats } = scannedPath;
   const artifactType = classifyArtifact(name);
   const contextHints = getFileContextHints(name, inheritedHints);
   const modifiedAt = stats.mtime.toISOString();
   const size = stats.size;
 
+  state.fileCount += 1;
   state.artifactTypeCounts[artifactType] += 1;
-
-  const node: FolderTreeNode = {
-    name,
-    relativePath,
-    kind: 'file',
-    artifactType,
-    contextHints,
-    size,
-    modifiedAt,
-  };
-
   addRecentFile(state, {
     name,
     relativePath,
@@ -452,7 +462,57 @@ const scanNode = async (
     modifiedAt,
   });
 
-  return node;
+  return {
+    name,
+    relativePath,
+    kind: 'file',
+    artifactType,
+    contextHints,
+    size,
+    modifiedAt,
+  };
+};
+
+const scanNode = async (
+  context: ScanContext,
+  input: ScanNodeInput,
+): Promise<FolderTreeNode | null> => {
+  const stats = await readPathStats(context, input.entryPath);
+
+  if (!stats) {
+    return null;
+  }
+
+  const name = path.basename(input.entryPath);
+  const relativePath = toRelativePath(context.rootPath, input.entryPath);
+
+  if (stats.isSymbolicLink() && !context.options.followSymlinks) {
+    addWarning(context.state, {
+      path: relativePath,
+      type: 'symlink-skipped',
+      severity: 'info',
+      message: 'Symbolic link skipped.',
+    });
+
+    return null;
+  }
+
+  const scannedPath = {
+    ...input,
+    name,
+    relativePath,
+    stats,
+  };
+
+  if (stats.isDirectory()) {
+    return scanDirectory(context, scannedPath);
+  }
+
+  if (!stats.isFile()) {
+    return null;
+  }
+
+  return scanFile(context, scannedPath);
 };
 
 export const scanProjectFolder = async (
@@ -464,7 +524,16 @@ export const scanProjectFolder = async (
     ...options,
   };
   const state = createScanState();
-  const rootNode = await scanNode(rootPath, rootPath, 0, [], resolvedOptions, state);
+  const context = {
+    rootPath,
+    options: resolvedOptions,
+    state,
+  };
+  const rootNode = await scanNode(context, {
+    entryPath: rootPath,
+    depth: 0,
+    inheritedHints: [],
+  });
 
   if (!rootNode) {
     throw new Error('Unable to scan selected folder.');

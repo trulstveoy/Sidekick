@@ -816,6 +816,11 @@ Documentation structure expectation:
   - Context-package and transcription-import status rendering are split into state-specific functions.
   - Tree-node rendering and top-level view rendering are split into smaller focused functions.
   - Renderer function-level maintainability warnings are gone; the remaining renderer warning is file length.
+- 2026-05-11: D5 refactored `src/main/folder-scanner.ts`.
+  - D1 routed `DEFAULT_SCAN_OPTIONS` to D5. It is still used internally, but no external caller imports it, so D5 made it module-internal instead of exported.
+  - Scanner traversal now uses a scan context object instead of passing root path, options, and state through every recursive call.
+  - Directory scanning, file scanning, stat reading, directory reading, and scanner warnings are split into focused helpers.
+  - Scanner function-level maintainability warnings are gone; the remaining scanner warning is file length.
 
 ## Verification Log
 
@@ -839,6 +844,12 @@ Documentation structure expectation:
   - `npm run test`: passed.
   - `npm run test:ui`: passed, 5 Playwright tests.
   - Maintainability ESLint command: passed with warnings. Renderer warnings were reduced from file length plus four function-level hotspots to file length only.
+- 2026-05-11: D5 verification:
+  - `npm run check`: passed.
+  - `npm run test`: passed.
+  - `npx vitest run tests/unit/folder-classification.test.ts tests/integration/folder-scanner.test.ts`: passed, 2 files and 5 tests.
+  - Maintainability ESLint command: passed with warnings. Scanner warnings were reduced from file length plus six function-level hotspots to file length only.
+  - `npx knip --no-progress`: `DEFAULT_SCAN_OPTIONS` no longer appears. Remaining findings are already documented by D1.
 
 ## Closeout
 

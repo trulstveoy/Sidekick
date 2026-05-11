@@ -735,6 +735,45 @@ Verification:
 - `npm run test:ui`: passed, 5 Playwright tests.
 - Maintainability ESLint command: passed with warnings. Renderer warnings were reduced to file length only.
 
+## Addendum: TASK-0009 D5 Scanner Maintainability Refactor
+
+Date:
+- 2026-05-11
+
+Purpose:
+- Reduce scanner maintainability findings from SA-005 without changing filesystem traversal behavior.
+- Resolve D1's scanner-owned dead-code finding if it naturally belongs with the scanner refactor.
+
+Inputs from D1:
+- `DEFAULT_SCAN_OPTIONS` was listed as an unused export and assigned to D5.
+- D5 kept the default options but made them module-internal because no external caller imports them.
+
+Changes made:
+- Replaced the chained extension checks with data-driven extension groups.
+- Introduced a scan context object so recursive scanner calls do not carry root path, options, and state as repeated parameters.
+- Split path stat reading, directory scanning, file scanning, directory-entry reading, and warning creation into focused helpers.
+- Kept scan defaults, symlink behavior, excluded folders, depth limits, file limits, warning types, and summary shape unchanged.
+
+Maintainability result:
+- Before D5, `src/main/folder-scanner.ts` had warnings for:
+  - `extensionType` complexity;
+  - `scanNode` length, statements, complexity, parameter count, and nesting;
+  - file length.
+- After D5, the scanner function-level warnings are gone.
+- The remaining scanner warning is file length: `src/main/folder-scanner.ts` is still above the local 300-line warning threshold.
+
+Final status:
+- Scanner part of SA-005: improved.
+- D1 finding `DEFAULT_SCAN_OPTIONS` unused export: fixed.
+- Remaining scanner issue: file length only. A later task can decide whether to split scanner classification, traversal, and summary code into separate modules.
+
+Verification:
+- `npm run check`: passed.
+- `npm run test`: passed.
+- `npx vitest run tests/unit/folder-classification.test.ts tests/integration/folder-scanner.test.ts`: passed, 2 files and 5 tests.
+- Maintainability ESLint command: passed with warnings. Scanner warnings were reduced to file length only.
+- `npx knip --no-progress`: `DEFAULT_SCAN_OPTIONS` no longer appears. Remaining findings are the context-package exports, transcription-folder helper export, and shared exported types already documented by D1.
+
 ## Deferred Findings
 
 - Finding: Repository-wide duplication detection.
