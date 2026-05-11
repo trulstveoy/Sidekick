@@ -43,9 +43,9 @@ Related decisions:
 - None yet.
 
 Related tasks:
-- `docs/tasks/TASK-0001-inspect-local-folder.md`
-- `docs/tasks/TASK-0002-folder-tree-expand-collapse.md`
-- `docs/tasks/TASK-0004-context-package-workflow.md`
+- `docs/tasks/closed/TASK-0001-inspect-local-folder.md`
+- `docs/tasks/closed/TASK-0002-folder-tree-expand-collapse.md`
+- `docs/tasks/closed/TASK-0004-context-package-workflow.md`
 
 ## Explore Notes
 
@@ -229,7 +229,7 @@ Implemented changes:
 
 Files changed:
 - `docs/design/desktop-design-guidelines.md`
-- `docs/tasks/TASK-0006-minimalist-ui-refresh.md`
+- `docs/tasks/closed/TASK-0006-minimalist-ui-refresh.md`
 - `index.html`
 - `src/index.css`
 - `src/renderer.ts`

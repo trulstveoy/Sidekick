@@ -335,7 +335,7 @@ Resolved decisions:
 Likely documentation areas:
 - `docs/release/ci-cd.md`
 - `docs/architecture/application-architecture.md`
-- `docs/tasks/TASK-0008-release-signing-and-artifact-trust.md`
+- `docs/tasks/closed/TASK-0008-release-signing-and-artifact-trust.md`
 
 Likely script areas:
 - `scripts/signing/`

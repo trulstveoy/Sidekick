@@ -52,9 +52,9 @@ Related decisions:
 - None yet.
 
 Related docs:
-- `docs/tasks/TASK-0001-inspect-local-folder.md`
-- `docs/tasks/TASK-0002-folder-tree-expand-collapse.md`
-- `docs/tasks/TASK-0003-repomix-integration-spike.md`
+- `docs/tasks/closed/TASK-0001-inspect-local-folder.md`
+- `docs/tasks/closed/TASK-0002-folder-tree-expand-collapse.md`
+- `docs/tasks/closed/TASK-0003-repomix-integration-spike.md`
 
 ## Explore Notes
 
@@ -473,7 +473,7 @@ Out of scope:
 - `tests/unit/`
 - `tests/integration/`
 - `tests/e2e/`
-- `docs/tasks/TASK-0004-context-package-workflow.md`
+- `docs/tasks/closed/TASK-0004-context-package-workflow.md`
 
 ### Data Model Draft
 
@@ -640,7 +640,7 @@ Reviewed against the task acceptance criteria:
 ## Documentation Notes
 
 Docs updated:
-- `docs/tasks/TASK-0004-context-package-workflow.md`
+- `docs/tasks/closed/TASK-0004-context-package-workflow.md`
 - `docs/architecture/application-architecture.md`
 
 Docs intentionally not updated:

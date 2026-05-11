@@ -224,7 +224,7 @@ Likely files:
 - `forge.config.ts`
 - `package.json`
 - `docs/architecture/application-architecture.md`
-- `docs/tasks/TASK-0005-github-ci-cd-release-pipeline.md`
+- `docs/tasks/closed/TASK-0005-github-ci-cd-release-pipeline.md`
 
 Possible CI workflow shape:
 - `verify` job on `ubuntu-latest`:
@@ -572,7 +572,7 @@ Completed review:
 Docs updated:
 - `docs/release/ci-cd.md`
 - `docs/architecture/application-architecture.md`
-- `docs/tasks/TASK-0005-github-ci-cd-release-pipeline.md`
+- `docs/tasks/closed/TASK-0005-github-ci-cd-release-pipeline.md`
 - `docs/decisions/0002-tag-based-github-releases.md`
 
 ## Closeout

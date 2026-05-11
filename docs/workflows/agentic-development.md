@@ -102,6 +102,7 @@ Status rules:
 - Use `Blocked` when progress requires human input or unavailable external access.
 - Use `Approved` only when a required human gate has been cleared.
 - Use `Done` only after closeout.
+- Move task records with `Done` status into the repository's closed-task archive when one exists.
 - Use `Canceled` when the task is intentionally abandoned.
 
 ### Task Classes
@@ -277,6 +278,8 @@ docs/
   tasks/
     TASK-0001-short-title.md
     TASK-0002-short-title.md
+    closed/
+      TASK-0000-completed-title.md
   decisions/
     0001-decision-title.md
     0002-decision-title.md
@@ -296,10 +299,17 @@ docs/
 
 `docs/tasks/`
 
-- Contains persistent Task Records.
+- Contains active persistent Task Records.
 - Used for standard work that spans sessions and for major work.
 - Captures the lifecycle from Explore through Close.
 - Serves as the lightweight task tracker.
+
+`docs/tasks/closed/`
+
+- Contains completed Task Records.
+- Used after a task reaches `Done`.
+- Keeps active task discovery focused on work that is not finished.
+- Preserves closed task history without deleting or renumbering records.
 
 `docs/decisions/`
 
@@ -322,6 +332,7 @@ Task records:
 
 ```text
 docs/tasks/TASK-0001-short-title.md
+docs/tasks/closed/TASK-0000-completed-title.md
 ```
 
 Rules:
@@ -330,6 +341,8 @@ Rules:
 - Use a short lowercase kebab-case title.
 - Keep the title stable after creation unless it is misleading.
 - Do not reuse task IDs.
+- Keep active task records directly under `docs/tasks/`.
+- Move completed task records to `docs/tasks/closed/` during closeout.
 
 Decision records:
 
@@ -399,7 +412,8 @@ Index rules:
 
 - Tiny task artifacts usually stay in the conversation.
 - Standard task artifacts stay in the conversation unless the work spans sessions, has meaningful risk, or needs later review.
-- Major task artifacts should be stored in `docs/tasks/`.
+- Major task artifacts should be stored in `docs/tasks/` while active.
+- Completed task records should be moved to `docs/tasks/closed/` when they reach `Done`.
 - Durable decisions belong in `docs/decisions/`, even if they started inside a task record.
 - Workflow changes belong in `docs/workflows/`.
 - Reusable blank forms belong in `docs/templates/`.
@@ -1068,6 +1082,7 @@ Final status:
 - [ ] Known gaps are not hidden.
 - [ ] Next step is included when useful.
 - [ ] Task status set to `Done`, `Blocked`, or `Canceled`.
+- [ ] Task record moved to the closed-task archive if status is `Done` and the repository has one.
 
 ## Human Gates
 

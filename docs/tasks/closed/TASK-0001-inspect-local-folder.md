@@ -525,7 +525,7 @@ Check before closeout:
 ### Documentation Impact
 
 Update or create:
-- `docs/tasks/TASK-0001-inspect-local-folder.md`
+- `docs/tasks/closed/TASK-0001-inspect-local-folder.md`
 - `docs/architecture/application-architecture.md`
 
 Consider updating:
@@ -603,7 +603,7 @@ Decision record needed:
 ## Documentation Notes
 
 Docs updated:
-- `docs/tasks/TASK-0001-inspect-local-folder.md`
+- `docs/tasks/closed/TASK-0001-inspect-local-folder.md`
 - `docs/architecture/application-architecture.md`
 - `README.md`
 

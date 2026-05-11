@@ -44,7 +44,7 @@ Related decisions:
 
 Related docs:
 - `docs/architecture/application-architecture.md`
-- `docs/tasks/TASK-0001-inspect-local-folder.md`
+- `docs/tasks/closed/TASK-0001-inspect-local-folder.md`
 
 ## Explore Notes
 
@@ -296,7 +296,7 @@ Check before closeout:
 ### Documentation Impact
 
 Update:
-- `docs/tasks/TASK-0002-folder-tree-expand-collapse.md`
+- `docs/tasks/closed/TASK-0002-folder-tree-expand-collapse.md`
 
 Consider updating:
 - `README.md` only if user-facing behavior needs mention.
@@ -365,7 +365,7 @@ Decision record needed:
 ## Documentation Notes
 
 Docs updated:
-- `docs/tasks/TASK-0002-folder-tree-expand-collapse.md`
+- `docs/tasks/closed/TASK-0002-folder-tree-expand-collapse.md`
 
 Docs intentionally not updated:
 - `README.md` because the documented scripts and architecture did not change.

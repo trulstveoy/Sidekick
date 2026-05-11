@@ -46,7 +46,7 @@ Related decisions:
 
 Related docs:
 - `docs/product/vision.md`
-- `docs/tasks/TASK-0001-inspect-local-folder.md`
+- `docs/tasks/closed/TASK-0001-inspect-local-folder.md`
 
 External references:
 - `https://repomix.com/guide/development/using-repomix-as-a-library`
@@ -266,7 +266,7 @@ Recommendation:
 ## Documentation Notes
 
 Docs updated:
-- `docs/tasks/TASK-0003-repomix-integration-spike.md`
+- `docs/tasks/closed/TASK-0003-repomix-integration-spike.md`
 
 Docs intentionally not updated:
 - `README.md` because no product workflow was added.
