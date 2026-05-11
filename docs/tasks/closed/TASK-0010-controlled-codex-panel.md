@@ -1,7 +1,7 @@
 # Task: Controlled Codex Panel
 
 ID: TASK-0010
-Status: Reviewing
+Status: Done
 Class: Major
 Owner: Pair
 Created: 2026-05-11
@@ -33,7 +33,7 @@ This is not an embedded shell. It is a Sidekick-owned work surface for user-init
 
 ## Current Phase
 
-Review
+Close
 
 ## Progress Checklist
 
@@ -46,7 +46,7 @@ Review
 - [x] Verification complete
 - [x] Review complete
 - [x] Documentation complete
-- [ ] Closeout complete
+- [x] Closeout complete
 
 ## Links
 
@@ -448,6 +448,11 @@ Passed:
 - `npm run test`
 - `CI=1 npm run test:ui`
 - `npm run make`
+- Rebased on `main` after TASK-0011 and TASK-0012.
+- Fast-forward merged to `main`.
+- Final verification from `main`: `npm run check`
+- Final verification from `main`: `npm run test`
+- Final verification from `main`: `CI=1 npm run test:ui`
 - `codex --version` -> `codex-cli 0.130.0`
 - `codex login status` -> `Logged in using ChatGPT`
 
@@ -498,4 +503,30 @@ Decision record needed:
 
 ## Closeout
 
-Pending human review and integration from task worktree.
+Changed:
+- Added controlled Codex panel for selected project folders.
+- Added main-process Codex CLI runner with status, login, run, output streaming, cancellation, and edit-mode refresh behavior.
+- Added typed shared/preload API for Codex operations.
+- Added tests for runner helpers, fake Codex process lifecycle, and renderer smoke flow.
+- Added architecture documentation and decision record.
+
+Verified:
+- `npm run check`
+- `npm run test`
+- `CI=1 npm run test:ui`
+- `npm run make`
+- Final verification from `main`: `npm run check`
+- Final verification from `main`: `npm run test`
+- Final verification from `main`: `CI=1 npm run test:ui`
+
+Known gaps:
+- Manual Electron run with real Codex prompt has not been performed.
+- Real edit-mode file change should be tested in a disposable project folder.
+- Packaged app Codex PATH discovery should be checked on Windows.
+
+Next:
+- Human manual QA of read-only and edit-mode Codex runs.
+- Remove task worktree after push if no further local inspection is needed.
+
+Final status:
+- Done
