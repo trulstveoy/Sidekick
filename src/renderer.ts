@@ -37,6 +37,13 @@ type TranscriptionImportState =
   | { status: 'complete'; result: TranscriptionImportResult }
   | { status: 'error'; message: string };
 
+type DetailRow = [string, string];
+
+type ActionTargets = {
+  primaryButton: HTMLButtonElement | null;
+  secondaryButton: HTMLButtonElement | null;
+};
+
 const appInfoTarget = document.querySelector<HTMLSpanElement>('[data-app-info]');
 const chooseFolderButton = document.querySelector<HTMLButtonElement>('[data-choose-folder]');
 const selectedNameTarget = document.querySelector<HTMLElement>('[data-selected-name]');
@@ -126,6 +133,41 @@ const createListItem = (text: string) => {
   item.textContent = text;
 
   return item;
+};
+
+const createDetailRow = ([label, value]: DetailRow) => {
+  const wrapper = document.createElement('div');
+  const term = document.createElement('dt');
+  const description = document.createElement('dd');
+  term.textContent = label;
+  description.textContent = value;
+  wrapper.append(term, description);
+
+  return wrapper;
+};
+
+const renderDetails = (target: HTMLElement | null, rows: DetailRow[]) => {
+  clear(target);
+  target?.append(...rows.map(createDetailRow));
+};
+
+const renderList = (target: HTMLUListElement | null, items: string[]) => {
+  clear(target);
+  target?.append(...items.map(createListItem));
+};
+
+const renderActions = (
+  { primaryButton, secondaryButton }: ActionTargets,
+  primaryLabel: string,
+  primaryDisabled: boolean,
+  secondaryVisible = false,
+) => {
+  if (primaryButton) {
+    primaryButton.textContent = primaryLabel;
+    primaryButton.disabled = primaryDisabled;
+  }
+
+  secondaryButton?.toggleAttribute('hidden', !secondaryVisible);
 };
 
 const formatBytes = (bytes?: number) => {
@@ -242,7 +284,7 @@ const renderSummary = (scan?: ProjectFolderScan) => {
     return;
   }
 
-  const rows = scan
+  const rows: DetailRow[] = scan
     ? [
         ['Files', scan.summary.fileCount.toString()],
         ['Folders', scan.summary.folderCount.toString()],
@@ -254,18 +296,7 @@ const renderSummary = (scan?: ProjectFolderScan) => {
         ['Status', 'Waiting'],
       ];
 
-  summaryTarget.replaceChildren(
-    ...rows.map(([label, value]) => {
-      const wrapper = document.createElement('div');
-      const term = document.createElement('dt');
-      const description = document.createElement('dd');
-      term.textContent = label;
-      description.textContent = value;
-      wrapper.append(term, description);
-
-      return wrapper;
-    }),
-  );
+  summaryTarget.replaceChildren(...rows.map(createDetailRow));
 };
 
 const renderArtifactCounts = (scan?: ProjectFolderScan) => {
@@ -333,61 +364,31 @@ const renderWarnings = (warnings: ScanWarning[] = []) => {
   );
 };
 
-const renderContextPackageDetails = (rows: Array<[string, string]>) => {
-  clear(contextPackageDetailsTarget);
+const renderContextPackageDetails = (rows: DetailRow[]) =>
+  renderDetails(contextPackageDetailsTarget, rows);
 
-  contextPackageDetailsTarget?.append(
-    ...rows.map(([label, value]) => {
-      const wrapper = document.createElement('div');
-      const term = document.createElement('dt');
-      const description = document.createElement('dd');
-      term.textContent = label;
-      description.textContent = value;
-      wrapper.append(term, description);
+const renderContextPackageList = (items: string[]) => renderList(contextPackageListTarget, items);
 
-      return wrapper;
-    }),
-  );
-};
+const renderTranscriptionImportDetails = (rows: DetailRow[]) =>
+  renderDetails(transcriptionImportDetailsTarget, rows);
 
-const renderContextPackageList = (items: string[]) => {
-  clear(contextPackageListTarget);
-  contextPackageListTarget?.append(...items.map(createListItem));
-};
-
-const renderTranscriptionImportDetails = (rows: Array<[string, string]>) => {
-  clear(transcriptionImportDetailsTarget);
-
-  transcriptionImportDetailsTarget?.append(
-    ...rows.map(([label, value]) => {
-      const wrapper = document.createElement('div');
-      const term = document.createElement('dt');
-      const description = document.createElement('dd');
-      term.textContent = label;
-      description.textContent = value;
-      wrapper.append(term, description);
-
-      return wrapper;
-    }),
-  );
-};
-
-const renderTranscriptionImportList = (items: string[]) => {
-  clear(transcriptionImportListTarget);
-  transcriptionImportListTarget?.append(...items.map(createListItem));
-};
+const renderTranscriptionImportList = (items: string[]) =>
+  renderList(transcriptionImportListTarget, items);
 
 const renderContextPackageActions = (
   primaryLabel: string,
   primaryDisabled: boolean,
   secondaryVisible = false,
 ) => {
-  if (contextPackagePrimaryButton) {
-    contextPackagePrimaryButton.textContent = primaryLabel;
-    contextPackagePrimaryButton.disabled = primaryDisabled;
-  }
-
-  contextPackageSecondaryButton?.toggleAttribute('hidden', !secondaryVisible);
+  renderActions(
+    {
+      primaryButton: contextPackagePrimaryButton,
+      secondaryButton: contextPackageSecondaryButton,
+    },
+    primaryLabel,
+    primaryDisabled,
+    secondaryVisible,
+  );
 };
 
 const renderTranscriptionImportActions = (
@@ -395,203 +396,250 @@ const renderTranscriptionImportActions = (
   primaryDisabled: boolean,
   secondaryVisible = false,
 ) => {
-  if (transcriptionImportPrimaryButton) {
-    transcriptionImportPrimaryButton.textContent = primaryLabel;
-    transcriptionImportPrimaryButton.disabled = primaryDisabled;
-  }
-
-  transcriptionImportSecondaryButton?.toggleAttribute('hidden', !secondaryVisible);
+  renderActions(
+    {
+      primaryButton: transcriptionImportPrimaryButton,
+      secondaryButton: transcriptionImportSecondaryButton,
+    },
+    primaryLabel,
+    primaryDisabled,
+    secondaryVisible,
+  );
 };
 
-const renderContextPackage = (scan?: ProjectFolderScan) => {
-  if (!scan || !window.sidekick || contextPackageState.status === 'unavailable') {
-    setText(contextPackageTitleTarget, 'No folder selected');
-    setText(
-      contextPackageMessageTarget,
-      window.sidekick ? 'Choose a folder first.' : 'Open in Electron to create context packages.',
-    );
-    renderContextPackageDetails([]);
-    renderContextPackageList([]);
-    renderContextPackageActions('Create context package', true);
-    return;
-  }
+const renderContextPackageUnavailable = () => {
+  setText(contextPackageTitleTarget, 'No folder selected');
+  setText(
+    contextPackageMessageTarget,
+    window.sidekick ? 'Choose a folder first.' : 'Open in Electron to create context packages.',
+  );
+  renderContextPackageDetails([]);
+  renderContextPackageList([]);
+  renderContextPackageActions('Create context package', true);
+};
 
-  if (contextPackageState.status === 'ready') {
-    setText(contextPackageTitleTarget, 'Ready');
-    setText(contextPackageMessageTarget, 'Create one Markdown package in the folder root.');
-    renderContextPackageDetails([
-      ['Scope', 'Full selected folder'],
-      ['Format', 'Markdown'],
-    ]);
-    renderContextPackageList([]);
-    renderContextPackageActions('Create context package', false);
-    return;
-  }
+const renderContextPackageReady = () => {
+  setText(contextPackageTitleTarget, 'Ready');
+  setText(contextPackageMessageTarget, 'Create one Markdown package in the folder root.');
+  renderContextPackageDetails([
+    ['Scope', 'Full selected folder'],
+    ['Format', 'Markdown'],
+  ]);
+  renderContextPackageList([]);
+  renderContextPackageActions('Create context package', false);
+};
 
-  if (contextPackageState.status === 'previewing') {
-    setText(contextPackageTitleTarget, 'Preparing');
-    setText(contextPackageMessageTarget, 'Checking output path.');
-    renderContextPackageDetails([]);
-    renderContextPackageList([]);
-    renderContextPackageActions('Preparing...', true);
-    return;
-  }
+const renderContextPackagePreviewing = () => {
+  setText(contextPackageTitleTarget, 'Preparing');
+  setText(contextPackageMessageTarget, 'Checking output path.');
+  renderContextPackageDetails([]);
+  renderContextPackageList([]);
+  renderContextPackageActions('Preparing...', true);
+};
 
-  if (contextPackageState.status === 'confirming') {
-    const { preview } = contextPackageState;
-    setText(contextPackageTitleTarget, 'Confirm generation');
-    setText(contextPackageMessageTarget, 'Review the output before writing.');
-    renderContextPackageDetails([
-      ['Output file', preview.outputFileName],
-      ['Overwrite', preview.willOverwrite ? 'Yes' : 'No'],
-      ['Output path', preview.outputPath],
-    ]);
-    renderContextPackageList([preview.binaryFileWarning, preview.selfIgnoreWarning]);
-    renderContextPackageActions('Generate package', false, true);
-    return;
-  }
+const renderContextPackageConfirming = (preview: ContextPackagePreview) => {
+  setText(contextPackageTitleTarget, 'Confirm generation');
+  setText(contextPackageMessageTarget, 'Review the output before writing.');
+  renderContextPackageDetails([
+    ['Output file', preview.outputFileName],
+    ['Overwrite', preview.willOverwrite ? 'Yes' : 'No'],
+    ['Output path', preview.outputPath],
+  ]);
+  renderContextPackageList([preview.binaryFileWarning, preview.selfIgnoreWarning]);
+  renderContextPackageActions('Generate package', false, true);
+};
 
-  if (contextPackageState.status === 'generating') {
-    const { preview } = contextPackageState;
-    setText(contextPackageTitleTarget, 'Generating');
-    setText(contextPackageMessageTarget, 'Writing context package.');
-    renderContextPackageDetails([
-      ['Output file', preview.outputFileName],
-      ['Output path', preview.outputPath],
-    ]);
-    renderContextPackageList([]);
-    renderContextPackageActions('Generating...', true);
-    return;
-  }
+const renderContextPackageGenerating = (preview: ContextPackagePreview) => {
+  setText(contextPackageTitleTarget, 'Generating');
+  setText(contextPackageMessageTarget, 'Writing context package.');
+  renderContextPackageDetails([
+    ['Output file', preview.outputFileName],
+    ['Output path', preview.outputPath],
+  ]);
+  renderContextPackageList([]);
+  renderContextPackageActions('Generating...', true);
+};
 
-  if (contextPackageState.status === 'complete') {
-    const { result } = contextPackageState;
-    const skippedPreview = result.skippedFiles
-      .slice(0, 5)
-      .map((file) => `${file.path}: ${file.reason}`);
-    const warningPreview = result.warnings.map((warning) =>
-      warning.path ? `${warning.path}: ${warning.message}` : warning.message,
-    );
-    setText(contextPackageTitleTarget, 'Package created');
-    setText(contextPackageMessageTarget, result.overwritten ? 'Existing package overwritten.' : 'Context package created.');
-    renderContextPackageDetails([
-      ['Output file', result.outputFileName],
-      ['Included', result.totalFiles.toString()],
-      ['Skipped', result.skippedFiles.length.toString()],
-      ['Tokens', result.totalTokens.toString()],
-      ['Characters', result.totalCharacters.toString()],
-      ['Size', formatBytes(result.outputBytes)],
-      ['Output path', result.outputPath],
-    ]);
-    renderContextPackageList([
-      ...warningPreview,
-      ...skippedPreview,
-      ...(result.skippedFiles.length > skippedPreview.length
-        ? [`${result.skippedFiles.length - skippedPreview.length} more skipped files`]
-        : []),
-    ]);
-    renderContextPackageActions('Create again', false);
-    return;
-  }
+const renderContextPackageComplete = (result: ContextPackageResult) => {
+  const skippedPreview = result.skippedFiles
+    .slice(0, 5)
+    .map((file) => `${file.path}: ${file.reason}`);
+  const warningPreview = result.warnings.map((warning) =>
+    warning.path ? `${warning.path}: ${warning.message}` : warning.message,
+  );
 
+  setText(contextPackageTitleTarget, 'Package created');
+  setText(
+    contextPackageMessageTarget,
+    result.overwritten ? 'Existing package overwritten.' : 'Context package created.',
+  );
+  renderContextPackageDetails([
+    ['Output file', result.outputFileName],
+    ['Included', result.totalFiles.toString()],
+    ['Skipped', result.skippedFiles.length.toString()],
+    ['Tokens', result.totalTokens.toString()],
+    ['Characters', result.totalCharacters.toString()],
+    ['Size', formatBytes(result.outputBytes)],
+    ['Output path', result.outputPath],
+  ]);
+  renderContextPackageList([
+    ...warningPreview,
+    ...skippedPreview,
+    ...(result.skippedFiles.length > skippedPreview.length
+      ? [`${result.skippedFiles.length - skippedPreview.length} more skipped files`]
+      : []),
+  ]);
+  renderContextPackageActions('Create again', false);
+};
+
+const renderContextPackageError = (message: string) => {
   setText(contextPackageTitleTarget, 'Generation failed');
-  setText(contextPackageMessageTarget, contextPackageState.message);
+  setText(contextPackageMessageTarget, message);
   renderContextPackageDetails([]);
   renderContextPackageList([]);
   renderContextPackageActions('Try again', false);
 };
 
-const renderTranscriptionImport = (scan?: ProjectFolderScan) => {
-  if (!scan || !window.sidekick || transcriptionImportState.status === 'unavailable') {
-    setText(transcriptionImportTitleTarget, 'No folder selected');
-    setText(
-      transcriptionImportMessageTarget,
-      window.sidekick ? 'Choose a folder first.' : 'Open in Electron to import transcriptions.',
-    );
-    renderTranscriptionImportDetails([]);
-    renderTranscriptionImportList([]);
-    renderTranscriptionImportActions('Add transcription', true);
+const renderContextPackage = (scan?: ProjectFolderScan) => {
+  if (!scan || !window.sidekick || contextPackageState.status === 'unavailable') {
+    renderContextPackageUnavailable();
     return;
   }
 
-  if (transcriptionImportState.status === 'ready') {
-    setText(transcriptionImportTitleTarget, 'Ready');
-    setText(transcriptionImportMessageTarget, 'Copy a text or Markdown transcript into the project.');
-    renderTranscriptionImportDetails([
-      ['Accepted', '.txt, .md, .markdown'],
-      ['Target', 'Detected transcription folder'],
-    ]);
-    renderTranscriptionImportList([]);
-    renderTranscriptionImportActions('Add transcription', false);
-    return;
+  switch (contextPackageState.status) {
+    case 'ready':
+      renderContextPackageReady();
+      break;
+    case 'previewing':
+      renderContextPackagePreviewing();
+      break;
+    case 'confirming':
+      renderContextPackageConfirming(contextPackageState.preview);
+      break;
+    case 'generating':
+      renderContextPackageGenerating(contextPackageState.preview);
+      break;
+    case 'complete':
+      renderContextPackageComplete(contextPackageState.result);
+      break;
+    case 'error':
+      renderContextPackageError(contextPackageState.message);
+      break;
   }
+};
 
-  if (transcriptionImportState.status === 'previewing') {
-    setText(transcriptionImportTitleTarget, 'Choose file');
-    setText(transcriptionImportMessageTarget, 'Waiting for transcription file selection.');
-    renderTranscriptionImportDetails([]);
-    renderTranscriptionImportList([]);
-    renderTranscriptionImportActions('Choosing...', true);
-    return;
-  }
+const renderTranscriptionImportUnavailable = () => {
+  setText(transcriptionImportTitleTarget, 'No folder selected');
+  setText(
+    transcriptionImportMessageTarget,
+    window.sidekick ? 'Choose a folder first.' : 'Open in Electron to import transcriptions.',
+  );
+  renderTranscriptionImportDetails([]);
+  renderTranscriptionImportList([]);
+  renderTranscriptionImportActions('Add transcription', true);
+};
 
-  if (transcriptionImportState.status === 'confirming') {
-    const { preview } = transcriptionImportState;
-    setText(transcriptionImportTitleTarget, 'Confirm import');
-    setText(transcriptionImportMessageTarget, 'Review the destination before copying.');
-    renderTranscriptionImportDetails([
-      ['Source file', preview.sourceFileName],
-      ['Target folder', preview.targetFolderRelativePath],
-      ['Destination file', preview.destinationFileName],
-      [
-        'Numbering',
-        `${preview.numbering.nextNumber.toString().padStart(preview.numbering.width, '0')}${preview.numbering.separator} (${preview.numbering.inferredFromExistingFiles ? 'inferred' : 'new sequence'})`,
-      ],
-      ['Destination path', preview.destinationPath],
-    ]);
-    renderTranscriptionImportList([
-      'Source file will be copied, not moved.',
-      ...preview.warnings.map((warning) =>
-        warning.path ? `${warning.path}: ${warning.message}` : warning.message,
-      ),
-    ]);
-    renderTranscriptionImportActions('Import transcription', false, true);
-    return;
-  }
+const renderTranscriptionImportReady = () => {
+  setText(transcriptionImportTitleTarget, 'Ready');
+  setText(transcriptionImportMessageTarget, 'Copy a text or Markdown transcript into the project.');
+  renderTranscriptionImportDetails([
+    ['Accepted', '.txt, .md, .markdown'],
+    ['Target', 'Detected transcription folder'],
+  ]);
+  renderTranscriptionImportList([]);
+  renderTranscriptionImportActions('Add transcription', false);
+};
 
-  if (transcriptionImportState.status === 'importing') {
-    const { preview } = transcriptionImportState;
-    setText(transcriptionImportTitleTarget, 'Importing');
-    setText(transcriptionImportMessageTarget, 'Copying transcription into the project.');
-    renderTranscriptionImportDetails([
-      ['Destination file', preview.destinationFileName],
-      ['Destination path', preview.destinationPath],
-    ]);
-    renderTranscriptionImportList([]);
-    renderTranscriptionImportActions('Importing...', true);
-    return;
-  }
+const renderTranscriptionImportPreviewing = () => {
+  setText(transcriptionImportTitleTarget, 'Choose file');
+  setText(transcriptionImportMessageTarget, 'Waiting for transcription file selection.');
+  renderTranscriptionImportDetails([]);
+  renderTranscriptionImportList([]);
+  renderTranscriptionImportActions('Choosing...', true);
+};
 
-  if (transcriptionImportState.status === 'complete') {
-    const { result } = transcriptionImportState;
-    setText(transcriptionImportTitleTarget, 'Transcription added');
-    setText(transcriptionImportMessageTarget, 'Copied into the transcription folder.');
-    renderTranscriptionImportDetails([
-      ['Destination file', result.destinationFileName],
-      ['Source file', result.sourceFileName],
-      ['Size', formatBytes(result.copiedBytes)],
-      ['Destination path', result.destinationPath],
-    ]);
-    renderTranscriptionImportList([]);
-    renderTranscriptionImportActions('Add another', false);
-    return;
-  }
+const formatNumberingPreview = (preview: TranscriptionImportPreview) =>
+  `${preview.numbering.nextNumber.toString().padStart(preview.numbering.width, '0')}${
+    preview.numbering.separator
+  } (${preview.numbering.inferredFromExistingFiles ? 'inferred' : 'new sequence'})`;
 
+const renderTranscriptionImportConfirming = (preview: TranscriptionImportPreview) => {
+  setText(transcriptionImportTitleTarget, 'Confirm import');
+  setText(transcriptionImportMessageTarget, 'Review the destination before copying.');
+  renderTranscriptionImportDetails([
+    ['Source file', preview.sourceFileName],
+    ['Target folder', preview.targetFolderRelativePath],
+    ['Destination file', preview.destinationFileName],
+    ['Numbering', formatNumberingPreview(preview)],
+    ['Destination path', preview.destinationPath],
+  ]);
+  renderTranscriptionImportList([
+    'Source file will be copied, not moved.',
+    ...preview.warnings.map((warning) =>
+      warning.path ? `${warning.path}: ${warning.message}` : warning.message,
+    ),
+  ]);
+  renderTranscriptionImportActions('Import transcription', false, true);
+};
+
+const renderTranscriptionImportImporting = (preview: TranscriptionImportPreview) => {
+  setText(transcriptionImportTitleTarget, 'Importing');
+  setText(transcriptionImportMessageTarget, 'Copying transcription into the project.');
+  renderTranscriptionImportDetails([
+    ['Destination file', preview.destinationFileName],
+    ['Destination path', preview.destinationPath],
+  ]);
+  renderTranscriptionImportList([]);
+  renderTranscriptionImportActions('Importing...', true);
+};
+
+const renderTranscriptionImportComplete = (result: TranscriptionImportResult) => {
+  setText(transcriptionImportTitleTarget, 'Transcription added');
+  setText(transcriptionImportMessageTarget, 'Copied into the transcription folder.');
+  renderTranscriptionImportDetails([
+    ['Destination file', result.destinationFileName],
+    ['Source file', result.sourceFileName],
+    ['Size', formatBytes(result.copiedBytes)],
+    ['Destination path', result.destinationPath],
+  ]);
+  renderTranscriptionImportList([]);
+  renderTranscriptionImportActions('Add another', false);
+};
+
+const renderTranscriptionImportError = (message: string) => {
   setText(transcriptionImportTitleTarget, 'Import failed');
-  setText(transcriptionImportMessageTarget, transcriptionImportState.message);
+  setText(transcriptionImportMessageTarget, message);
   renderTranscriptionImportDetails([]);
   renderTranscriptionImportList([]);
   renderTranscriptionImportActions('Try again', false);
+};
+
+const renderTranscriptionImport = (scan?: ProjectFolderScan) => {
+  if (!scan || !window.sidekick || transcriptionImportState.status === 'unavailable') {
+    renderTranscriptionImportUnavailable();
+    return;
+  }
+
+  switch (transcriptionImportState.status) {
+    case 'ready':
+      renderTranscriptionImportReady();
+      break;
+    case 'previewing':
+      renderTranscriptionImportPreviewing();
+      break;
+    case 'confirming':
+      renderTranscriptionImportConfirming(transcriptionImportState.preview);
+      break;
+    case 'importing':
+      renderTranscriptionImportImporting(transcriptionImportState.preview);
+      break;
+    case 'complete':
+      renderTranscriptionImportComplete(transcriptionImportState.result);
+      break;
+    case 'error':
+      renderTranscriptionImportError(transcriptionImportState.message);
+      break;
+  }
 };
 
 const renderTreeToolbar = (scan?: ProjectFolderScan) => {
@@ -602,54 +650,23 @@ const renderTreeToolbar = (scan?: ProjectFolderScan) => {
   collapseAllButton?.toggleAttribute('disabled', !hasScan);
 };
 
-const renderTreeNode = (node: FolderTreeNode, level = 1) => {
+const createTreeItem = (node: FolderTreeNode, level: number) => {
   const item = document.createElement('li');
   item.className = `tree-node tree-node--${node.kind}`;
   item.setAttribute('role', 'treeitem');
   item.setAttribute('aria-level', level.toString());
 
-  const row = document.createElement('div');
-  row.className = 'tree-row';
+  return item;
+};
 
-  if (isFolderNode(node)) {
-    const isExpanded = expandedPaths.has(node.relativePath);
-    const canExpand = hasChildren(node);
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.className = 'tree-toggle';
-    toggle.textContent = canExpand ? (isExpanded ? 'v' : '>') : '';
-    toggle.disabled = !canExpand;
-    toggle.setAttribute(
-      'aria-label',
-      canExpand
-        ? `${isExpanded ? 'Collapse' : 'Expand'} ${node.name}`
-        : `${node.name} has no child items`,
-    );
-
-    if (canExpand) {
-      item.setAttribute('aria-expanded', isExpanded.toString());
-      row.classList.add('tree-row--interactive');
-      row.addEventListener('click', () => {
-        toggleFolder(node.relativePath);
-      });
-      toggle.addEventListener('click', (event) => {
-        event.stopPropagation();
-        toggleFolder(node.relativePath);
-      });
-    }
-
-    row.append(toggle);
-  } else {
-    const spacer = document.createElement('span');
-    spacer.className = 'tree-toggle-spacer';
-    row.append(spacer);
-  }
-
+const appendTreeNodeName = (row: HTMLDivElement, node: FolderTreeNode) => {
   const name = document.createElement('span');
   name.className = 'tree-name';
   name.textContent = node.kind === 'folder' ? `${node.name}/` : node.name;
   row.append(name);
+};
 
+const appendTreeNodeMeta = (row: HTMLDivElement, node: FolderTreeNode) => {
   if (isFolderNode(node)) {
     const meta = document.createElement('span');
     meta.className = 'tree-meta';
@@ -661,22 +678,85 @@ const renderTreeNode = (node: FolderTreeNode, level = 1) => {
     meta.textContent = `${artifactLabels[node.artifactType]} ${formatBytes(node.size)}`.trim();
     row.append(meta);
   }
+};
 
+const appendTreeNodeHints = (row: HTMLDivElement, node: FolderTreeNode) => {
   if (node.contextHints.length > 0) {
     const hints = document.createElement('span');
     hints.className = 'tree-hints';
     hints.textContent = node.contextHints.map((hint) => signalLabels[hint]).join(', ');
     row.append(hints);
   }
+};
 
-  item.append(row);
+const appendTreeSpacer = (row: HTMLDivElement) => {
+  const spacer = document.createElement('span');
+  spacer.className = 'tree-toggle-spacer';
+  row.append(spacer);
+};
 
-  if (isFolderNode(node) && expandedPaths.has(node.relativePath) && hasChildren(node)) {
-    const children = document.createElement('ol');
-    children.setAttribute('role', 'group');
-    children.append(...getChildren(node).map((child) => renderTreeNode(child, level + 1)));
-    item.append(children);
+const appendFolderToggle = (item: HTMLLIElement, row: HTMLDivElement, node: FolderTreeNode) => {
+  const isExpanded = expandedPaths.has(node.relativePath);
+  const canExpand = hasChildren(node);
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'tree-toggle';
+  toggle.textContent = canExpand ? (isExpanded ? 'v' : '>') : '';
+  toggle.disabled = !canExpand;
+  toggle.setAttribute(
+    'aria-label',
+    canExpand
+      ? `${isExpanded ? 'Collapse' : 'Expand'} ${node.name}`
+      : `${node.name} has no child items`,
+  );
+
+  if (canExpand) {
+    item.setAttribute('aria-expanded', isExpanded.toString());
+    row.classList.add('tree-row--interactive');
+    row.addEventListener('click', () => {
+      toggleFolder(node.relativePath);
+    });
+    toggle.addEventListener('click', (event) => {
+      event.stopPropagation();
+      toggleFolder(node.relativePath);
+    });
   }
+
+  row.append(toggle);
+};
+
+const createTreeRow = (item: HTMLLIElement, node: FolderTreeNode) => {
+  const row = document.createElement('div');
+  row.className = 'tree-row';
+
+  if (isFolderNode(node)) {
+    appendFolderToggle(item, row, node);
+  } else {
+    appendTreeSpacer(row);
+  }
+
+  appendTreeNodeName(row, node);
+  appendTreeNodeMeta(row, node);
+  appendTreeNodeHints(row, node);
+
+  return row;
+};
+
+const appendTreeChildren = (item: HTMLLIElement, node: FolderTreeNode, level: number) => {
+  if (!isFolderNode(node) || !expandedPaths.has(node.relativePath) || !hasChildren(node)) {
+    return;
+  }
+
+  const children = document.createElement('ol');
+  children.setAttribute('role', 'group');
+  children.append(...getChildren(node).map((child) => renderTreeNode(child, level + 1)));
+  item.append(children);
+};
+
+const renderTreeNode = (node: FolderTreeNode, level = 1) => {
+  const item = createTreeItem(node, level);
+  item.append(createTreeRow(item, node));
+  appendTreeChildren(item, node, level);
 
   return item;
 };
@@ -692,56 +772,55 @@ const renderTree = (scan?: ProjectFolderScan) => {
   treeTarget.append(renderTreeNode(scan.tree));
 };
 
-const render = () => {
-  chooseFolderButton?.toggleAttribute('disabled', state.status === 'loading' || !window.sidekick);
+const renderNoScanPanels = () => {
+  renderContextPackage();
+  renderTranscriptionImport();
+  renderTree();
+};
 
-  if (state.status === 'empty') {
-    setText(selectedNameTarget, 'No folder selected');
-    setText(selectedPathTarget, window.sidekick ? 'Choose a folder to inspect.' : 'Open in Electron to inspect local folders.');
-    setText(stateTitleTarget, 'Choose a project folder');
-    setText(stateMessageTarget, 'Read-only scan of structure, metadata, and artifact types.');
-    renderSummary();
-    renderArtifactCounts();
-    renderFolderSignals();
-    renderRecentFiles();
-    renderWarnings();
-    renderContextPackage();
-    renderTranscriptionImport();
-    renderTree();
-    return;
-  }
+const renderEmptyState = () => {
+  setText(selectedNameTarget, 'No folder selected');
+  setText(
+    selectedPathTarget,
+    window.sidekick ? 'Choose a folder to inspect.' : 'Open in Electron to inspect local folders.',
+  );
+  setText(stateTitleTarget, 'Choose a project folder');
+  setText(stateMessageTarget, 'Read-only scan of structure, metadata, and artifact types.');
+  renderSummary();
+  renderArtifactCounts();
+  renderFolderSignals();
+  renderRecentFiles();
+  renderWarnings();
+  renderNoScanPanels();
+};
 
-  if (state.status === 'loading') {
-    setText(stateTitleTarget, 'Scanning folder');
-    setText(stateMessageTarget, 'Reading structure and metadata.');
-    renderContextPackage();
-    renderTranscriptionImport();
-    renderTree();
-    return;
-  }
+const renderLoadingState = () => {
+  setText(stateTitleTarget, 'Scanning folder');
+  setText(stateMessageTarget, 'Reading structure and metadata.');
+  renderNoScanPanels();
+};
 
-  if (state.status === 'error') {
-    setText(stateTitleTarget, 'Unable to inspect folder');
-    setText(stateMessageTarget, state.message);
-    renderContextPackage();
-    renderTranscriptionImport();
-    renderWarnings([
-      {
-        path: '.',
-        type: 'read-error',
-        severity: 'error',
-        message: state.message,
-      },
-    ]);
-    return;
-  }
+const renderErrorState = (message: string) => {
+  setText(stateTitleTarget, 'Unable to inspect folder');
+  setText(stateMessageTarget, message);
+  renderContextPackage();
+  renderTranscriptionImport();
+  renderWarnings([
+    {
+      path: '.',
+      type: 'read-error',
+      severity: 'error',
+      message,
+    },
+  ]);
+};
 
-  const scan = state.scan;
+const renderReadyState = (scan: ProjectFolderScan, status: 'ready' | 'partial') => {
   const newestFile = scan.summary.recentFiles[0];
 
   setText(selectedNameTarget, scan.rootName);
   setText(selectedPathTarget, scan.rootPath);
-  setText(stateTitleTarget, state.status === 'partial' ? 'Partial folder overview' : 'Folder overview');
+  setText(stateTitleTarget, status === 'partial' ? 'Partial folder overview' : 'Folder overview');
   setText(
     stateMessageTarget,
     newestFile
@@ -756,6 +835,26 @@ const render = () => {
   renderContextPackage(scan);
   renderTranscriptionImport(scan);
   renderTree(scan);
+};
+
+const render = () => {
+  chooseFolderButton?.toggleAttribute('disabled', state.status === 'loading' || !window.sidekick);
+
+  switch (state.status) {
+    case 'empty':
+      renderEmptyState();
+      break;
+    case 'loading':
+      renderLoadingState();
+      break;
+    case 'error':
+      renderErrorState(state.message);
+      break;
+    case 'ready':
+    case 'partial':
+      renderReadyState(state.scan, state.status);
+      break;
+  }
 };
 
 const openContextPackageConfirmation = async () => {

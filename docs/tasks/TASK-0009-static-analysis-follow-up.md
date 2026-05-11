@@ -810,6 +810,12 @@ Documentation structure expectation:
   - `npm audit fix --package-lock-only --dry-run` did not identify a safe non-breaking cleanup path.
   - No dependency update was made in D3.
   - SA-001 is accepted for now as development/build-toolchain risk, not runtime dependency risk.
+- 2026-05-11: D4 refactored `src/renderer.ts`.
+  - D1 routed no dead-code findings to D4, so D4 handled only renderer maintainability findings from SA-005.
+  - Shared helpers now render detail rows, lists, and primary/secondary actions.
+  - Context-package and transcription-import status rendering are split into state-specific functions.
+  - Tree-node rendering and top-level view rendering are split into smaller focused functions.
+  - Renderer function-level maintainability warnings are gone; the remaining renderer warning is file length.
 
 ## Verification Log
 
@@ -828,6 +834,11 @@ Documentation structure expectation:
   - `npm audit`: failed with remaining development/build-toolchain advisories; accepted as documented in the static-analysis report.
   - `npm run check`: passed.
   - `npm run test`: passed.
+- 2026-05-11: D4 verification:
+  - `npm run check`: passed.
+  - `npm run test`: passed.
+  - `npm run test:ui`: passed, 5 Playwright tests.
+  - Maintainability ESLint command: passed with warnings. Renderer warnings were reduced from file length plus four function-level hotspots to file length only.
 
 ## Closeout
 

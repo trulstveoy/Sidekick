@@ -695,6 +695,46 @@ Verification:
 - `npm run check`: passed.
 - `npm run test`: passed.
 
+## Addendum: TASK-0009 D4 Renderer Maintainability Refactor
+
+Date:
+- 2026-05-11
+
+Purpose:
+- Reduce the renderer maintainability findings from SA-005 without changing UI behavior or Electron security boundaries.
+- Confirm whether any D1 dead-code findings were routed to the renderer work.
+
+Inputs from D1:
+- D1 did not route any remaining Knip finding to D4.
+- D4 therefore handled only the renderer maintainability findings from SA-005.
+
+Changes made:
+- Replaced duplicated detail, list, and action rendering code with shared renderer helpers.
+- Split context-package status rendering into one small function per UI state.
+- Split transcription-import status rendering into one small function per UI state.
+- Split tree-node rendering into focused helpers for item setup, toggles, names, metadata, hints, and child nodes.
+- Split the top-level render function into state-specific render functions.
+
+Maintainability result:
+- Before D4, `src/renderer.ts` had warnings for:
+  - file length;
+  - `renderContextPackage` length, statements, and complexity;
+  - `renderTranscriptionImport` length, statements, and complexity;
+  - `renderTreeNode` length, statements, and complexity;
+  - `render` statement count.
+- After D4, the renderer function-level warnings are gone.
+- The remaining renderer warning is file length: `src/renderer.ts` is still above the local 300-line warning threshold.
+
+Final status:
+- Renderer part of SA-005: improved.
+- Remaining renderer issue: file length only. A later task can decide whether to split the renderer into modules.
+
+Verification:
+- `npm run check`: passed.
+- `npm run test`: passed.
+- `npm run test:ui`: passed, 5 Playwright tests.
+- Maintainability ESLint command: passed with warnings. Renderer warnings were reduced to file length only.
+
 ## Deferred Findings
 
 - Finding: Repository-wide duplication detection.
