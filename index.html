@@ -23,6 +23,14 @@
           <p class="path" data-selected-path>Choose a folder to inspect.</p>
         </section>
 
+        <section class="project-create" aria-label="Create project">
+          <p class="section-label">New project</p>
+          <label for="project-name">Project name</label>
+          <input id="project-name" type="text" data-project-name autocomplete="off" />
+          <button type="button" data-create-project>Create project</button>
+          <p class="project-create-message" data-create-project-message></p>
+        </section>
+
         <section aria-label="Folder signals">
           <p class="section-label">Folder signals</p>
           <ul class="signal-list" data-folder-signals>

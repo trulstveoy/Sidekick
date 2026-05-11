@@ -6,6 +6,7 @@ import type {
   ContextPackageResult,
   FolderSignal,
   FolderTreeNode,
+  ProjectCreationResult,
   ProjectFolderScan,
   ScanWarning,
   TranscriptionImportPreview,
@@ -37,6 +38,12 @@ type TranscriptionImportState =
   | { status: 'complete'; result: TranscriptionImportResult }
   | { status: 'error'; message: string };
 
+type ProjectCreationState =
+  | { status: 'idle'; message: string }
+  | { status: 'creating'; message: string }
+  | { status: 'complete'; message: string }
+  | { status: 'error'; message: string };
+
 type DetailRow = [string, string];
 
 type ActionTargets = {
@@ -46,6 +53,11 @@ type ActionTargets = {
 
 const appInfoTarget = document.querySelector<HTMLSpanElement>('[data-app-info]');
 const chooseFolderButton = document.querySelector<HTMLButtonElement>('[data-choose-folder]');
+const projectNameInput = document.querySelector<HTMLInputElement>('[data-project-name]');
+const createProjectButton = document.querySelector<HTMLButtonElement>('[data-create-project]');
+const createProjectMessageTarget = document.querySelector<HTMLElement>(
+  '[data-create-project-message]',
+);
 const selectedNameTarget = document.querySelector<HTMLElement>('[data-selected-name]');
 const selectedPathTarget = document.querySelector<HTMLElement>('[data-selected-path]');
 const folderSignalsTarget = document.querySelector<HTMLUListElement>('[data-folder-signals]');
@@ -113,6 +125,7 @@ let state: ViewState = { status: 'empty' };
 let expandedPaths = new Set<string>();
 let contextPackageState: ContextPackageState = { status: 'unavailable' };
 let transcriptionImportState: TranscriptionImportState = { status: 'unavailable' };
+let projectCreationState: ProjectCreationState = { status: 'idle', message: '' };
 
 const ROOT_PATH = '.';
 
@@ -204,6 +217,13 @@ const setContextPackageStateForScan = (scan?: ProjectFolderScan) => {
 const setTranscriptionImportStateForScan = (scan?: ProjectFolderScan) => {
   transcriptionImportState =
     scan && window.sidekick ? { status: 'ready' } : { status: 'unavailable' };
+};
+
+const setActiveScan = (scan: ProjectFolderScan) => {
+  resetExpandedPaths();
+  setContextPackageStateForScan(scan);
+  setTranscriptionImportStateForScan(scan);
+  state = scan.status === 'partial' ? { status: 'partial', scan } : { status: 'ready', scan };
 };
 
 const getActiveScan = () =>
@@ -362,6 +382,27 @@ const renderWarnings = (warnings: ScanWarning[] = []) => {
   warningsTarget.append(
     ...warnings.map((warning) => createListItem(`${warning.path}: ${warning.message}`)),
   );
+};
+
+const renderProjectCreation = () => {
+  const isCreating = projectCreationState.status === 'creating';
+
+  projectNameInput?.toggleAttribute('disabled', isCreating || !window.sidekick);
+  createProjectButton?.toggleAttribute('disabled', isCreating || !window.sidekick);
+
+  if (createProjectMessageTarget) {
+    if (projectCreationState.status === 'idle') {
+      createProjectMessageTarget.removeAttribute('data-status');
+    } else {
+      createProjectMessageTarget.dataset.status = projectCreationState.status;
+    }
+  }
+
+  setText(createProjectMessageTarget, projectCreationState.message);
+
+  if (createProjectButton) {
+    createProjectButton.textContent = isCreating ? 'Creating...' : 'Create project';
+  }
 };
 
 const renderContextPackageDetails = (rows: DetailRow[]) =>
@@ -838,7 +879,10 @@ const renderReadyState = (scan: ProjectFolderScan, status: 'ready' | 'partial') 
 };
 
 const render = () => {
-  chooseFolderButton?.toggleAttribute('disabled', state.status === 'loading' || !window.sidekick);
+  const isBusy = state.status === 'loading' || projectCreationState.status === 'creating';
+
+  chooseFolderButton?.toggleAttribute('disabled', isBusy || !window.sidekick);
+  renderProjectCreation();
 
   switch (state.status) {
     case 'empty':
@@ -1000,10 +1044,7 @@ const chooseFolder = async () => {
       return;
     }
 
-    resetExpandedPaths();
-    setContextPackageStateForScan(scan);
-    setTranscriptionImportStateForScan(scan);
-    state = scan.status === 'partial' ? { status: 'partial', scan } : { status: 'ready', scan };
+    setActiveScan(scan);
     render();
   } catch (error) {
     expandedPaths = new Set();
@@ -1013,6 +1054,54 @@ const chooseFolder = async () => {
       status: 'error',
       message: error instanceof Error ? error.message : 'Unable to inspect the selected folder.',
     };
+    render();
+  }
+};
+
+const createProject = async () => {
+  if (!window.sidekick) {
+    projectCreationState = {
+      status: 'error',
+      message: 'Project creation is available in the Electron app.',
+    };
+    render();
+    return;
+  }
+
+  const projectName = projectNameInput?.value ?? '';
+  const previousState = state;
+  projectCreationState = { status: 'creating', message: 'Choose where to create the project.' };
+  state = { status: 'loading' };
+  render();
+
+  try {
+    const result: ProjectCreationResult | null = await window.sidekick.createProjectFolder({
+      projectName,
+    });
+
+    if (!result) {
+      projectCreationState = { status: 'idle', message: '' };
+      state = previousState;
+      render();
+      return;
+    }
+
+    if (projectNameInput) {
+      projectNameInput.value = '';
+    }
+
+    setActiveScan(result.scan);
+    projectCreationState = {
+      status: 'complete',
+      message: `Created ${result.rootName}.`,
+    };
+    render();
+  } catch (error) {
+    projectCreationState = {
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unable to create project.',
+    };
+    state = previousState;
     render();
   }
 };
@@ -1027,6 +1116,10 @@ if (window.sidekick) {
 
 chooseFolderButton?.addEventListener('click', () => {
   void chooseFolder();
+});
+
+createProjectButton?.addEventListener('click', () => {
+  void createProject();
 });
 
 expandAllButton?.addEventListener('click', expandAllFolders);

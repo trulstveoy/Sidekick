@@ -4,6 +4,7 @@ import type {
   ContextPackagePreview,
   ContextPackageResult,
   FolderSignal,
+  ProjectCreationResult,
   ProjectFolderScan,
   TranscriptionImportPreview,
   TranscriptionImportResult,
@@ -207,6 +208,58 @@ const mockTranscriptionImportResult: TranscriptionImportResult = {
   scan: mockScanAfterTranscriptionImport,
 };
 
+const mockProjectCreationResult: ProjectCreationResult = {
+  rootPath: '/tmp/new-sidekick-project',
+  rootName: 'new-sidekick-project',
+  requiredFolders: [
+    {
+      name: '00. Forutsetninger',
+      path: '/tmp/new-sidekick-project/00. Forutsetninger',
+      status: 'created',
+    },
+    {
+      name: '01. Transkripsjoner',
+      path: '/tmp/new-sidekick-project/01. Transkripsjoner',
+      status: 'created',
+    },
+  ],
+  scan: {
+    ...mockScan,
+    rootPath: '/tmp/new-sidekick-project',
+    rootName: 'new-sidekick-project',
+    tree: {
+      ...mockScan.tree,
+      name: 'new-sidekick-project',
+      children: [
+        {
+          name: '00. Forutsetninger',
+          relativePath: '00. Forutsetninger',
+          kind: 'folder',
+          children: [],
+          folderSignals: ['background'],
+          contextHints: ['background'],
+          modifiedAt: '2026-05-09T12:00:00.000Z',
+        },
+        {
+          name: '01. Transkripsjoner',
+          relativePath: '01. Transkripsjoner',
+          kind: 'folder',
+          children: [],
+          folderSignals: ['transcript'],
+          contextHints: ['transcript'],
+          modifiedAt: '2026-05-09T12:00:00.000Z',
+        },
+      ],
+    },
+    summary: {
+      ...mockScan.summary,
+      fileCount: 0,
+      folderCount: 2,
+      recentFiles: [],
+    },
+  },
+};
+
 test('renders the folder inspection empty state', async ({ page }) => {
   await page.goto('/');
 
@@ -221,6 +274,49 @@ test('renders the folder inspection empty state', async ({ page }) => {
   await expect(page.getByText('Browser preview')).toBeVisible();
   await expect(page.getByText('No warnings')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add transcription' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Create project' })).toBeDisabled();
+});
+
+test('creates a project and displays the required folders', async ({ page }) => {
+  await page.addInitScript(
+    ({ createdProject }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => null,
+        createProjectFolder: async (request) =>
+          request.projectName === 'new-sidekick-project' ? createdProject : null,
+        previewContextPackage: async () => {
+          throw new Error('No context package preview.');
+        },
+        generateContextPackage: async () => {
+          throw new Error('No context package result.');
+        },
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+      };
+    },
+    {
+      createdProject: mockProjectCreationResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByLabel('Project name').fill('new-sidekick-project');
+  await page.getByRole('button', { name: 'Create project' }).click();
+
+  await expect(page.getByLabel('Selected project folder').getByRole('heading')).toHaveText(
+    'new-sidekick-project',
+  );
+  await expect(page.getByText('Created new-sidekick-project.')).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /00. Forutsetninger/ })).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /01. Transkripsjoner/ })).toBeVisible();
 });
 
 test('expands and collapses scanned folders', async ({ page }) => {
@@ -234,6 +330,7 @@ test('expands and collapses scanned folders', async ({ page }) => {
           isPackaged: false,
         }),
         chooseProjectFolder: async () => scan,
+        createProjectFolder: async () => null,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => result,
         previewTranscriptionImport: async () => null,
@@ -277,6 +374,7 @@ test('expands and collapses all scanned folders', async ({ page }) => {
           isPackaged: false,
         }),
         chooseProjectFolder: async () => scan,
+        createProjectFolder: async () => null,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => result,
         previewTranscriptionImport: async () => null,
@@ -316,6 +414,7 @@ test('confirms and displays a generated context package', async ({ page }) => {
           isPackaged: false,
         }),
         chooseProjectFolder: async () => scan,
+        createProjectFolder: async () => null,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => result,
         previewTranscriptionImport: async () => null,
@@ -370,6 +469,7 @@ test('confirms and displays an imported transcription', async ({ page }) => {
           isPackaged: false,
         }),
         chooseProjectFolder: async () => scan,
+        createProjectFolder: async () => null,
         previewContextPackage: async () => contextPreview,
         generateContextPackage: async () => contextResult,
         previewTranscriptionImport: async () => importPreview,

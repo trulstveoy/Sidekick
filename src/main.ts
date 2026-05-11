@@ -1,9 +1,14 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
-import type { AppInfo, TranscriptionImportPreview } from './shared/sidekick-api';
+import type {
+  AppInfo,
+  ProjectCreationRequest,
+  TranscriptionImportPreview,
+} from './shared/sidekick-api';
 import { generateContextPackage, getContextPackagePreview } from './main/context-package';
 import { scanProjectFolder } from './main/folder-scanner';
+import { createProjectFolder } from './main/project-creator';
 import {
   confirmTranscriptionImport,
   createTranscriptionImportPreview,
@@ -44,6 +49,36 @@ ipcMain.handle('project-folder:choose-and-scan', async (event) => {
 
   selectedProjectRoots.add(result.filePaths[0]);
   return scanProjectFolder(result.filePaths[0]);
+});
+
+ipcMain.handle('project-folder:create', async (event, request: ProjectCreationRequest) => {
+  if (!request || typeof request.projectName !== 'string') {
+    throw new Error('Project name is required.');
+  }
+
+  const window = BrowserWindow.fromWebContents(event.sender);
+  const dialogOptions: Electron.OpenDialogOptions = {
+    title: 'Choose where to create the project',
+    properties: ['openDirectory'],
+  };
+  const result = window
+    ? await dialog.showOpenDialog(window, dialogOptions)
+    : await dialog.showOpenDialog(dialogOptions);
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+
+  const createdProject = await createProjectFolder({
+    parentPath: result.filePaths[0],
+    request,
+  });
+  selectedProjectRoots.add(createdProject.rootPath);
+
+  return {
+    ...createdProject,
+    scan: await scanProjectFolder(createdProject.rootPath),
+  };
 });
 
 const assertKnownProjectRoot = (rootPath: unknown) => {

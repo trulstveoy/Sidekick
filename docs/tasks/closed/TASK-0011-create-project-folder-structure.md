@@ -1,11 +1,25 @@
 # Task: Create Project Folder Structure
 
 ID: TASK-0011
-Status: Planned - Pending Human Approval
+Status: Done
 Class: Major
 Owner: Pair
 Created: 2026-05-11
 Updated: 2026-05-11
+Branch: task/TASK-0011-create-project-folder-structure
+Worktree: ../Sidekick-worktrees/TASK-0011-create-project-folder-structure
+Base branch: main
+Write scope:
+- `src/main.ts`
+- `src/main/project-creator.ts`
+- `src/preload.ts`
+- `src/shared/sidekick-api.ts`
+- `src/renderer.ts`
+- `index.html`
+- `src/index.css`
+- `tests`
+- `docs/tasks/TASK-0011-create-project-folder-structure.md`
+Parallel safety: Coordinate
 
 ## Summary
 
@@ -20,19 +34,20 @@ These folders are part of the project contract. They should exist immediately af
 
 ## Current Phase
 
-Plan
+Close
 
 ## Progress Checklist
 
 - [x] Explore complete
 - [x] Spec complete
 - [x] Plan complete
-- [ ] Human approval received, if required
-- [ ] Build complete
-- [ ] Verification complete
-- [ ] Review complete
-- [ ] Documentation complete
-- [ ] Closeout complete
+- [x] Worktree created or reused, if required
+- [x] Human approval received, if required
+- [x] Build complete
+- [x] Verification complete
+- [x] Review complete
+- [x] Documentation complete
+- [x] Closeout complete
 
 ## Links
 
@@ -51,6 +66,9 @@ Related tasks:
 
 Related backlog items:
 - `docs/tasks/BACKLOG.md#items` (`BL-0001`)
+
+Related decisions:
+- `docs/decisions/0004-project-folder-structure.md`
 
 Related workflows:
 - `docs/workflows/agentic-development.md`
@@ -255,12 +273,60 @@ Expected documentation updates:
 
 ## Build Log
 
-Pending.
+- 2026-05-11: Created task worktree `../Sidekick-worktrees/TASK-0011-create-project-folder-structure` on branch `task/TASK-0011-create-project-folder-structure`.
+- 2026-05-11: Baseline setup:
+  - `npm run check` initially failed because the new worktree did not have `node_modules`.
+  - Ran `npm ci` in the task worktree.
+  - `npm run check`: passed after install.
+  - `npm run test`: passed after install.
+- 2026-05-11: Added shared project-creation types to `src/shared/sidekick-api.ts`.
+- 2026-05-11: Added `src/main/project-creator.ts`.
+  - Centralizes required project folder names.
+  - Validates project names.
+  - Rejects path traversal and path-like project names.
+  - Rejects an existing target project folder.
+  - Creates `00. Forutsetninger` and `01. Transkripsjoner`.
+- 2026-05-11: Added main/preload API wiring.
+  - Main process opens the parent-folder dialog.
+  - Main process creates the project and registers it as selected.
+  - Main process returns a fresh folder scan.
+- 2026-05-11: Added renderer workflow.
+  - New project name input and create button.
+  - Success and error messages.
+  - Successful creation selects and scans the new project.
+- 2026-05-11: Added integration and UI tests.
 
 ## Verification Log
 
-Pending.
+- 2026-05-11: Baseline after `npm ci`:
+  - `npm run check`: passed.
+  - `npm run test`: passed, 9 files and 32 tests.
+- 2026-05-11: Final task verification:
+  - `npm run check`: passed.
+  - `npm run test`: passed, 10 files and 38 tests.
+  - `npm run test:ui`: passed, 6 Playwright tests.
 
 ## Closeout
 
-Pending.
+Changed:
+- Added controlled project creation from the renderer through a typed preload API.
+- Added main-process project folder creation and validation.
+- Added the required folders `00. Forutsetninger` and `01. Transkripsjoner`.
+- Added tests for project creation and UI behavior.
+- Added decision record `docs/decisions/0004-project-folder-structure.md`.
+
+Verified:
+- `npm run check`: passed.
+- `npm run test`: passed.
+- `npm run test:ui`: passed.
+
+Known gaps:
+- Initializing an existing folder as a project is not included. It remains backlog item `BL-0001`.
+
+Worktree status:
+- Branch: `task/TASK-0011-create-project-folder-structure`
+- Worktree: `../Sidekick-worktrees/TASK-0011-create-project-folder-structure`
+- Base branch: local `main`, because local workflow/backlog commits were not on `origin/main` when the task worktree was created.
+
+Final status:
+- Done.

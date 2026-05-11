@@ -95,6 +95,27 @@ export type ScanOptions = {
   followSymlinks: boolean;
 };
 
+export type ProjectCreationRequest = {
+  projectName: string;
+};
+
+export type RequiredProjectFolderName = '00. Forutsetninger' | '01. Transkripsjoner';
+
+export type ProjectCreationFolderStatus = 'created' | 'existing';
+
+export type ProjectCreationFolder = {
+  name: RequiredProjectFolderName;
+  path: string;
+  status: ProjectCreationFolderStatus;
+};
+
+export type ProjectCreationResult = {
+  rootPath: string;
+  rootName: string;
+  requiredFolders: ProjectCreationFolder[];
+  scan: ProjectFolderScan;
+};
+
 export type ContextPackageSkippedFile = {
   path: string;
   reason: string;
@@ -171,6 +192,9 @@ export type TranscriptionImportResult = {
 export type SidekickApi = {
   getAppInfo: () => Promise<AppInfo>;
   chooseProjectFolder: () => Promise<ProjectFolderScan | null>;
+  createProjectFolder: (
+    request: ProjectCreationRequest,
+  ) => Promise<ProjectCreationResult | null>;
   previewContextPackage: (rootPath: string) => Promise<ContextPackagePreview>;
   generateContextPackage: (rootPath: string) => Promise<ContextPackageResult>;
   previewTranscriptionImport: (rootPath: string) => Promise<TranscriptionImportPreview | null>;

@@ -32,7 +32,8 @@ body {
 }
 
 button,
-a {
+a,
+input {
   font: inherit;
 }
 
@@ -156,6 +157,51 @@ li {
   font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;
+}
+
+.project-create {
+  display: grid;
+  gap: 8px;
+}
+
+.project-create label {
+  color: var(--muted-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.project-create input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px 9px;
+  color: var(--text);
+  background: var(--workspace-background);
+}
+
+.project-create input:focus {
+  border-color: var(--focus);
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.project-create button {
+  width: 100%;
+}
+
+.project-create-message {
+  min-height: 18px;
+  margin-bottom: 0;
+  color: var(--muted-text);
+  font-size: 12px;
+}
+
+.project-create-message[data-status='error'] {
+  color: var(--warning);
+}
+
+.project-create-message[data-status='complete'] {
+  color: var(--accent);
 }
 
 .runtime {
