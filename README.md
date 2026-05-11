@@ -34,3 +34,7 @@ Sidekick is a local-first desktop app for inspecting and organizing project fold
 ## Agentic Development
 
 Use `AGENTS.md` as the working agreement for future agent sessions. The full workflow lives in `docs/workflows/agentic-development.md`.
+
+## Static Analysis
+
+Use `docs/workflows/static-analysis.md` for the local static analysis workflow, including dead-code analysis, import-boundary checks, maintainability metrics, and security-oriented review.
