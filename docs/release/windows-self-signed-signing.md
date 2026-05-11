@@ -49,6 +49,14 @@ Default output location:
 %USERPROFILE%\SidekickSigning
 ```
 
+For example:
+
+```text
+C:\Users\trutve\SidekickSigning
+```
+
+If the Windows username is different, replace `trutve` with that username in the commands below.
+
 The default subject is:
 
 ```text
@@ -62,7 +70,7 @@ Keep the `.pfx` file and its password private. Do not commit them to git.
 Import the public `.cer` into the current user's trusted root and trusted publisher stores:
 
 ```powershell
-$cerPath = "$HOME\SidekickSigning\sidekick-local-code-signing.cer"
+$cerPath = "C:\Users\trutve\SidekickSigning\sidekick-local-code-signing.cer"
 
 Import-Certificate -FilePath $cerPath -CertStoreLocation Cert:\CurrentUser\Root
 Import-Certificate -FilePath $cerPath -CertStoreLocation Cert:\CurrentUser\TrustedPublisher
@@ -77,8 +85,8 @@ The CurrentUser stores are the default Sidekick workflow. Importing into LocalMa
 GitHub Actions needs the private `.pfx` as a base64 string.
 
 ```powershell
-$pfxPath = "$HOME\SidekickSigning\sidekick-local-code-signing.pfx"
-$outPath = "$HOME\SidekickSigning\sidekick-local-code-signing.pfx.base64.txt"
+$pfxPath = "C:\Users\trutve\SidekickSigning\sidekick-local-code-signing.pfx"
+$outPath = "C:\Users\trutve\SidekickSigning\sidekick-local-code-signing.pfx.base64.txt"
 
 [Convert]::ToBase64String([IO.File]::ReadAllBytes($pfxPath)) | Set-Content -NoNewline $outPath
 ```
@@ -111,7 +119,7 @@ To make a signed Windows package locally, set signing environment variables befo
 
 ```powershell
 $env:SIDEKICK_REQUIRE_WINDOWS_SIGNING = "true"
-$env:SIDEKICK_SIGNING_PFX_PATH = "$HOME\SidekickSigning\sidekick-local-code-signing.pfx"
+$env:SIDEKICK_SIGNING_PFX_PATH = "C:\Users\trutve\SidekickSigning\sidekick-local-code-signing.pfx"
 $env:SIDEKICK_SIGNING_PASSWORD = "<pfx-password>"
 $env:SIDEKICK_SIGNING_EXPECTED_SUBJECT = "CN=Sidekick Local Code Signing"
 
