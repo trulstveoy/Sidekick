@@ -804,6 +804,12 @@ Documentation structure expectation:
   - Added `@electron-forge/shared-types` as a direct `devDependency`.
   - Removed `@electron-forge/plugin-auto-unpack-natives` because no repository usage or current native dependency need was found.
   - Regenerated `package-lock.json`.
+- 2026-05-11: D3 reviewed development/build-toolchain audit findings.
+  - Production dependency audit remains clean.
+  - Full audit still reports development/build-toolchain vulnerabilities.
+  - `npm audit fix --package-lock-only --dry-run` did not identify a safe non-breaking cleanup path.
+  - No dependency update was made in D3.
+  - SA-001 is accepted for now as development/build-toolchain risk, not runtime dependency risk.
 
 ## Verification Log
 
@@ -817,6 +823,11 @@ Documentation structure expectation:
   - `npm run test`: passed.
   - `npm run package`: passed on Linux x64.
   - `npx knip --no-progress`: SA-002 and SA-003 no longer appear; remaining output is exported symbols and exported types routed by D1.
+- 2026-05-11: D3 verification:
+  - `npm audit --omit=dev`: passed.
+  - `npm audit`: failed with remaining development/build-toolchain advisories; accepted as documented in the static-analysis report.
+  - `npm run check`: passed.
+  - `npm run test`: passed.
 
 ## Closeout
 

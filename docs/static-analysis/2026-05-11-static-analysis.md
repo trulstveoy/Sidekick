@@ -649,6 +649,52 @@ Verification:
 - `npm run package`: passed on Linux x64.
 - `npx knip --no-progress`: SA-002 and SA-003 no longer appear. Remaining output is limited to exported symbols and exported types already routed by D1.
 
+## Addendum: TASK-0009 D3 Development/Build Toolchain Audit Review
+
+Date:
+- 2026-05-11
+
+Purpose:
+- Review SA-001 without confusing development/build-toolchain vulnerabilities with shipped runtime dependency risk.
+
+Commands:
+- `npm audit --omit=dev`
+- `npm audit`
+- `npm outdated --long`
+- `npm audit fix --package-lock-only --dry-run`
+- `npm explain @tootallnate/once http-proxy-agent make-fetch-happen tar tmp vite esbuild @electron/rebuild @electron/node-gyp @inquirer/prompts`
+
+Results:
+- Production dependency audit:
+  - `npm audit --omit=dev`: passed with `found 0 vulnerabilities`.
+- Full dependency audit:
+  - `npm audit`: still reports development/build-toolchain vulnerabilities.
+  - Count after D2: `31 vulnerabilities (6 low, 2 moderate, 23 high)`.
+  - D2 reduced the full-audit count by removing the unused Forge auto-unpack plugin, but the core toolchain findings remain.
+- Non-forced audit fix:
+  - `npm audit fix --package-lock-only --dry-run` did not produce a clean non-breaking fix path.
+- Vite/esbuild:
+  - The current package range resolves to `vite@5.4.21`.
+  - `npm audit` says the esbuild advisory requires `npm audit fix --force` and would install `vite@8.0.12`, which is a breaking major-version change.
+  - D3 did not apply that upgrade.
+- Electron Forge rebuild/tooling chain:
+  - The `tar`, `@tootallnate/once`, and related findings flow through development/build tooling such as `@electron/rebuild`, `@electron/node-gyp`, `make-fetch-happen`, and Electron Forge packages.
+  - `npm audit` still reports no fix available for the main `tar` chain in the current dependency tree.
+- `tmp`:
+  - The `tmp` finding flows through `@inquirer/prompts` used by Electron Forge CLI tooling.
+  - `npm audit` still reports no fix available in the current dependency tree.
+
+Final status:
+- SA-001: accepted for now as development/build-toolchain risk, not runtime dependency risk.
+- No dependency update was made in D3.
+- A future dependency-upgrade task can revisit major Vite upgrades or Electron Forge/toolchain upgrades separately.
+
+Verification:
+- `npm audit --omit=dev`: passed.
+- `npm audit`: failed with remaining development/build-toolchain advisories; accepted as documented above.
+- `npm run check`: passed.
+- `npm run test`: passed.
+
 ## Deferred Findings
 
 - Finding: Repository-wide duplication detection.
