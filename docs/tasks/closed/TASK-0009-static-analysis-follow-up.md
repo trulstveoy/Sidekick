@@ -1,7 +1,7 @@
 # Task: Static Analysis Follow-Up
 
 ID: TASK-0009
-Status: Completed
+Status: Done
 Class: Major
 Owner: Pair
 Created: 2026-05-11
