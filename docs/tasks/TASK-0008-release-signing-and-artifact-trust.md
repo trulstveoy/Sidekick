@@ -557,9 +557,7 @@ Results:
 - Production dependency audit reported 0 vulnerabilities.
 
 Maintainer verification still required:
-- Download the signed Windows installer from GitHub.
 - Confirm `Get-AuthenticodeSignature` reports `Status = Valid` on the maintainer's Windows machine.
-- Record any remaining Defender or SmartScreen warning as a reputation limitation if the signature is valid.
 
 GitHub external verification completed:
 - GitHub signing secrets and variables were configured by the maintainer.
@@ -573,19 +571,20 @@ GitHub external verification completed:
 - Old large GitHub Actions artifacts from failed retry runs were deleted to clear Actions artifact storage pressure. Release assets were not deleted.
 
 Remaining maintainer check:
-- Download the signed Windows installer from GitHub.
 - Confirm `Get-AuthenticodeSignature` reports `Status = Valid` on the maintainer's Windows machine.
-- Record any remaining Defender or SmartScreen warning as a reputation limitation if the signature is valid.
+
+Maintainer installation check completed:
+- The maintainer downloaded `Sidekick-0.1.6.Setup.exe` from the GitHub release.
+- The installer completed and the app works on the maintainer's Windows machine.
+- Windows still reports that the file is not commonly downloaded and asks the maintainer to confirm trust. This is recorded as an expected Defender/SmartScreen reputation warning for self-signed prerelease artifacts, not as an application runtime failure.
 
 ## Maintainer Handoff
 
 The GitHub release-side verification is complete for `v0.1.6`.
 
 Remaining Windows maintainer steps:
-1. Download `Sidekick-0.1.6.Setup.exe` from https://github.com/trulstveoy/Sidekick/releases/tag/v0.1.6.
-2. Run `Get-AuthenticodeSignature` locally and confirm `Status = Valid`.
-3. Install the downloaded setup executable.
-4. Record whether Defender or SmartScreen still shows any reputation warning.
+1. Run `Get-AuthenticodeSignature` locally and confirm `Status = Valid`.
+2. If `Status = Valid`, treat the remaining "not commonly downloaded" warning as a SmartScreen reputation limitation of the self-signed prerelease path.
 
 ## Human Gate
 
