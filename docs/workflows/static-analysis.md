@@ -46,6 +46,24 @@ npm audit --omit=dev
 
 The exact command names are project-specific. The workflow requires that the commands be discoverable in project documentation, package scripts, or agent instructions.
 
+## Local Environment Bootstrap
+
+Before running analysis, confirm the local checkout can execute the project's package scripts.
+
+1. Check dependency installation.
+   - If package dependencies are missing, install them with the project's lockfile-based install command, such as `npm ci`.
+   - Record the install command and any warnings that affect analysis confidence.
+
+2. Distinguish runtime and toolchain audit results.
+   - A production dependency audit and a full dependency audit answer different questions.
+   - Record both separately when both are run.
+   - Do not merge development-toolchain vulnerabilities into runtime findings without explaining the impact path.
+
+3. Use transient tools when the workflow tool is not yet a project dependency.
+   - Prefer `npx` or package-manager equivalent for first-pass report-only analysis.
+   - Record the exact transient tool version.
+   - Do not update `package.json` or lockfiles just to perform a first local report unless a separate task explicitly decides to adopt the tool.
+
 ## Minimal Recommended Toolchain
 
 Prefer a small default toolchain. Add more tools only when a functional gap remains.
@@ -276,6 +294,7 @@ Use this flow when looking for unused files, unused exports, unused types, or un
    - Knip is a strong default for TypeScript repositories.
    - Start in report-only mode.
    - Do not use automatic fixes until the report has been reviewed and configuration is stable.
+   - If Knip is not installed in the project, run it transiently and record the version, for example `npx knip --version` and `npx knip --no-progress`.
 
 2. Configure entry points carefully.
    - Entry points should include actual application, library, script, test, and build entry files.
@@ -315,6 +334,16 @@ Use this flow to protect module boundaries and avoid dependency drift.
 2. Start in report-only mode.
    - Generate a graph or rule report without making it part of the normal local baseline yet.
    - Make rules mandatory in local scripts only after the baseline is clean or accepted exceptions are documented.
+   - If no dependency-cruiser config exists, use `--no-config` for the first local run.
+   - Exclude dependency directories from the graph, such as `--exclude "^node_modules"`.
+   - For TypeScript projects, verify that dependency-cruiser sees TypeScript support with `dependency-cruiser --info`.
+   - When running dependency-cruiser transiently through `npx` or `npm exec`, set `NODE_PATH=./node_modules` if TypeScript is installed in the project but dependency-cruiser does not detect `.ts` and `.tsx` support.
+   - A first-pass command can look like:
+
+```bash
+NODE_PATH=./node_modules npm exec --package dependency-cruiser -- \
+  dependency-cruiser --no-config --exclude "^node_modules" src tests scripts --output-type err
+```
 
 3. Define project-specific boundaries.
    - UI layers should not import server-only, desktop-only, or privileged modules.
@@ -486,6 +515,12 @@ Repository or project:
 Scope:
 - ...
 
+Environment:
+- Branch:
+- Commit:
+- Dependency install:
+- Tool versions:
+
 Tools and commands:
 - `...`
 
@@ -547,6 +582,9 @@ Open questions:
 - ...
 
 False-positive risk:
+- ...
+
+Workflow observations:
 - ...
 
 ## False Positives
