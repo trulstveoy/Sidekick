@@ -31,13 +31,46 @@ function Test-RequiresSidekickSigner {
   return ($normalizedPath -match "/out/make/.+\.exe$") -or ($normalizedPath -match "/sidekick\.exe$")
 }
 
+function Get-SignatureInfo {
+  param([string]$Path)
+
+  try {
+    $authenticodeSignature = Get-AuthenticodeSignature -FilePath $Path
+
+    return [PSCustomObject]@{
+      Status = $authenticodeSignature.Status.ToString()
+      Signer = $authenticodeSignature.SignerCertificate
+      Source = "Get-AuthenticodeSignature"
+      Trusted = $authenticodeSignature.Status -eq "Valid"
+    }
+  } catch {
+    try {
+      $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::CreateFromSignedFile($Path)
+
+      return [PSCustomObject]@{
+        Status = "SignedTrustNotEvaluated"
+        Signer = $certificate
+        Source = "X509Certificate2.CreateFromSignedFile"
+        Trusted = $false
+      }
+    } catch {
+      return [PSCustomObject]@{
+        Status = "NotSigned"
+        Signer = $null
+        Source = "X509Certificate2.CreateFromSignedFile"
+        Trusted = $false
+      }
+    }
+  }
+}
+
 $failed = $false
 
 foreach ($file in $executables) {
-  $signature = Get-AuthenticodeSignature -FilePath $file.FullName
-  $signer = $signature.SignerCertificate
+  $signature = Get-SignatureInfo -Path $file.FullName
+  $signer = $signature.Signer
   $signed = $null -ne $signer -and $signature.Status -ne "NotSigned"
-  $trusted = $signature.Status -eq "Valid"
+  $trusted = $signature.Trusted
   $requiresSidekickSigner = Test-RequiresSidekickSigner -Path $file.FullName
   $subject = if ($signer) { $signer.Subject } else { "<none>" }
   $thumbprint = if ($signer) { $signer.Thumbprint } else { "<none>" }
@@ -48,6 +81,7 @@ foreach ($file in $executables) {
   Write-Host "  Signed:     $signed"
   Write-Host "  Trusted:    $trusted"
   Write-Host "  Sidekick:   $requiresSidekickSigner"
+  Write-Host "  Source:     $($signature.Source)"
   Write-Host "  Subject:    $subject"
   Write-Host "  Thumbprint: $thumbprint"
 
@@ -67,7 +101,7 @@ foreach ($file in $executables) {
   }
 
   if ($RequireTrusted -and -not $trusted) {
-    Write-Host "ERROR: Expected a locally trusted signature, but status was '$($signature.Status)': $($file.FullName)"
+    Write-Host "ERROR: Expected a locally trusted signature, but status was '$($signature.Status)' from '$($signature.Source)': $($file.FullName)"
     $failed = $true
   }
 }
