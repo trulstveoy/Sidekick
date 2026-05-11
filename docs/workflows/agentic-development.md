@@ -200,6 +200,12 @@ Class: Tiny | Standard | Major
 Owner: Human | Agent | Pair
 Created: YYYY-MM-DD
 Updated: YYYY-MM-DD
+Branch: task/TASK-0001-short-title
+Worktree: ../repo-worktrees/TASK-0001-short-title
+Base branch: origin/main
+Write scope:
+- `path/or/module`
+Parallel safety: Safe | Coordinate | Exclusive
 
 ## Summary
 
@@ -214,6 +220,7 @@ Explore | Specify | Plan | Build | Verify | Review | Document | Close
 - [ ] Explore complete
 - [ ] Spec complete
 - [ ] Plan complete
+- [ ] Worktree created or reused, if required
 - [ ] Human approval received, if required
 - [ ] Build complete
 - [ ] Verification complete
@@ -568,6 +575,168 @@ Extension rules:
 - Keep boundaries between categories explicit.
 - If a research note leads to a durable decision, summarize the outcome in `docs/decisions/` and link back to the research.
 - If a large spec creates implementation work, link it to one or more task records.
+
+## Agent Worktrees
+
+Use Git worktrees to keep parallel agent work isolated. The main repository checkout should normally act as the control and integration surface; substantial task work should happen in a task-specific worktree.
+
+### Purpose
+
+Agent worktrees exist to:
+
+- reduce conflicts between agents;
+- make task ownership explicit;
+- keep unmerged changes out of the main checkout;
+- make review and integration easier;
+- preserve a clean place for release, CI, and final verification commands.
+
+### Default Rule
+
+For standard and major tasks, create or reuse a task-specific worktree before Build begins.
+
+Tiny documentation or copy edits may happen in the main checkout when there is no realistic conflict risk. If a tiny task touches files likely to be edited by other agents, use a worktree anyway.
+
+If the agent is already inside the correct task worktree, it should reuse that worktree and record it in the Task Record. Do not create a second worktree for the same task unless there is an explicit reason.
+
+Recommended naming:
+
+```text
+Branch: task/TASK-0001-short-title
+Worktree: ../<repo-name>-worktrees/TASK-0001-short-title
+```
+
+If a repository already has a worktree convention, follow it. If the repository uses a repo-local `.worktrees/` directory, that directory should be ignored by version control.
+
+### Task Record Fields
+
+When a persistent Task Record exists, include enough worktree information for another agent to understand where work is happening.
+
+During active work, the Task Record's source of truth is the task worktree. The agent should update the Task Record in the assigned worktree together with code and documentation changes. Do not maintain a second live copy in the main checkout; the Task Record is merged back to the main checkout during integration.
+
+Recommended fields:
+
+```markdown
+Branch: task/TASK-0001-short-title
+Worktree: ../repo-worktrees/TASK-0001-short-title
+Base branch: origin/main
+Write scope:
+- `path/or/module`
+Parallel safety: Safe | Coordinate | Exclusive
+Depends on:
+- ...
+Blocks:
+- ...
+```
+
+Use `Safe` when the work has a disjoint write scope. Use `Coordinate` when another active task may touch nearby files. Use `Exclusive` when only one agent should work in the area at a time, such as broad architecture, package management, release workflows, or shared agent instructions.
+
+The base branch should describe the latest intended integration base. This is usually `origin/main`. If local `main` commits must be included, push them first or explicitly choose local `main` as the base and record that choice in the Task Record.
+
+### Starting A New Task
+
+Before creating or entering a worktree, the agent should:
+
+1. Check the main checkout status.
+2. Check existing active Task Records in the main checkout and in known task worktrees.
+3. Check existing worktrees with `git worktree list`.
+4. Identify likely write scope.
+5. Look for overlapping active work.
+6. Create or reuse the task branch and worktree.
+7. Record branch, worktree, base branch, and write scope in the Task Record when one exists.
+
+If the main checkout has uncommitted changes, stop and classify them as user work, other-agent work, or current-task work before creating or integrating a worktree. Do not stash, reset, overwrite, or absorb those changes without explicit approval.
+
+Default command shape:
+
+```text
+git fetch
+git worktree add ../<repo-name>-worktrees/TASK-0001-short-title -b task/TASK-0001-short-title <base-ref>
+```
+
+Usually `<base-ref>` is `origin/main`.
+
+If the branch already exists, reuse it instead of creating another branch for the same task:
+
+```text
+git worktree add ../<repo-name>-worktrees/TASK-0001-short-title task/TASK-0001-short-title
+```
+
+After creating or entering the worktree, run a relevant baseline check when practical. If the baseline fails, record the failure before implementation so later agents can distinguish pre-existing failures from task regressions.
+
+### Working Rules
+
+While working in a task worktree, the agent should:
+
+- make task edits only inside the assigned worktree;
+- keep the main checkout free for integration and quick inspection;
+- avoid editing another task's worktree;
+- keep file ownership aligned with the Task Record write scope;
+- coordinate before touching files owned by another active task;
+- run verification from the task worktree unless repository instructions require otherwise;
+- update the Task Record when write scope changes.
+
+The agent should not:
+
+- create multiple worktrees for the same task without a clear reason;
+- use the main checkout for substantial implementation while a task worktree exists;
+- assume a clean main checkout means no other agent is working;
+- resolve conflicts by discarding another agent's changes;
+- merge or delete another task branch without explicit instruction.
+
+### Conflict Rules
+
+If two tasks need the same files, treat that as a coordination point, not a merge problem to solve later.
+
+Use these defaults:
+
+- Disjoint files: parallel work is allowed.
+- Same module but different files: parallel work is allowed only with clear write scopes.
+- Same file: coordinate before editing.
+- Shared contracts, package files, CI, release, security, persistence, or workflow docs: prefer exclusive ownership.
+
+Common hotspot files should be treated carefully because many tasks can need them. Examples include package manifests, lockfiles, shared type definitions, IPC contracts, CI workflows, release scripts, architecture docs, workflow docs, and repository-root agent instructions.
+
+### Integration
+
+When implementation and verification are complete:
+
+1. Review the task worktree diff.
+2. Update the Task Record with build, verification, and review notes.
+3. Rebase the task branch against the intended integration base unless repository policy says otherwise.
+4. Fast-forward merge the task branch into the main checkout.
+5. Run final relevant verification from the main checkout.
+6. Confirm the main checkout has the expected final diff.
+7. Push if the task requires a remote update.
+
+Default command shape:
+
+```text
+git fetch
+git -C ../<repo-name>-worktrees/TASK-0001-short-title rebase <base-ref>
+git merge --ff-only task/TASK-0001-short-title
+```
+
+Use merge commits only when the repository has chosen that policy or when a fast-forward integration is not appropriate and the human has accepted the tradeoff.
+
+Integration should be deliberate. Do not let a task worktree become the hidden source of truth after the task is complete.
+
+### Closeout And Cleanup
+
+During Close, the agent should:
+
+- record final branch and worktree status in the Closeout when a worktree was used;
+- move completed task records to the closed-task archive when applicable;
+- remove the task worktree only after the work is committed, integrated, verified, and pushed when the task requires push;
+- delete the task branch only when repository policy allows it and the work is safely integrated.
+
+Recommended cleanup command shape:
+
+```text
+git worktree remove ../<repo-name>-worktrees/TASK-0001-short-title
+git branch -d task/TASK-0001-short-title
+```
+
+Use non-destructive cleanup. If the worktree has uncommitted or unmerged work, stop and resolve that state before removing it.
 
 ## Core Principles
 
