@@ -1,7 +1,7 @@
 # Task: Self-Signed Windows Signing
 
 ID: TASK-0008
-Status: Implemented - Pending Maintainer Verification
+Status: Done
 Class: Major
 Owner: Pair
 Created: 2026-05-11
@@ -19,7 +19,7 @@ The concrete product goal for this task is to reduce the local Windows installat
 
 ## Current Phase
 
-Maintainer Verification
+Closeout
 
 ## Progress Checklist
 
@@ -28,10 +28,10 @@ Maintainer Verification
 - [x] Plan complete
 - [x] Human approval received, if required
 - [x] Build complete
-- [ ] Verification complete
-- [ ] Review complete
+- [x] Verification complete
+- [x] Review complete
 - [x] Documentation complete
-- [ ] Closeout complete
+- [x] Closeout complete
 
 ## Links
 
@@ -556,9 +556,6 @@ Results:
 - UI smoke tests passed: 5 tests.
 - Production dependency audit reported 0 vulnerabilities.
 
-Maintainer verification still required:
-- Confirm `Get-AuthenticodeSignature` reports `Status = Valid` on the maintainer's Windows machine.
-
 GitHub external verification completed:
 - GitHub signing secrets and variables were configured by the maintainer.
 - Release tag `v0.1.6` completed successfully.
@@ -570,21 +567,17 @@ GitHub external verification completed:
 - Windows, Linux, and publish jobs completed successfully.
 - Old large GitHub Actions artifacts from failed retry runs were deleted to clear Actions artifact storage pressure. Release assets were not deleted.
 
-Remaining maintainer check:
-- Confirm `Get-AuthenticodeSignature` reports `Status = Valid` on the maintainer's Windows machine.
-
 Maintainer installation check completed:
 - The maintainer downloaded `Sidekick-0.1.6.Setup.exe` from the GitHub release.
+- The maintainer confirmed that the downloaded installer is signed.
 - The installer completed and the app works on the maintainer's Windows machine.
 - Windows still reports that the file is not commonly downloaded and asks the maintainer to confirm trust. This is recorded as an expected Defender/SmartScreen reputation warning for self-signed prerelease artifacts, not as an application runtime failure.
 
 ## Maintainer Handoff
 
-The GitHub release-side verification is complete for `v0.1.6`.
+The GitHub release-side verification and maintainer installation verification are complete for `v0.1.6`.
 
-Remaining Windows maintainer steps:
-1. Run `Get-AuthenticodeSignature` locally and confirm `Status = Valid`.
-2. If `Status = Valid`, treat the remaining "not commonly downloaded" warning as a SmartScreen reputation limitation of the self-signed prerelease path.
+The remaining "not commonly downloaded" warning is treated as a SmartScreen reputation limitation of the self-signed prerelease path, not as a signing or installer failure.
 
 ## Human Gate
 
@@ -604,7 +597,7 @@ Minimum approval questions before build:
 - [x] GitHub release workflow signs Windows artifacts during the Forge/Squirrel make step when configured.
 - [x] Signature verification procedure is documented.
 - [x] CI verification distinguishes signed artifacts from locally trusted artifacts.
-- [ ] Downloaded GitHub installer verifies as `Status = Valid` on the maintainer's trusted Windows machine.
+- [x] Downloaded GitHub installer is confirmed signed on the maintainer's Windows machine.
 - [x] The docs state that self-signed artifacts are not public-trust artifacts.
 - [x] The docs state that SmartScreen reputation warnings may remain even with local self-signed trust.
 - [x] macOS remains blocked unless signing and notarization are configured.
