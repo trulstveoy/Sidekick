@@ -1,7 +1,7 @@
 # Task: Self-Signed Windows Signing
 
 ID: TASK-0008
-Status: Implemented - Pending External Verification
+Status: Implemented - Pending Maintainer Verification
 Class: Major
 Owner: Pair
 Created: 2026-05-11
@@ -19,7 +19,7 @@ The concrete product goal for this task is to reduce the local Windows installat
 
 ## Current Phase
 
-Verification
+Maintainer Verification
 
 ## Progress Checklist
 
@@ -556,45 +556,36 @@ Results:
 - UI smoke tests passed: 5 tests.
 - Production dependency audit reported 0 vulnerabilities.
 
-External verification still required:
-- Configure GitHub signing secrets and variables.
-- Bump `package.json` and `package-lock.json` to a new release version before tagging, because `v0.1.2` already exists.
-- Push a matching release tag for the next retry version.
-- Confirm the Windows GitHub release job signs and verifies artifacts before upload.
+Maintainer verification still required:
 - Download the signed Windows installer from GitHub.
-- Install the public certificate into the maintainer's Windows CurrentUser trust stores.
+- Confirm `Get-AuthenticodeSignature` reports `Status = Valid` on the maintainer's Windows machine.
+- Record any remaining Defender or SmartScreen warning as a reputation limitation if the signature is valid.
+
+GitHub external verification completed:
+- GitHub signing secrets and variables were configured by the maintainer.
+- Release tag `v0.1.6` completed successfully.
+- GitHub Release: https://github.com/trulstveoy/Sidekick/releases/tag/v0.1.6
+- Windows release job decoded signing material before `npm run make`.
+- Windows release job verified the published Squirrel setup executable before upload.
+- Verified CI signer subject: `CN=Sidekick Local Code Signing`.
+- Verified CI signature status: signed by expected certificate; runner trust reported as not trusted, which is expected for self-signed CI verification.
+- Windows, Linux, and publish jobs completed successfully.
+- Old large GitHub Actions artifacts from failed retry runs were deleted to clear Actions artifact storage pressure. Release assets were not deleted.
+
+Remaining maintainer check:
+- Download the signed Windows installer from GitHub.
 - Confirm `Get-AuthenticodeSignature` reports `Status = Valid` on the maintainer's Windows machine.
 - Record any remaining Defender or SmartScreen warning as a reputation limitation if the signature is valid.
 
 ## Maintainer Handoff
 
-The implementation is ready for maintainer-supplied signing material.
+The GitHub release-side verification is complete for `v0.1.6`.
 
-Repository state needed before external verification:
-- Commit and push this task implementation.
-- Bump the app version before creating the next release tag, because the current package version is `0.1.2` and `v0.1.2` already exists.
-
-Windows maintainer steps:
-1. Run `npm run signing:create-self-signed-cert` on the Windows machine.
-2. Keep the `.pfx` password private.
-3. Import the generated `.cer` into `Cert:\CurrentUser\Root`.
-4. Import the generated `.cer` into `Cert:\CurrentUser\TrustedPublisher`.
-5. Encode the `.pfx` to base64 as described in `docs/release/windows-self-signed-signing.md`.
-
-GitHub configuration needed:
-- secret `SIDEKICK_SIGNING_PFX_BASE64`
-- secret `SIDEKICK_SIGNING_PASSWORD`
-- variable `SIDEKICK_REQUIRE_WINDOWS_SIGNING=true`
-- variable `SIDEKICK_SIGNING_EXPECTED_SUBJECT=CN=Sidekick Local Code Signing`
-- optional secret or variable `SIDEKICK_SIGNING_TIMESTAMP_URL`
-
-Expected external verification release:
-- Bump version to the next retry version.
-- Commit and push the version bump.
-- Push the matching version tag.
-- Confirm the GitHub release workflow signs and verifies Windows artifacts.
-- Download the Windows installer from the GitHub prerelease.
-- Run `Get-AuthenticodeSignature` locally and confirm `Status = Valid`.
+Remaining Windows maintainer steps:
+1. Download `Sidekick-0.1.6.Setup.exe` from https://github.com/trulstveoy/Sidekick/releases/tag/v0.1.6.
+2. Run `Get-AuthenticodeSignature` locally and confirm `Status = Valid`.
+3. Install the downloaded setup executable.
+4. Record whether Defender or SmartScreen still shows any reputation warning.
 
 ## Human Gate
 
