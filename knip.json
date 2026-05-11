@@ -1,0 +1,21 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "forge.config.ts",
+    "vite.main.config.ts",
+    "vite.preload.config.ts",
+    "src/main.ts",
+    "src/preload.ts",
+    "scripts/**/*.mjs",
+    "tests/**/*.test.ts",
+    "tests/**/*.spec.ts"
+  ],
+  "project": [
+    "*.ts",
+    "src/**/*.ts",
+    "scripts/**/*.mjs",
+    "tests/**/*.ts",
+    "!tests/fixtures/**"
+  ],
+  "ignoreBinaries": ["powershell.exe"]
+}

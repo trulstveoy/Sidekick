@@ -788,11 +788,24 @@ Documentation structure expectation:
 
 ## Build Log
 
-Pending.
+- 2026-05-11: D1 started after human approval.
+- 2026-05-11: Baseline before D1:
+  - `npm run check`: passed.
+  - `npm run test`: passed, 9 test files and 32 tests.
+  - `npx knip --no-progress`: reproduced first-run Knip findings.
+- 2026-05-11: Added `knip.json` to model Electron/Vite entrypoints, scripts, tests, intentional fixtures, and `powershell.exe` Windows tooling.
+- 2026-05-11: D1 after configuration:
+  - Known Electron/Vite entrypoints no longer appear as unused files.
+  - Intentional fixture files no longer appear as deletion candidates.
+  - `powershell.exe` no longer appears as an unlisted binary.
+  - Remaining Knip findings were routed in `docs/static-analysis/2026-05-11-static-analysis.md`.
 
 ## Verification Log
 
-Pending.
+- 2026-05-11: D1 verification:
+  - `npm run check`: passed.
+  - `npm run test`: passed.
+  - `npx knip --no-progress`: completed with remaining findings documented in the D1 handoff table.
 
 ## Closeout
 

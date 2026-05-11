@@ -556,6 +556,70 @@ Workflow observations:
   Reason: `SidekickApi` is imported by `src/preload.ts`; the finding is downstream of Knip not recognizing `src/preload.ts` as an entrypoint.
   Suppression or config change: Same as above.
 
+## Addendum: TASK-0009 D1 Knip Configuration
+
+Date:
+- 2026-05-11
+
+Purpose:
+- Configure Knip so dead-code findings are based on the actual Electron/Vite project shape.
+- Preserve the original first-run report as historical evidence.
+
+Change made:
+- Added `knip.json`.
+- Marked these files as real entrypoints:
+  - `forge.config.ts`
+  - `vite.main.config.ts`
+  - `vite.preload.config.ts`
+  - `src/main.ts`
+  - `src/preload.ts`
+  - scripts under `scripts/**/*.mjs`
+  - tests under `tests/**/*.test.ts` and `tests/**/*.spec.ts`
+- Excluded intentional test fixtures from project-file unused-file analysis:
+  - `tests/fixtures/**`
+- Treated `powershell.exe` as accepted Windows local tooling for package scripts.
+
+Before D1:
+- Command: `npx knip --no-progress`
+- Result:
+  - Reported `src/preload.ts` as an unused file.
+  - Reported `vite.preload.config.ts` as an unused file.
+  - Reported `tests/fixtures/project-folder-basic/dist/ignored-package/index.js` as an unused file.
+  - Reported `powershell.exe` as an unlisted binary.
+  - Reported `SidekickApi` as an unused exported type.
+  - Reported `forge.config.ts` default export as unused.
+  - Also reported dependency and exported-symbol findings listed below.
+
+After D1:
+- Command: `npx knip --no-progress`
+- Result:
+  - Known Electron/Vite entrypoints are no longer reported as unused files.
+  - Intentional fixture files are no longer reported as deletion candidates.
+  - `powershell.exe` is no longer reported as an unlisted binary.
+  - `SidekickApi` is no longer reported as an unused exported type.
+  - `forge.config.ts` default export is no longer reported as unused.
+  - Remaining findings are listed in the handoff table below.
+
+D1 handoff table:
+
+| Remaining Knip finding | Final status or next owner | Reason |
+| --- | --- | --- |
+| `@electron-forge/plugin-auto-unpack-natives` unused dev dependency | D2 | Dependency cleanup belongs with dependency declaration fixes. |
+| `@electron-forge/shared-types` unlisted dependency | D2 | Direct import must be resolved by a direct dependency or a different type import. |
+| `DEFAULT_SCAN_OPTIONS` unused export | D5 | Scanner export cleanup belongs with the scanner refactor if it remains valid after D5 changes. |
+| `CONTEXT_PACKAGE_SUFFIX` unused export | Follow-up cleanup recommendation | Context-package export cleanup does not belong to D2, D4, or D5. |
+| `BINARY_FILE_WARNING` unused export | Follow-up cleanup recommendation | Context-package export cleanup does not belong to D2, D4, or D5. |
+| `SELF_IGNORE_WARNING` unused export | Follow-up cleanup recommendation | Context-package export cleanup does not belong to D2, D4, or D5. |
+| `findTranscriptionFolders` unused export | Follow-up cleanup recommendation | Transcription-importer export cleanup does not belong to D2, D4, or D5. |
+| `ScanStatus` unused exported type | Needs human decision | Shared API types may be kept for public contract clarity even when only used inside composed exported types. |
+| `ScanWarningSeverity` unused exported type | Needs human decision | Shared API types may be kept for public contract clarity even when only used inside composed exported types. |
+| `TranscriptionImportWarning` unused exported type | Needs human decision | Shared API types may be kept for public contract clarity even when only used inside composed exported types. |
+
+Verification:
+- `npm run check`: passed.
+- `npm run test`: passed.
+- `npx knip --no-progress`: completed with the remaining findings listed in the handoff table.
+
 ## Deferred Findings
 
 - Finding: Repository-wide duplication detection.
