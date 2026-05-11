@@ -1,7 +1,7 @@
 # Task: Static Analysis Follow-Up
 
 ID: TASK-0009
-Status: Approved - Building
+Status: Completed
 Class: Major
 Owner: Pair
 Created: 2026-05-11
@@ -17,7 +17,7 @@ The task is organized as separate deliverables so each change can be implemented
 
 ## Current Phase
 
-Build
+Closeout
 
 ## Progress Checklist
 
@@ -25,11 +25,11 @@ Build
 - [x] Spec complete
 - [x] Plan complete
 - [x] Human approval received, if required
-- [ ] Build complete
-- [ ] Verification complete
-- [ ] Review complete
-- [ ] Documentation complete
-- [ ] Closeout complete
+- [x] Build complete
+- [x] Verification complete
+- [x] Review complete
+- [x] Documentation complete
+- [x] Closeout complete
 
 ## Links
 
@@ -821,6 +821,11 @@ Documentation structure expectation:
   - Scanner traversal now uses a scan context object instead of passing root path, options, and state through every recursive call.
   - Directory scanning, file scanning, stat reading, directory reading, and scanner warnings are split into focused helpers.
   - Scanner function-level maintainability warnings are gone; the remaining scanner warning is file length.
+- 2026-05-11: D6 closed out the task.
+  - Added final status for every static-analysis finding to the report.
+  - Reclassified SA-006 as a passed informational check.
+  - Marked SA-007 fixed by the workflow update.
+  - Listed remaining Knip findings as follow-up cleanup recommendations or human decisions.
 
 ## Verification Log
 
@@ -850,7 +855,28 @@ Documentation structure expectation:
   - `npx vitest run tests/unit/folder-classification.test.ts tests/integration/folder-scanner.test.ts`: passed, 2 files and 5 tests.
   - Maintainability ESLint command: passed with warnings. Scanner warnings were reduced from file length plus six function-level hotspots to file length only.
   - `npx knip --no-progress`: `DEFAULT_SCAN_OPTIONS` no longer appears. Remaining findings are already documented by D1.
+- 2026-05-11: D6 final verification:
+  - `npm run check`: passed.
+  - `npm run test`: passed, 9 files and 32 tests.
+  - `npx knip --no-progress`: completed with remaining findings documented as follow-up cleanup recommendations or human decisions.
+  - `npm audit --omit=dev`: passed, `found 0 vulnerabilities`.
+  - `npm audit`: failed with 31 development/build-toolchain vulnerabilities; accepted as SA-001.
 
 ## Closeout
 
-Pending.
+Completed.
+
+Summary:
+- D1 added a project-specific Knip baseline.
+- D2 fixed dependency declaration and unused plugin findings.
+- D3 documented the remaining full-audit findings as development/build-toolchain risk.
+- D4 reduced renderer maintainability warnings to file length only.
+- D5 reduced scanner maintainability warnings to file length only and fixed the `DEFAULT_SCAN_OPTIONS` unused export.
+- D6 updated the report so each finding has a clear final status.
+
+Remaining follow-up candidates:
+- Remove or internalize the remaining context-package exports if they are not part of the intended module contract.
+- Remove or internalize `findTranscriptionFolders` if it is not part of the intended module contract.
+- Decide whether exported shared API types should remain for contract clarity.
+- Decide whether splitting long renderer and scanner files into modules is worth doing.
+- Revisit build-toolchain dependency upgrades in a separate dependency-upgrade task.

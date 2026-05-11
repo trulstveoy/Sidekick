@@ -774,6 +774,34 @@ Verification:
 - Maintainability ESLint command: passed with warnings. Scanner warnings were reduced to file length only.
 - `npx knip --no-progress`: `DEFAULT_SCAN_OPTIONS` no longer appears. Remaining findings are the context-package exports, transcription-folder helper export, and shared exported types already documented by D1.
 
+## Final Status After TASK-0009
+
+Date:
+- 2026-05-11
+
+| Finding | Final status | What happened |
+| --- | --- | --- |
+| SA-001: development dependency audit reports vulnerable toolchain packages | Accepted for now | Production audit is clean. Full audit still reports development/build-toolchain advisories. No safe non-breaking update path was applied in this task. |
+| SA-002: `@electron-forge/shared-types` imported directly but not listed directly | Fixed | Added `@electron-forge/shared-types` as a direct `devDependency`. |
+| SA-003: `@electron-forge/plugin-auto-unpack-natives` appears unused | Fixed | Removed the unused Forge plugin dependency. Packaging still passes on Linux x64 after removal. |
+| SA-004: Knip needs project-specific entry and ignore configuration | Fixed enough for local use | Added `knip.json` for Electron/Vite entrypoints, scripts, tests, fixtures, and the Windows `powershell.exe` script binary. |
+| SA-005: renderer and scanner have maintainability hotspots | Improved | Renderer and scanner function-level warnings are gone. Remaining warnings are file length in `src/renderer.ts` and `src/main/folder-scanner.ts`. |
+| SA-006: import-boundary analysis found no violations | Passed informational check | dependency-cruiser found no import-boundary violations. This is not a defect. |
+| SA-007: static-analysis workflow needed first-run operational guidance | Fixed | The local static-analysis workflow now includes first-run guidance and structured reporting expectations. |
+| Knip unlisted binary: `powershell.exe` | Fixed as analysis configuration | Added to `ignoreBinaries` because it is a Windows local-script command, not an npm package. |
+| `DEFAULT_SCAN_OPTIONS` unused export | Fixed | Made the scanner default options module-internal. |
+| Remaining context-package unused exports | Follow-up cleanup recommendation | `CONTEXT_PACKAGE_SUFFIX`, `BINARY_FILE_WARNING`, and `SELF_IGNORE_WARNING` remain as exported-but-unused symbols. |
+| Remaining transcription importer unused export | Follow-up cleanup recommendation | `findTranscriptionFolders` remains as an exported-but-unused helper. |
+| Remaining shared exported types | Needs human decision | `ScanStatus`, `ScanWarningSeverity`, and `TranscriptionImportWarning` may be kept for public contract clarity or removed in a later API cleanup. |
+| Deferred duplication and exact cognitive-complexity checks | Deferred investigation | No extra free local tool was adopted for these during TASK-0009. |
+
+Final verification:
+- `npm run check`: passed.
+- `npm run test`: passed, 9 files and 32 tests.
+- `npx knip --no-progress`: completed with remaining findings listed above.
+- `npm audit --omit=dev`: passed, `found 0 vulnerabilities`.
+- `npm audit`: failed with 31 development/build-toolchain vulnerabilities; accepted as SA-001.
+
 ## Deferred Findings
 
 - Finding: Repository-wide duplication detection.
@@ -786,7 +814,7 @@ Verification:
 
 ## Accepted Risks
 
-- None.
+- SA-001 remains accepted as a development/build-toolchain risk for now. Runtime production dependency audit is clean.
 
 ## Local Verification
 
