@@ -99,6 +99,8 @@ Canceled
 Status rules:
 
 - Move status forward when a workflow phase is completed.
+- Use `Backlog` for a Task Record that already exists but is not yet being explored or planned.
+- Use the repository backlog document for smaller deferred ideas that are not yet Task Records.
 - Use `Blocked` when progress requires human input or unavailable external access.
 - Use `Approved` only when a required human gate has been cleared.
 - Use `Done` only after closeout.
@@ -276,6 +278,7 @@ docs/
   workflows/
     agentic-development.md
   tasks/
+    BACKLOG.md
     TASK-0001-short-title.md
     TASK-0002-short-title.md
     closed/
@@ -303,6 +306,14 @@ docs/
 - Used for standard work that spans sessions and for major work.
 - Captures the lifecycle from Explore through Close.
 - Serves as the lightweight task tracker.
+
+`docs/tasks/BACKLOG.md`
+
+- Contains deferred ideas and candidate work that may become tasks later.
+- Used when useful future work is discovered but intentionally left out of the current task.
+- Keeps active task records focused on approved or planned work.
+- Should not contain full implementation plans.
+- Should link back to the source task, report, or decision when possible.
 
 `docs/tasks/closed/`
 
@@ -343,6 +354,21 @@ Rules:
 - Do not reuse task IDs.
 - Keep active task records directly under `docs/tasks/`.
 - Move completed task records to `docs/tasks/closed/` during closeout.
+
+Backlog:
+
+```text
+docs/tasks/BACKLOG.md
+```
+
+Backlog item rules:
+
+- Use `BL-` followed by a zero-padded number for backlog items, for example `BL-0001`.
+- Do not reuse backlog item IDs.
+- Keep each item short and task-ready.
+- Include status, title, source, reason deferred, and next step.
+- Mark an item as `Promoted` when it becomes a Task Record, and link to that task.
+- Do not use backlog items as a substitute for an approved task plan.
 
 Decision records:
 
@@ -408,11 +434,46 @@ Index rules:
 - Update it only when a persistent task document is created or changes final state.
 - Do not duplicate full task details in the index.
 
+### Backlog Management
+
+Use a backlog when the repository repeatedly discovers useful future work during active tasks.
+
+The backlog is for ideas that are worth preserving but not ready or approved as active tasks. Typical examples:
+
+- follow-up workflows deferred from the current task;
+- cleanup that is valid but not part of the current scope;
+- product ideas that need prioritization;
+- investigation topics that need a future decision.
+
+Backlog items should answer:
+
+- What is the idea?
+- Where did it come from?
+- Why is it not part of the current task?
+- What decision or trigger would make it active work?
+
+Recommended backlog statuses:
+
+- `Candidate`: captured idea that still needs refinement.
+- `Deferred`: valid future work, intentionally not part of current scope.
+- `Ready for Task`: clear enough to become a task when prioritized.
+- `Promoted`: converted to a Task Record.
+- `Dropped`: intentionally not going forward.
+
+Promotion rules:
+
+- Create a normal `TASK-0000-title.md` file when a backlog item becomes active work.
+- Keep the backlog item and mark it `Promoted`.
+- Link from the backlog item to the task record.
+- Link from the task record back to the backlog item when the relationship matters.
+- Do not start building directly from a backlog item; specify and plan the task first.
+
 ### Artifact Placement Rules
 
 - Tiny task artifacts usually stay in the conversation.
 - Standard task artifacts stay in the conversation unless the work spans sessions, has meaningful risk, or needs later review.
 - Major task artifacts should be stored in `docs/tasks/` while active.
+- Deferred ideas and future-work candidates should be captured in `docs/tasks/BACKLOG.md` when they are worth preserving.
 - Completed task records should be moved to `docs/tasks/closed/` when they reach `Done`.
 - Durable decisions belong in `docs/decisions/`, even if they started inside a task record.
 - Workflow changes belong in `docs/workflows/`.

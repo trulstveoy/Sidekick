@@ -49,6 +49,9 @@ Related tasks:
 - `docs/tasks/closed/TASK-0001-inspect-local-folder.md`
 - `docs/tasks/closed/TASK-0007-add-transcription-import.md`
 
+Related backlog items:
+- `docs/tasks/BACKLOG.md#items` (`BL-0001`)
+
 Related workflows:
 - `docs/workflows/agentic-development.md`
 
@@ -70,18 +73,16 @@ Important product rule:
   - `00. Forutsetninger`
   - `01. Transkripsjoner`
 
-Open questions before build:
-- Should the user choose a parent folder and enter a project name, or choose the final project folder path directly?
-- What should happen if the project folder already exists?
-- What should happen if one or both required subfolders already exist?
-- Should project creation immediately select and scan the new project folder?
-
-Initial recommendation:
+Resolved policy before build:
 - Let the user choose a parent folder and enter a project name.
 - Create the project folder under the chosen parent folder.
-- Create missing required subfolders.
-- If the project folder already exists, require explicit confirmation before using it.
+- If the project folder already exists, stop with a clear error.
+- Create the two required subfolders inside the new project folder.
 - After successful creation, select and scan the new project folder.
+
+Deferred follow-up:
+- Initializing an existing folder as a project is out of scope for this task.
+- That follow-up is captured as `BL-0001` in `docs/tasks/BACKLOG.md`.
 
 ## Task Spec
 
@@ -99,14 +100,15 @@ Acceptance criteria:
 - Sidekick creates `00. Forutsetninger` inside the project root folder.
 - Sidekick creates `01. Transkripsjoner` inside the project root folder.
 - Folder names must match exactly, including numbering, punctuation, spacing, and Norwegian characters.
+- If the target project folder already exists, Sidekick stops and shows a clear error.
 - Folder creation happens in the main process.
 - Renderer code does not receive raw filesystem access.
 - Main process validates the target path before creating folders.
 - Path validation prevents empty names, path traversal, and creating outside the selected parent folder.
-- Existing required subfolders are treated as already satisfied, not as an error.
+- If a required subfolder already exists during a retry or partial creation recovery, it is treated as already satisfied.
 - Unexpected filesystem errors are shown to the user with clear messages.
 - After successful project creation, Sidekick selects the new project folder and refreshes the folder scan.
-- Tests cover successful creation, existing required subfolders, invalid project names or paths, and error reporting.
+- Tests cover successful creation, existing target-folder rejection, retry-safe required subfolder handling, invalid project names or paths, and error reporting.
 
 Non-goals:
 - Project templates beyond the two required subfolders.
@@ -114,6 +116,7 @@ Non-goals:
 - Moving or renaming existing projects.
 - Deleting projects.
 - Migrating existing folders into the new structure.
+- Initializing an existing folder as a project.
 - Multi-project workspace management.
 - Cloud sync or remote project creation.
 
@@ -128,7 +131,7 @@ Constraints:
 Risks:
 - Folder creation writes to the user's filesystem.
 - Incorrect path validation could create folders in the wrong location.
-- Existing folders may contain user data and must not be overwritten or deleted.
+- Existing folders may contain user data and must not be overwritten, reused, or deleted by this workflow.
 - Packaged app behavior may differ across operating systems for folder selection and path permissions.
 
 ## Implementation Plan
@@ -161,14 +164,15 @@ Purpose:
 Expected output:
 - A main-process project creation function.
 - IPC handler exposed through preload as a typed task-specific API.
-- Tests for successful creation and existing subfolders.
+- Tests for successful creation, existing target-folder rejection, and retry-safe required subfolder handling.
 
 Steps:
 1. Implement project root folder creation.
 2. Implement required subfolder creation.
-3. Treat existing required subfolders as success.
-4. Return the created project root path and created/existing folder status.
-5. Add tests for success and expected filesystem edge cases.
+3. Reject an already existing target project folder with a clear error.
+4. Treat already existing required subfolders as success only for retry or partial creation recovery.
+5. Return the created project root path and created/existing folder status.
+6. Add tests for success and expected filesystem edge cases.
 
 Verification:
 - `npm run check`
@@ -228,7 +232,8 @@ Minimum verification before closeout:
 
 Focused verification:
 - Project creation succeeds in an empty temporary parent folder.
-- Existing required subfolders are accepted.
+- Required subfolders that already exist during retry or partial creation recovery are accepted.
+- Existing target project folder is rejected.
 - Invalid project names are rejected.
 - Path traversal attempts are rejected.
 - Filesystem errors are reported clearly.
