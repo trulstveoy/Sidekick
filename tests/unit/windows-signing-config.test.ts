@@ -34,9 +34,7 @@ describe('Windows signing Forge configuration', () => {
         'win32',
       ),
     ).toEqual({
-      certificateFile: 'C:\\certs\\sidekick.pfx',
-      certificatePassword: 'secret-password',
-      signWithParams: '/fd SHA256',
+      signWithParams: '/fd SHA256 /f "C:\\certs\\sidekick.pfx" /p "secret-password"',
     });
   });
 
@@ -50,6 +48,6 @@ describe('Windows signing Forge configuration', () => {
         },
         'win32',
       ).signWithParams,
-    ).toBe('/fd SHA256 /tr http://timestamp.example.test /td SHA256');
+    ).toBe('/fd SHA256 /f "C:\\certs\\sidekick.pfx" /p "secret-password" /tr http://timestamp.example.test /td SHA256');
   });
 });

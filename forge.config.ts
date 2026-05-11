@@ -9,6 +9,8 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
 const isTrue = (value: string | undefined): boolean => value?.toLowerCase() === 'true';
 
+const quoteSignToolValue = (value: string): string => `"${value.replace(/"/g, '\\"')}"`;
+
 type SigningEnvironment = Partial<Record<
   | 'SIDEKICK_REQUIRE_WINDOWS_SIGNING'
   | 'SIDEKICK_SIGNING_PFX_PATH'
@@ -25,28 +27,33 @@ export const createSquirrelConfig = (
   const certificateFile = environment.SIDEKICK_SIGNING_PFX_PATH;
   const certificatePassword = environment.SIDEKICK_SIGNING_PASSWORD;
   const timestampUrl = environment.SIDEKICK_SIGNING_TIMESTAMP_URL;
-  const hasCompleteSigningConfig = Boolean(certificateFile && certificatePassword);
+  const hasIncompleteSigningConfig = !certificateFile || !certificatePassword;
   const hasPartialSigningConfig = Boolean(certificateFile || certificatePassword);
 
-  if (platform === 'win32' && (requireSigning || hasPartialSigningConfig) && !hasCompleteSigningConfig) {
+  if (platform === 'win32' && (requireSigning || hasPartialSigningConfig) && hasIncompleteSigningConfig) {
     throw new Error(
       'Windows signing is enabled but SIDEKICK_SIGNING_PFX_PATH and SIDEKICK_SIGNING_PASSWORD are not both set.',
     );
   }
 
-  if (!hasCompleteSigningConfig) {
+  if (hasIncompleteSigningConfig) {
     return {};
   }
 
-  const signWithParams = ['/fd', 'SHA256'];
+  const signWithParams = [
+    '/fd',
+    'SHA256',
+    '/f',
+    quoteSignToolValue(certificateFile),
+    '/p',
+    quoteSignToolValue(certificatePassword),
+  ];
 
   if (timestampUrl) {
     signWithParams.push('/tr', timestampUrl, '/td', 'SHA256');
   }
 
   return {
-    certificateFile,
-    certificatePassword,
     signWithParams: signWithParams.join(' '),
   };
 };
