@@ -189,6 +189,49 @@ export type TranscriptionImportResult = {
   scan: ProjectFolderScan;
 };
 
+export type CodexRunMode = 'read-only' | 'workspace-write';
+
+export type CodexStatusState = 'unavailable' | 'logged-out' | 'ready';
+
+export type CodexStatus = {
+  state: CodexStatusState;
+  available: boolean;
+  loggedIn: boolean;
+  version?: string;
+  message?: string;
+};
+
+export type CodexRunRequest = {
+  rootPath: string;
+  prompt: string;
+  mode: CodexRunMode;
+};
+
+export type CodexRunStartResult = {
+  runId: string;
+};
+
+export type CodexOutputEvent = {
+  runId: string;
+  stream: 'stdout' | 'stderr';
+  text: string;
+  parsed?: unknown;
+  createdAt: string;
+};
+
+export type CodexCompletionEvent = {
+  runId: string;
+  state: 'completed' | 'failed' | 'canceled';
+  mode: CodexRunMode | 'login';
+  exitCode: number | null;
+  signal: string | null;
+  message?: string;
+  scan?: ProjectFolderScan;
+  createdAt: string;
+};
+
+export type CodexEventUnsubscribe = () => void;
+
 export type SidekickApi = {
   getAppInfo: () => Promise<AppInfo>;
   chooseProjectFolder: () => Promise<ProjectFolderScan | null>;
@@ -199,6 +242,12 @@ export type SidekickApi = {
   generateContextPackage: (rootPath: string) => Promise<ContextPackageResult>;
   previewTranscriptionImport: (rootPath: string) => Promise<TranscriptionImportPreview | null>;
   confirmTranscriptionImport: (previewId: string) => Promise<TranscriptionImportResult>;
+  getCodexStatus: (rootPath: string) => Promise<CodexStatus>;
+  startCodexLogin: (rootPath: string) => Promise<CodexRunStartResult>;
+  startCodexRun: (request: CodexRunRequest) => Promise<CodexRunStartResult>;
+  cancelCodexRun: (runId: string) => Promise<void>;
+  onCodexOutput: (listener: (event: CodexOutputEvent) => void) => CodexEventUnsubscribe;
+  onCodexCompletion: (listener: (event: CodexCompletionEvent) => void) => CodexEventUnsubscribe;
 };
 
 declare global {

@@ -397,39 +397,45 @@ li {
 }
 
 .context-package-panel,
-.transcription-import-panel {
+.transcription-import-panel,
+.codex-panel {
   display: grid;
   gap: 10px;
 }
 
 .context-package-panel h3,
-.transcription-import-panel h3 {
+.transcription-import-panel h3,
+.codex-panel h3 {
   margin-bottom: 0;
   font-size: 15px;
 }
 
 .context-package-panel p,
-.transcription-import-panel p {
+.transcription-import-panel p,
+.codex-panel p {
   margin-bottom: 0;
   color: var(--muted-text);
   font-size: 13px;
 }
 
 .context-package-details,
-.transcription-import-details {
+.transcription-import-details,
+.codex-details {
   display: grid;
   gap: 6px;
   margin: 0;
 }
 
 .context-package-details div,
-.transcription-import-details div {
+.transcription-import-details div,
+.codex-details div {
   padding-top: 7px;
   border-top: 1px solid var(--subtle-border);
 }
 
 .context-package-details dt,
-.transcription-import-details dt {
+.transcription-import-details dt,
+.codex-details dt {
   color: var(--soft-text);
   font-size: 11px;
   font-weight: 700;
@@ -437,7 +443,8 @@ li {
 }
 
 .context-package-details dd,
-.transcription-import-details dd {
+.transcription-import-details dd,
+.codex-details dd {
   margin: 3px 0 0;
   color: var(--text);
   font-size: 13px;
@@ -445,7 +452,8 @@ li {
 }
 
 .context-package-list,
-.transcription-import-list {
+.transcription-import-list,
+.codex-output {
   display: grid;
   gap: 6px;
   margin: 0;
@@ -460,7 +468,8 @@ li {
 }
 
 .context-package-actions,
-.transcription-import-actions {
+.transcription-import-actions,
+.codex-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -469,28 +478,80 @@ li {
 .context-package-primary,
 .context-package-secondary,
 .transcription-import-primary,
-.transcription-import-secondary {
+.transcription-import-secondary,
+.codex-primary,
+.codex-secondary {
   min-width: 0;
   padding: 8px 10px;
   font-size: 12px;
 }
 
 .context-package-secondary,
-.transcription-import-secondary {
+.transcription-import-secondary,
+.codex-secondary {
   border: 1px solid var(--border);
   color: var(--accent);
   background: transparent;
 }
 
 .context-package-secondary:hover:not(:disabled),
-.transcription-import-secondary:hover:not(:disabled) {
+.transcription-import-secondary:hover:not(:disabled),
+.codex-secondary:hover:not(:disabled) {
   border-color: #c7c1b6;
   background: var(--subtle-surface);
 }
 
 .context-package-secondary[hidden],
-.transcription-import-secondary[hidden] {
+.transcription-import-secondary[hidden],
+.codex-secondary[hidden] {
   display: none;
+}
+
+.codex-prompt-label {
+  color: var(--soft-text);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.codex-panel textarea {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 9px 10px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+}
+
+.codex-panel textarea:disabled {
+  color: var(--soft-text);
+  background: var(--subtle-surface);
+}
+
+.codex-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted-text);
+  font-size: 13px;
+}
+
+.codex-output {
+  max-height: 160px;
+  overflow: auto;
+  border-top: 1px solid var(--subtle-border);
+  padding-top: 7px;
+}
+
+.codex-output li {
+  color: var(--muted-text);
+  font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
 }
 
 .signal-list,

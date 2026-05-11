@@ -2,7 +2,7 @@
 
 ## Scope
 
-This document describes the first implemented Sidekick architecture for inspecting one local project folder and generating a local context-package file from it.
+This document describes the first implemented Sidekick architecture for inspecting one local project folder, generating a local context-package file, importing transcriptions, and running controlled Codex tasks against the selected folder.
 
 ## Process Boundaries
 
@@ -20,8 +20,14 @@ The renderer currently receives two APIs through `window.sidekick`:
 - `generateContextPackage()`
 - `previewTranscriptionImport()`
 - `confirmTranscriptionImport()`
+- `getCodexStatus()`
+- `startCodexLogin()`
+- `startCodexRun()`
+- `cancelCodexRun()`
+- `onCodexOutput()`
+- `onCodexCompletion()`
 
-No generic filesystem API is exposed to the renderer.
+No generic filesystem, process, shell, terminal, or raw IPC API is exposed to the renderer.
 
 ## Folder Inspection Flow
 
@@ -70,6 +76,24 @@ No generic filesystem API is exposed to the renderer.
 
 The renderer never sends a destination path for a write operation. Confirmation uses only the `previewId` created by the main process.
 
+## Controlled Codex Panel Flow
+
+1. The user selects a project folder through the folder inspection flow.
+2. The main process records the selected root path as a known Sidekick project root for the current app session.
+3. The renderer asks for Codex status with `window.sidekick.getCodexStatus(rootPath)`.
+4. The preload script invokes the `codex:get-status` IPC channel.
+5. The main process validates that the requested root path is absolute and was selected through Sidekick.
+6. The main process checks `codex --version` and `codex login status` through `CodexRunner`.
+7. If login is required, the renderer can start `codex login --device-auth` through `window.sidekick.startCodexLogin(rootPath)`.
+8. If Codex is ready, the renderer can start a read-only or edit-mode run through `window.sidekick.startCodexRun({ rootPath, prompt, mode })`.
+9. The main process validates the selected root again, constructs a fixed Codex argument array, and starts `codex exec` without shell execution.
+10. The prompt is written to Codex stdin using `codex exec ... -`; it is not passed as a command-line argument.
+11. The main process streams Codex stdout and stderr to the requesting renderer through typed output events.
+12. The renderer can cancel the active run through `window.sidekick.cancelCodexRun(runId)`.
+13. The main process attempts to stop the full process group or process tree.
+14. After a completed edit-mode run, the main process rescans the selected project folder and includes the fresh scan in the completion event.
+15. Read-only, failed, and canceled runs do not automatically refresh the folder scan.
+
 ## Shared Contract
 
 Shared TypeScript types live in `src/shared/sidekick-api.ts`.
@@ -91,6 +115,11 @@ The shared contract currently includes:
 - `TranscriptionImportResult`
 - `TranscriptionImportWarning`
 - `TranscriptionImportNumbering`
+- `CodexStatus`
+- `CodexRunRequest`
+- `CodexRunMode`
+- `CodexOutputEvent`
+- `CodexCompletionEvent`
 - `SidekickApi`
 
 These types are used by main, preload, renderer, and tests to keep IPC payloads explicit.
@@ -150,13 +179,33 @@ The first version is a controlled copy workflow:
 
 The service never exposes a general filesystem write API to the renderer.
 
+## Codex Runner
+
+The Codex runner lives in `src/main/codex-runner.ts`.
+
+The first version is a controlled process wrapper around the Codex CLI:
+
+- the executable is discovered through PATH
+- missing Codex CLI is reported as an unavailable state, not an app startup failure
+- status checks call `codex --version` and `codex login status`
+- login uses `codex login --device-auth`
+- read-only runs use `codex exec --json --ephemeral --skip-git-repo-check --cd <projectRoot> --sandbox read-only -`
+- edit-mode runs use `codex exec --json --ephemeral --skip-git-repo-check --cd <projectRoot> --sandbox workspace-write -`
+- prompts are sent through stdin
+- stdout JSONL is parsed when possible and raw lines are still streamed
+- stderr is streamed as raw output
+- only one Codex process can run at a time in the first version
+- cancellation attempts process-group cleanup on POSIX and process-tree cleanup on Windows
+
+The runner does not expose a general shell, terminal, arbitrary executable, arbitrary working directory, or `danger-full-access` mode.
+
 ## UI Shape
 
 The renderer uses a three-column work surface:
 
 - left: selected project, path, runtime, and folder signals
 - center: read-only folder structure
-- right: summary, transcription import action/result, context-package action/result, artifact counts, recent files, and warnings
+- right: summary, transcription import action/result, context-package action/result, controlled Codex panel, artifact counts, recent files, and warnings
 
 The UI treats folder categories as inferred hints, not facts.
 
@@ -174,6 +223,13 @@ The current architecture preserves the Electron security boundary:
 - transcription import is allowed only for a root path selected through Sidekick in the current session.
 - renderer requests do not provide arbitrary output paths.
 - transcription import confirmation uses a `previewId`, not renderer-supplied source or destination paths.
+- Codex operations are allowed only for a root path selected through Sidekick in the current session.
+- Codex process spawning is isolated to the main process.
+- Codex runs use fixed argument arrays and do not use shell execution.
+- Codex prompts are sent over stdin instead of command-line arguments.
+- Codex edit mode requires an explicit per-run user choice in the renderer.
+- Codex `danger-full-access` and sandbox bypass flags are not exposed.
+- the renderer cannot choose the Codex executable, working directory, sandbox flag, or arbitrary command.
 - symlinks are skipped by default during folder scans.
 - external windows are denied, with HTTPS links opened through Electron only after protocol checking.
 
@@ -204,8 +260,9 @@ Automated verification is split by responsibility:
 - Integration tests cover scanner behavior against a fixture project folder.
 - Unit and integration tests cover context-package filename rules, ignore rules, preview behavior, generation, skipped binary files, and self-ignore behavior.
 - Unit and integration tests cover transcription import extension rules, numbering, target-folder detection, no-overwrite behavior, copy behavior, and post-import rescanning.
+- Unit and integration tests cover Codex command construction, stdin prompt delivery, JSONL parsing, status detection, one-active-run enforcement, and cancellation.
 - Unit tests cover CI artifact staging rules for release package files.
-- Playwright smoke tests cover the renderer empty state, folder tree behavior, mocked transcription import confirmation/result states, and mocked context-package confirmation/result states.
+- Playwright smoke tests cover the renderer empty state, folder tree behavior, mocked transcription import confirmation/result states, mocked context-package confirmation/result states, and mocked Codex output/completion states.
 - Electron packaging verifies the main, preload, and renderer bundles.
 - GitHub Actions runs verification and package builds before publishing release assets.
 

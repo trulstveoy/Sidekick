@@ -1,11 +1,27 @@
 # Task: Controlled Codex Panel
 
 ID: TASK-0010
-Status: Planned - Pending Human Approval
+Status: Reviewing
 Class: Major
 Owner: Pair
 Created: 2026-05-11
 Updated: 2026-05-11
+Branch: task/TASK-0010-controlled-codex-panel
+Worktree: ../Sidekick-worktrees/TASK-0010-controlled-codex-panel
+Base branch: main
+Write scope:
+- `src/main.ts`
+- `src/preload.ts`
+- `src/shared/sidekick-api.ts`
+- `src/renderer.ts`
+- `src/index.css`
+- `src/main/codex-runner.ts`
+- `tests/unit`
+- `tests/integration`
+- `tests/e2e`
+- `docs/architecture/application-architecture.md`
+- `docs/decisions`
+Parallel safety: Exclusive
 
 ## Summary
 
@@ -17,18 +33,19 @@ This is not an embedded shell. It is a Sidekick-owned work surface for user-init
 
 ## Current Phase
 
-Plan
+Review
 
 ## Progress Checklist
 
 - [x] Explore complete
 - [x] Spec complete
 - [x] Plan complete
-- [ ] Human approval received, if required
-- [ ] Build complete
-- [ ] Verification complete
-- [ ] Review complete
-- [ ] Documentation complete
+- [x] Worktree created or reused, if required
+- [x] Human approval received, if required
+- [x] Build complete
+- [x] Verification complete
+- [x] Review complete
+- [x] Documentation complete
 - [ ] Closeout complete
 
 ## Links
@@ -374,7 +391,41 @@ Packaging check:
 
 ## Build Log
 
-Not started.
+Changes made:
+- Added `src/main/codex-runner.ts` as a main-process Codex CLI wrapper.
+- Added typed Codex status, run, output, and completion contracts to `src/shared/sidekick-api.ts`.
+- Added narrow Codex IPC handlers in `src/main.ts`.
+- Added typed preload methods and event subscriptions without exposing raw IPC.
+- Added a controlled Codex panel to the right inspector column.
+- Added read-only default mode and explicit edit-mode confirmation.
+- Added process cancellation and one-active-run enforcement.
+- Added scan refresh on completed edit-mode runs.
+- Added unit, integration, and UI smoke coverage.
+- Updated architecture documentation.
+- Added `docs/decisions/0004-controlled-codex-panel.md`.
+
+Important decisions during build:
+- Prompts are sent through stdin using `codex exec ... -`.
+- Runner output/completion events are deferred one tick so main can register the run before fast processes emit output.
+- Packaged app behavior remains PATH-only for Codex discovery.
+- Main process reports missing Codex as an unavailable state instead of failing startup.
+
+Deviations from plan:
+- No meaningful scope deviations.
+
+Files changed:
+- `src/main/codex-runner.ts`
+- `src/main.ts`
+- `src/preload.ts`
+- `src/shared/sidekick-api.ts`
+- `src/renderer.ts`
+- `src/index.css`
+- `index.html`
+- `tests/unit/codex-runner.test.ts`
+- `tests/integration/codex-runner.test.ts`
+- `tests/e2e/renderer-smoke.spec.ts`
+- `docs/architecture/application-architecture.md`
+- `docs/decisions/0004-controlled-codex-panel.md`
 
 ## Verification Log
 
@@ -386,17 +437,65 @@ Initial exploration verification:
 - Reviewed current `src/main.ts`, `src/preload.ts`, `src/shared/sidekick-api.ts`, and `src/renderer.ts`.
 - Reviewed `docs/architecture/application-architecture.md`.
 
+Baseline:
+- Initial `npm run check` and `npm run test` failed before dependency install because the new worktree had no `node_modules`.
+- `npm ci` completed successfully.
+- Baseline `npm run check` passed.
+- Baseline `npm run test` passed.
+
+Passed:
+- `npm run check`
+- `npm run test`
+- `CI=1 npm run test:ui`
+- `npm run make`
+- `codex --version` -> `codex-cli 0.130.0`
+- `codex login status` -> `Logged in using ChatGPT`
+
+Failed during implementation:
+- First `npm run test:ui` run used a stale reused Vite server from another worktree and showed the wrong DOM. Reran with `CI=1` so Playwright started the correct worktree server.
+
+Not run:
+- Manual Electron app run with real Codex prompt.
+  Reason: left for human/manual review before integration.
+- Real edit-mode Codex file change.
+  Reason: should be performed in a disposable project folder by the human or during a dedicated manual QA pass.
+
 ## Review Notes
 
-Not started.
+Diff matches goal:
+- Yes.
+
+Scope respected:
+- Yes. The feature is a controlled Codex panel, not a general terminal or arbitrary command runner.
+
+Risks remaining:
+- Packaged Windows apps may not find WSL-only Codex installations through PATH.
+- Real Codex JSONL event shapes may contain variants beyond the mocked and helper-tested shapes; raw output is still shown as fallback.
+- Manual edit-mode behavior should be validated in a disposable project before release.
+
+Security concerns:
+- Renderer cannot choose executable, working directory, sandbox mode outside the allowed enum, or arbitrary command.
+- Main process validates selected project root before each Codex action.
+- Edit mode requires explicit confirmation.
+- No `danger-full-access` or sandbox bypass flag is exposed.
+
+Maintainability concerns:
+- Renderer gained more state-management code. It remains local to the first-version panel, but future growth may justify extracting UI modules.
 
 ## Documentation Notes
 
-Expected documentation updates:
-- Update `docs/architecture/application-architecture.md` with the Codex process boundary.
-- Add or update release/runtime notes if packaged apps need a documented Codex CLI dependency.
-- Consider a decision record because this is a durable security and integration boundary.
+Docs updated:
+- `docs/architecture/application-architecture.md`
+- `docs/decisions/0004-controlled-codex-panel.md`
+
+Docs intentionally not updated:
+- Runtime/user guide for installing Codex CLI.
+  Reason: first implementation reports unavailable state; a user-facing setup guide can follow after manual packaging review.
+
+Decision record needed:
+- Yes.
+- Added `docs/decisions/0004-controlled-codex-panel.md`.
 
 ## Closeout
 
-Not started.
+Pending human review and integration from task worktree.

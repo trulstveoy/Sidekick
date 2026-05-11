@@ -2,6 +2,10 @@ import './index.css';
 import './shared/sidekick-api';
 import type {
   ArtifactType,
+  CodexCompletionEvent,
+  CodexOutputEvent,
+  CodexRunMode,
+  CodexStatus,
   ContextPackagePreview,
   ContextPackageResult,
   FolderSignal,
@@ -43,6 +47,18 @@ type ProjectCreationState =
   | { status: 'creating'; message: string }
   | { status: 'complete'; message: string }
   | { status: 'error'; message: string };
+
+type CodexState =
+  | { status: 'unavailable'; message: string }
+  | { status: 'checking' }
+  | { status: 'logged-out'; codexStatus: CodexStatus }
+  | { status: 'ready'; codexStatus: CodexStatus }
+  | { status: 'running'; runId: string; mode: CodexRunMode | 'login'; output: CodexOutputEvent[] }
+  | {
+      status: 'completed' | 'failed' | 'canceled';
+      completion: CodexCompletionEvent;
+      output: CodexOutputEvent[];
+    };
 
 type DetailRow = [string, string];
 
@@ -95,6 +111,14 @@ const transcriptionImportPrimaryButton = document.querySelector<HTMLButtonElemen
 const transcriptionImportSecondaryButton = document.querySelector<HTMLButtonElement>(
   '[data-transcription-import-secondary]',
 );
+const codexTitleTarget = document.querySelector<HTMLElement>('[data-codex-title]');
+const codexMessageTarget = document.querySelector<HTMLElement>('[data-codex-message]');
+const codexDetailsTarget = document.querySelector<HTMLElement>('[data-codex-details]');
+const codexPromptInput = document.querySelector<HTMLTextAreaElement>('[data-codex-prompt]');
+const codexEditModeInput = document.querySelector<HTMLInputElement>('[data-codex-edit-mode]');
+const codexOutputTarget = document.querySelector<HTMLUListElement>('[data-codex-output]');
+const codexPrimaryButton = document.querySelector<HTMLButtonElement>('[data-codex-primary]');
+const codexSecondaryButton = document.querySelector<HTMLButtonElement>('[data-codex-secondary]');
 
 const artifactLabels: Record<ArtifactType, string> = {
   'markdown-text': 'Markdown/text',
@@ -126,6 +150,7 @@ let expandedPaths = new Set<string>();
 let contextPackageState: ContextPackageState = { status: 'unavailable' };
 let transcriptionImportState: TranscriptionImportState = { status: 'unavailable' };
 let projectCreationState: ProjectCreationState = { status: 'idle', message: '' };
+let codexState: CodexState = { status: 'unavailable', message: 'Choose a folder first.' };
 
 const ROOT_PATH = '.';
 
@@ -219,10 +244,18 @@ const setTranscriptionImportStateForScan = (scan?: ProjectFolderScan) => {
     scan && window.sidekick ? { status: 'ready' } : { status: 'unavailable' };
 };
 
+const setCodexStateForScan = (scan?: ProjectFolderScan) => {
+  codexState =
+    scan && window.sidekick
+      ? { status: 'checking' }
+      : { status: 'unavailable', message: 'Choose a folder first.' };
+};
+
 const setActiveScan = (scan: ProjectFolderScan) => {
   resetExpandedPaths();
   setContextPackageStateForScan(scan);
   setTranscriptionImportStateForScan(scan);
+  setCodexStateForScan(scan);
   state = scan.status === 'partial' ? { status: 'partial', scan } : { status: 'ready', scan };
 };
 
@@ -683,6 +716,169 @@ const renderTranscriptionImport = (scan?: ProjectFolderScan) => {
   }
 };
 
+const renderCodexActions = (
+  primaryLabel: string,
+  primaryDisabled: boolean,
+  secondaryVisible = false,
+) => {
+  renderActions(
+    {
+      primaryButton: codexPrimaryButton,
+      secondaryButton: codexSecondaryButton,
+    },
+    primaryLabel,
+    primaryDisabled,
+    secondaryVisible,
+  );
+};
+
+const setCodexInputsDisabled = (disabled: boolean) => {
+  if (codexPromptInput) {
+    codexPromptInput.disabled = disabled;
+  }
+
+  if (codexEditModeInput) {
+    codexEditModeInput.disabled = disabled;
+  }
+};
+
+const renderCodexDetails = (rows: DetailRow[]) => renderDetails(codexDetailsTarget, rows);
+
+const renderCodexOutput = (output: CodexOutputEvent[] = []) => {
+  clear(codexOutputTarget);
+
+  if (!codexOutputTarget) {
+    return;
+  }
+
+  if (output.length === 0) {
+    codexOutputTarget.append(createListItem('No output yet'));
+    return;
+  }
+
+  codexOutputTarget.append(
+    ...output.slice(-12).map((event) => {
+      const text = event.parsed ? JSON.stringify(event.parsed) : event.text;
+      return createListItem(`${event.stream}: ${text}`);
+    }),
+  );
+};
+
+const renderCodexUnavailable = (message = 'Choose a folder first.') => {
+  setText(codexTitleTarget, 'No folder selected');
+  setText(codexMessageTarget, window.sidekick ? message : 'Open in Electron to use Codex.');
+  renderCodexDetails([]);
+  renderCodexOutput([]);
+  setCodexInputsDisabled(true);
+  renderCodexActions('Run Codex', true);
+};
+
+const renderCodexChecking = () => {
+  setText(codexTitleTarget, 'Checking Codex');
+  setText(codexMessageTarget, 'Looking for Codex CLI and login status.');
+  renderCodexDetails([]);
+  renderCodexOutput([]);
+  setCodexInputsDisabled(true);
+  renderCodexActions('Checking...', true);
+};
+
+const renderCodexLoggedOut = (codexStatus: CodexStatus) => {
+  setText(codexTitleTarget, 'Login required');
+  setText(codexMessageTarget, codexStatus.message ?? 'Codex is available but not logged in.');
+  renderCodexDetails([
+    ['Version', codexStatus.version ?? 'Unknown'],
+    ['Mode', 'Device auth'],
+  ]);
+  renderCodexOutput([]);
+  setCodexInputsDisabled(true);
+  renderCodexActions('Login', false);
+};
+
+const renderCodexReady = (codexStatus: CodexStatus) => {
+  setText(codexTitleTarget, 'Ready');
+  setText(codexMessageTarget, 'Run Codex in the selected project folder.');
+  renderCodexDetails([
+    ['Version', codexStatus.version ?? 'Unknown'],
+    ['Default sandbox', 'read-only'],
+  ]);
+  renderCodexOutput([]);
+  setCodexInputsDisabled(false);
+  renderCodexActions('Run Codex', false);
+};
+
+const renderCodexRunning = (run: Extract<CodexState, { status: 'running' }>) => {
+  setText(codexTitleTarget, run.mode === 'login' ? 'Login running' : 'Codex running');
+  setText(
+    codexMessageTarget,
+    run.mode === 'workspace-write'
+      ? 'Codex may edit files in this project.'
+      : 'Streaming Codex output.',
+  );
+  renderCodexDetails([
+    ['Run ID', run.runId],
+    ['Mode', run.mode],
+  ]);
+  renderCodexOutput(run.output);
+  setCodexInputsDisabled(true);
+  renderCodexActions('Running...', true, true);
+};
+
+const renderCodexFinished = (
+  finished: Extract<CodexState, { status: 'completed' | 'failed' | 'canceled' }>,
+) => {
+  const title =
+    finished.status === 'completed'
+      ? 'Codex completed'
+      : finished.status === 'canceled'
+        ? 'Codex canceled'
+        : 'Codex failed';
+  const message =
+    finished.completion.message ??
+    (finished.status === 'completed'
+      ? 'Run finished.'
+      : finished.status === 'canceled'
+        ? 'Run was canceled.'
+        : 'Run failed.');
+
+  setText(codexTitleTarget, title);
+  setText(codexMessageTarget, message);
+  renderCodexDetails([
+    ['Run ID', finished.completion.runId],
+    ['Mode', finished.completion.mode],
+    ['Exit', finished.completion.exitCode?.toString() ?? finished.completion.signal ?? 'Unknown'],
+  ]);
+  renderCodexOutput(finished.output);
+  setCodexInputsDisabled(false);
+  renderCodexActions('Run again', false);
+};
+
+const renderCodex = (scan?: ProjectFolderScan) => {
+  if (!scan || !window.sidekick || codexState.status === 'unavailable') {
+    renderCodexUnavailable(codexState.status === 'unavailable' ? codexState.message : undefined);
+    return;
+  }
+
+  switch (codexState.status) {
+    case 'checking':
+      renderCodexChecking();
+      break;
+    case 'logged-out':
+      renderCodexLoggedOut(codexState.codexStatus);
+      break;
+    case 'ready':
+      renderCodexReady(codexState.codexStatus);
+      break;
+    case 'running':
+      renderCodexRunning(codexState);
+      break;
+    case 'completed':
+    case 'failed':
+    case 'canceled':
+      renderCodexFinished(codexState);
+      break;
+  }
+};
+
 const renderTreeToolbar = (scan?: ProjectFolderScan) => {
   const hasScan = Boolean(scan);
 
@@ -816,6 +1012,7 @@ const renderTree = (scan?: ProjectFolderScan) => {
 const renderNoScanPanels = () => {
   renderContextPackage();
   renderTranscriptionImport();
+  renderCodex();
   renderTree();
 };
 
@@ -846,6 +1043,7 @@ const renderErrorState = (message: string) => {
   setText(stateMessageTarget, message);
   renderContextPackage();
   renderTranscriptionImport();
+  renderCodex();
   renderWarnings([
     {
       path: '.',
@@ -875,6 +1073,7 @@ const renderReadyState = (scan: ProjectFolderScan, status: 'ready' | 'partial') 
   renderWarnings(scan.warnings);
   renderContextPackage(scan);
   renderTranscriptionImport(scan);
+  renderCodex(scan);
   renderTree(scan);
 };
 
@@ -1022,6 +1221,197 @@ const handleTranscriptionImportPrimary = () => {
   void openTranscriptionImportConfirmation();
 };
 
+const refreshCodexStatus = async (scan: ProjectFolderScan) => {
+  if (!window.sidekick) {
+    codexState = { status: 'unavailable', message: 'Open in Electron to use Codex.' };
+    render();
+    return;
+  }
+
+  codexState = { status: 'checking' };
+  render();
+
+  try {
+    const codexStatus = await window.sidekick.getCodexStatus(scan.rootPath);
+
+    if (codexStatus.state === 'ready') {
+      codexState = { status: 'ready', codexStatus };
+    } else if (codexStatus.state === 'logged-out') {
+      codexState = { status: 'logged-out', codexStatus };
+    } else {
+      codexState = {
+        status: 'unavailable',
+        message: codexStatus.message ?? 'Codex CLI was not found on PATH.',
+      };
+    }
+  } catch (error) {
+    codexState = {
+      status: 'unavailable',
+      message: error instanceof Error ? error.message : 'Unable to check Codex status.',
+    };
+  }
+
+  render();
+};
+
+const startCodexLogin = async (scan: ProjectFolderScan) => {
+  if (!window.sidekick) {
+    return;
+  }
+
+  try {
+    const { runId } = await window.sidekick.startCodexLogin(scan.rootPath);
+    codexState = { status: 'running', runId, mode: 'login', output: [] };
+  } catch (error) {
+    codexState = {
+      status: 'unavailable',
+      message: error instanceof Error ? error.message : 'Unable to start Codex login.',
+    };
+  }
+
+  render();
+};
+
+const startCodexRun = async (scan: ProjectFolderScan) => {
+  if (!window.sidekick || !codexPromptInput) {
+    return;
+  }
+
+  const prompt = codexPromptInput.value.trim();
+
+  if (!prompt) {
+    codexState = {
+      status: 'failed',
+      completion: {
+        runId: 'not-started',
+        state: 'failed',
+        mode: 'read-only',
+        exitCode: null,
+        signal: null,
+        message: 'Enter a Codex prompt before running.',
+        createdAt: new Date().toISOString(),
+      },
+      output: [],
+    };
+    render();
+    return;
+  }
+
+  const mode: CodexRunMode = codexEditModeInput?.checked ? 'workspace-write' : 'read-only';
+
+  if (
+    mode === 'workspace-write' &&
+    !window.confirm('Allow Codex to change files in the selected project folder?')
+  ) {
+    return;
+  }
+
+  try {
+    const { runId } = await window.sidekick.startCodexRun({
+      rootPath: scan.rootPath,
+      prompt,
+      mode,
+    });
+    codexState = { status: 'running', runId, mode, output: [] };
+  } catch (error) {
+    codexState = {
+      status: 'failed',
+      completion: {
+        runId: 'not-started',
+        state: 'failed',
+        mode,
+        exitCode: null,
+        signal: null,
+        message: error instanceof Error ? error.message : 'Unable to start Codex.',
+        createdAt: new Date().toISOString(),
+      },
+      output: [],
+    };
+  }
+
+  render();
+};
+
+const handleCodexPrimary = () => {
+  const scan = getActiveScan();
+
+  if (!scan) {
+    return;
+  }
+
+  if (codexState.status === 'logged-out') {
+    void startCodexLogin(scan);
+    return;
+  }
+
+  void startCodexRun(scan);
+};
+
+const cancelCodexRun = async () => {
+  if (!window.sidekick || codexState.status !== 'running') {
+    return;
+  }
+
+  try {
+    await window.sidekick.cancelCodexRun(codexState.runId);
+  } catch (error) {
+    const completion: CodexCompletionEvent = {
+      runId: codexState.runId,
+      state: 'failed',
+      mode: codexState.mode,
+      exitCode: null,
+      signal: null,
+      message: error instanceof Error ? error.message : 'Unable to cancel Codex.',
+      createdAt: new Date().toISOString(),
+    };
+    codexState = { status: 'failed', completion, output: codexState.output };
+    render();
+  }
+};
+
+const appendCodexOutput = (event: CodexOutputEvent) => {
+  if (codexState.status !== 'running' || codexState.runId !== event.runId) {
+    return;
+  }
+
+  codexState = {
+    ...codexState,
+    output: [...codexState.output, event],
+  };
+  render();
+};
+
+const completeCodexRun = (completion: CodexCompletionEvent) => {
+  if (codexState.status !== 'running' || codexState.runId !== completion.runId) {
+    return;
+  }
+
+  if (completion.scan) {
+    state =
+      completion.scan.status === 'partial'
+        ? { status: 'partial', scan: completion.scan }
+        : { status: 'ready', scan: completion.scan };
+    setContextPackageStateForScan(completion.scan);
+    setTranscriptionImportStateForScan(completion.scan);
+  }
+
+  const output = codexState.output;
+  codexState = {
+    status: completion.state,
+    completion,
+    output,
+  };
+  render();
+
+  if (completion.mode === 'login' && completion.state === 'completed') {
+    const scan = getActiveScan();
+
+    if (scan) {
+      void refreshCodexStatus(scan);
+    }
+  }
+};
+
 const chooseFolder = async () => {
   if (!window.sidekick) {
     state = { status: 'error', message: 'Local folder inspection is available in the Electron app.' };
@@ -1039,6 +1429,7 @@ const chooseFolder = async () => {
       expandedPaths = new Set();
       setContextPackageStateForScan();
       setTranscriptionImportStateForScan();
+      setCodexStateForScan();
       state = { status: 'empty' };
       render();
       return;
@@ -1046,10 +1437,12 @@ const chooseFolder = async () => {
 
     setActiveScan(scan);
     render();
+    void refreshCodexStatus(scan);
   } catch (error) {
     expandedPaths = new Set();
     setContextPackageStateForScan();
     setTranscriptionImportStateForScan();
+    setCodexStateForScan();
     state = {
       status: 'error',
       message: error instanceof Error ? error.message : 'Unable to inspect the selected folder.',
@@ -1091,6 +1484,7 @@ const createProject = async () => {
     }
 
     setActiveScan(result.scan);
+    void refreshCodexStatus(result.scan);
     projectCreationState = {
       status: 'complete',
       message: `Created ${result.rootName}.`,
@@ -1134,5 +1528,12 @@ transcriptionImportSecondaryButton?.addEventListener('click', () => {
   transcriptionImportState = getActiveScan() ? { status: 'ready' } : { status: 'unavailable' };
   render();
 });
+codexPrimaryButton?.addEventListener('click', handleCodexPrimary);
+codexSecondaryButton?.addEventListener('click', () => {
+  void cancelCodexRun();
+});
+
+window.sidekick?.onCodexOutput?.(appendCodexOutput);
+window.sidekick?.onCodexCompletion?.(completeCodexRun);
 
 render();

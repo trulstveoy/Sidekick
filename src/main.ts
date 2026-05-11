@@ -3,10 +3,13 @@ import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import type {
   AppInfo,
+  CodexCompletionEvent,
+  CodexRunRequest,
   ProjectCreationRequest,
   TranscriptionImportPreview,
 } from './shared/sidekick-api';
 import { generateContextPackage, getContextPackagePreview } from './main/context-package';
+import { CodexRunner } from './main/codex-runner';
 import { scanProjectFolder } from './main/folder-scanner';
 import { createProjectFolder } from './main/project-creator';
 import {
@@ -32,6 +35,15 @@ ipcMain.handle('app:get-info', getAppInfo);
 
 const selectedProjectRoots = new Set<string>();
 const pendingTranscriptionImports = new Map<string, TranscriptionImportPreview>();
+const codexRunner = new CodexRunner();
+const codexRuns = new Map<
+  string,
+  {
+    sender: Electron.WebContents;
+    rootPath: string;
+    mode: CodexCompletionEvent['mode'];
+  }
+>();
 
 ipcMain.handle('project-folder:choose-and-scan', async (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
@@ -146,6 +158,114 @@ ipcMain.handle('transcription:confirm-import', async (_event, previewId) => {
   } finally {
     pendingTranscriptionImports.delete(previewId);
   }
+});
+
+const assertCodexRunRequest = (request: unknown): CodexRunRequest => {
+  if (!request || typeof request !== 'object') {
+    throw new Error('A Codex run request is required.');
+  }
+
+  const { rootPath, prompt, mode } = request as Partial<CodexRunRequest>;
+
+  if (typeof prompt !== 'string' || prompt.trim().length === 0) {
+    throw new Error('Enter a Codex prompt before running.');
+  }
+
+  if (mode !== 'read-only' && mode !== 'workspace-write') {
+    throw new Error('Choose a valid Codex run mode.');
+  }
+
+  return {
+    rootPath: assertKnownProjectRoot(rootPath),
+    prompt,
+    mode,
+  };
+};
+
+codexRunner.on('output', (output) => {
+  const run = codexRuns.get(output.runId);
+
+  if (!run || run.sender.isDestroyed()) {
+    return;
+  }
+
+  run.sender.send('codex:output', output);
+});
+
+codexRunner.on('completion', (completion) => {
+  const run = codexRuns.get(completion.runId);
+
+  if (!run) {
+    return;
+  }
+
+  void (async () => {
+    let completedEvent = completion;
+
+    if (completion.state === 'completed' && run.mode === 'workspace-write') {
+      try {
+        const scan = await scanProjectFolder(run.rootPath);
+        completedEvent = {
+          ...completion,
+          scan,
+        };
+      } catch (error) {
+        completedEvent = {
+          ...completion,
+          message:
+            error instanceof Error
+              ? `Codex completed, but the project refresh failed: ${error.message}`
+              : 'Codex completed, but the project refresh failed.',
+        };
+      }
+    }
+
+    if (!run.sender.isDestroyed()) {
+      run.sender.send('codex:completion', completedEvent);
+    }
+
+    codexRuns.delete(completion.runId);
+  })();
+});
+
+ipcMain.handle('codex:get-status', (_event, rootPath) =>
+  codexRunner.getStatus(assertKnownProjectRoot(rootPath)),
+);
+
+ipcMain.handle('codex:start-login', (event, rootPath) => {
+  const projectRoot = assertKnownProjectRoot(rootPath);
+  const runId = codexRunner.startLogin(projectRoot);
+  codexRuns.set(runId, {
+    sender: event.sender,
+    rootPath: projectRoot,
+    mode: 'login',
+  });
+
+  return { runId };
+});
+
+ipcMain.handle('codex:start-run', (event, request) => {
+  const codexRequest = assertCodexRunRequest(request);
+  const runId = codexRunner.startExec(
+    codexRequest.rootPath,
+    codexRequest.prompt,
+    codexRequest.mode,
+  );
+  codexRuns.set(runId, {
+    sender: event.sender,
+    rootPath: codexRequest.rootPath,
+    mode: codexRequest.mode,
+  });
+
+  return { runId };
+});
+
+ipcMain.handle('codex:cancel', (_event, runId) => {
+  if (typeof runId !== 'string' || runId.trim().length === 0) {
+    throw new Error('A Codex run id is required.');
+  }
+
+  codexRunner.cancel(runId);
 });
 
 const isAllowedNavigation = (targetUrl: string) => {

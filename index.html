@@ -129,6 +129,36 @@
         </section>
 
         <section>
+          <p class="section-label">Codex</p>
+          <div class="codex-panel">
+            <h3 data-codex-title>No folder selected</h3>
+            <p data-codex-message>Choose a folder first.</p>
+            <dl class="codex-details" data-codex-details></dl>
+            <label class="codex-prompt-label" for="codex-prompt">Prompt</label>
+            <textarea
+              id="codex-prompt"
+              data-codex-prompt
+              rows="4"
+              placeholder="Ask Codex to inspect or update this project..."
+              disabled
+            ></textarea>
+            <label class="codex-mode">
+              <input type="checkbox" data-codex-edit-mode disabled />
+              Allow file changes
+            </label>
+            <ul class="codex-output" data-codex-output></ul>
+            <div class="codex-actions">
+              <button class="codex-primary" type="button" data-codex-primary disabled>
+                Run Codex
+              </button>
+              <button class="codex-secondary" type="button" data-codex-secondary hidden>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section>
           <p class="section-label">Artifact counts</p>
           <ul class="metric-list" data-artifact-counts>
             <li>No artifacts yet</li>

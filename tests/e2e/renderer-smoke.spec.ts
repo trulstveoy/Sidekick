@@ -275,6 +275,7 @@ test('renders the folder inspection empty state', async ({ page }) => {
   await expect(page.getByText('No warnings')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add transcription' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Create project' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Run Codex' })).toBeDisabled();
 });
 
 test('creates a project and displays the required folders', async ({ page }) => {
@@ -300,6 +301,17 @@ test('creates a project and displays the required folders', async ({ page }) => 
         confirmTranscriptionImport: async () => {
           throw new Error('No transcription import preview.');
         },
+        getCodexStatus: async () => ({
+          state: 'ready',
+          available: true,
+          loggedIn: true,
+          version: 'codex-cli 0.130.0-test',
+        }),
+        startCodexLogin: async () => ({ runId: 'login-run' }),
+        startCodexRun: async () => ({ runId: 'codex-run' }),
+        cancelCodexRun: async () => undefined,
+        onCodexOutput: () => () => undefined,
+        onCodexCompletion: () => () => undefined,
       };
     },
     {
@@ -317,6 +329,7 @@ test('creates a project and displays the required folders', async ({ page }) => 
   await expect(page.getByText('Created new-sidekick-project.')).toBeVisible();
   await expect(page.getByRole('treeitem', { name: /00. Forutsetninger/ })).toBeVisible();
   await expect(page.getByRole('treeitem', { name: /01. Transkripsjoner/ })).toBeVisible();
+  await expect(page.locator('.codex-panel')).toContainText('codex-cli 0.130.0-test');
 });
 
 test('expands and collapses scanned folders', async ({ page }) => {
@@ -503,4 +516,104 @@ test('confirms and displays an imported transcription', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Transcription added' })).toBeVisible();
   await expect(transcriptionDetails).toContainText('00. new-transcription.md');
   await expect(page.getByRole('tree', { name: 'Scanned folder tree' }).getByText('00. new-transcription.md')).toBeVisible();
+});
+
+test('runs Codex from the controlled panel with mocked output', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan, contextPreview, contextResult }) => {
+      let outputListener:
+        | ((event: {
+            runId: string;
+            stream: 'stdout' | 'stderr';
+            text: string;
+            createdAt: string;
+          }) => void)
+        | undefined;
+      let completionListener:
+        | ((event: {
+            runId: string;
+            state: 'completed';
+            mode: 'read-only';
+            exitCode: number;
+            signal: null;
+            createdAt: string;
+          }) => void)
+        | undefined;
+
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        createProjectFolder: async () => null,
+        previewContextPackage: async () => contextPreview,
+        generateContextPackage: async () => contextResult,
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+        getCodexStatus: async () => ({
+          state: 'ready',
+          available: true,
+          loggedIn: true,
+          version: 'codex-cli 0.130.0-test',
+        }),
+        startCodexLogin: async () => ({ runId: 'login-run' }),
+        startCodexRun: async () => {
+          window.setTimeout(() => {
+            outputListener?.({
+              runId: 'codex-run',
+              stream: 'stdout',
+              text: 'Project summary complete',
+              createdAt: '2026-05-11T12:00:00.000Z',
+            });
+            completionListener?.({
+              runId: 'codex-run',
+              state: 'completed',
+              mode: 'read-only',
+              exitCode: 0,
+              signal: null,
+              createdAt: '2026-05-11T12:00:01.000Z',
+            });
+          }, 0);
+
+          return { runId: 'codex-run' };
+        },
+        cancelCodexRun: async () => undefined,
+        onCodexOutput: (listener) => {
+          outputListener = listener;
+          return () => {
+            outputListener = undefined;
+          };
+        },
+        onCodexCompletion: (listener) => {
+          completionListener = listener;
+          return () => {
+            completionListener = undefined;
+          };
+        },
+      };
+    },
+    {
+      scan: mockScan,
+      contextPreview: mockContextPackagePreview,
+      contextResult: mockContextPackageResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Choose folder' }).click();
+
+  const codexPanel = page.locator('.codex-panel');
+  await expect(codexPanel.getByRole('heading', { name: 'Ready' })).toBeVisible();
+  await expect(codexPanel).toContainText('codex-cli 0.130.0-test');
+
+  await codexPanel.getByLabel('Prompt').fill('Summarize this project');
+  await codexPanel.getByRole('button', { name: 'Run Codex' }).click();
+
+  await expect(codexPanel.getByRole('heading', { name: 'Codex completed' })).toBeVisible();
+  await expect(codexPanel).toContainText('Project summary complete');
 });
