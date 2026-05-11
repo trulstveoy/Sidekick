@@ -22,6 +22,14 @@ Use this short loop as the quick reminder. The full process is defined in `docs/
 4. Verify with `npm run check` before handing work back when practical.
 5. Record architectural decisions in `docs/decisions/` when they affect security, persistence, packaging, or agent workflows.
 
+## Plain Language
+
+- Write tasks, plans, findings, reports, and closeouts in clear practical language.
+- Prefer concrete status words such as `fixed`, `accepted`, `deferred`, `blocked`, `false positive`, and `needs human decision`.
+- Avoid vague process terms such as `disposition` unless they are immediately explained in plain language.
+- For every task deliverable, make the concrete output clear: what files or artifacts should exist, what should be verified, and what happens next.
+- When one step produces input for a later step, state that dependency explicitly.
+
 ## Electron Rules
 
 - Keep privileged code in the main process or preload.
