@@ -12,15 +12,15 @@ import type {
 import { scanProjectFolder } from './folder-scanner';
 
 const ALLOWED_TRANSCRIPTION_EXTENSIONS = new Set(['.txt', '.md', '.markdown']);
-const DEFAULT_SEPARATOR = '-';
-const DEFAULT_WIDTH = 2;
-const NUMBERED_PREFIX_PATTERN = /^(\d+)([\s_-]+)(.+)$/;
+const STRICT_NUMBER_SEPARATOR = '. ';
+const STRICT_NUMBER_WIDTH = 2;
+const FIRST_STRICT_NUMBER = 0;
+const NUMBERED_PREFIX_PATTERN = /^(\d+)(?:\. |[\s_-]+)(.+)$/;
+const STRICT_NUMBERED_PREFIX_PATTERN = /^(\d{2})\. (.+)$/;
 
 type NumberedFileName = {
   fileName: string;
   number: number;
-  width: number;
-  separator: string;
 };
 
 type TranscriptionDestination = {
@@ -47,17 +47,17 @@ export const isAllowedTranscriptionFile = (filePath: string) =>
 export const stripLeadingNumberPrefix = (fileName: string) => {
   const match = NUMBERED_PREFIX_PATTERN.exec(fileName);
 
-  return match?.[3] ? match[3] : fileName;
+  return match?.[2] ? match[2] : fileName;
 };
 
 const parseNumberedFileName = (fileName: string): NumberedFileName | null => {
-  const match = NUMBERED_PREFIX_PATTERN.exec(fileName);
+  const match = STRICT_NUMBERED_PREFIX_PATTERN.exec(fileName);
 
   if (!match) {
     return null;
   }
 
-  const [, numberText, separator] = match;
+  const [, numberText] = match;
   const number = Number.parseInt(numberText, 10);
 
   if (!Number.isSafeInteger(number)) {
@@ -67,34 +67,7 @@ const parseNumberedFileName = (fileName: string): NumberedFileName | null => {
   return {
     fileName,
     number,
-    width: numberText.length,
-    separator,
   };
-};
-
-const mostCommon = <T extends string | number>(values: T[], fallback: T) => {
-  if (values.length === 0) {
-    return fallback;
-  }
-
-  const counts = new Map<T, { count: number; firstIndex: number }>();
-
-  values.forEach((value, index) => {
-    const current = counts.get(value);
-
-    counts.set(value, {
-      count: (current?.count ?? 0) + 1,
-      firstIndex: current?.firstIndex ?? index,
-    });
-  });
-
-  return [...counts.entries()].sort((left, right) => {
-    if (right[1].count !== left[1].count) {
-      return right[1].count - left[1].count;
-    }
-
-    return left[1].firstIndex - right[1].firstIndex;
-  })[0][0];
 };
 
 export const detectNumberingConvention = (fileNames: string[]): TranscriptionImportNumbering => {
@@ -104,23 +77,17 @@ export const detectNumberingConvention = (fileNames: string[]): TranscriptionImp
 
   if (numberedNames.length === 0) {
     return {
-      nextNumber: 1,
-      width: DEFAULT_WIDTH,
-      separator: DEFAULT_SEPARATOR,
+      nextNumber: FIRST_STRICT_NUMBER,
+      width: STRICT_NUMBER_WIDTH,
+      separator: STRICT_NUMBER_SEPARATOR,
       inferredFromExistingFiles: false,
     };
   }
 
   return {
     nextNumber: Math.max(...numberedNames.map((fileName) => fileName.number)) + 1,
-    width: mostCommon(
-      numberedNames.map((fileName) => fileName.width),
-      DEFAULT_WIDTH,
-    ),
-    separator: mostCommon(
-      numberedNames.map((fileName) => fileName.separator),
-      DEFAULT_SEPARATOR,
-    ),
+    width: STRICT_NUMBER_WIDTH,
+    separator: STRICT_NUMBER_SEPARATOR,
     inferredFromExistingFiles: true,
   };
 };

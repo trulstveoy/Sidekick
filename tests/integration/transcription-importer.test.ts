@@ -48,13 +48,13 @@ describe('transcription import', () => {
     const rootPath = await copyFixtureToTemp();
     const targetFolder = path.join(rootPath, '02-transkripsjoner');
     const sourcePath = await createSourceTranscription();
-    await writeFile(path.join(targetFolder, '01-existing.md'), 'existing 1');
-    await writeFile(path.join(targetFolder, '02-existing.md'), 'existing 2');
+    await writeFile(path.join(targetFolder, '00. existing.md'), 'existing 1');
+    await writeFile(path.join(targetFolder, '01. existing.md'), 'existing 2');
 
     const preview = await createTranscriptionImportPreview(rootPath, sourcePath, 'preview-1');
     expect(preview.previewId).toBe('preview-1');
     expect(preview.targetFolderRelativePath).toBe('02-transkripsjoner');
-    expect(preview.destinationFileName).toBe('03-downloaded transcription.md');
+    expect(preview.destinationFileName).toBe('02. downloaded transcription.md');
     expect(preview.numbering.inferredFromExistingFiles).toBe(true);
 
     const result = await confirmTranscriptionImport(preview);
@@ -62,27 +62,27 @@ describe('transcription import', () => {
     const destinationContent = await readFile(result.destinationPath, 'utf8');
     const scannedPaths = collectRelativePaths(result.scan.tree);
 
-    expect(result.destinationFileName).toBe('03-downloaded transcription.md');
+    expect(result.destinationFileName).toBe('02. downloaded transcription.md');
     expect(sourceContent).toBe('Imported transcription content');
     expect(destinationContent).toBe('Imported transcription content');
-    expect(scannedPaths).toContain('02-transkripsjoner/03-downloaded transcription.md');
+    expect(scannedPaths).toContain('02-transkripsjoner/02. downloaded transcription.md');
   });
 
   it('automatically chooses the next number if the previewed destination is taken', async () => {
     const rootPath = await copyFixtureToTemp();
     const targetFolder = path.join(rootPath, '02-transkripsjoner');
     const sourcePath = await createSourceTranscription();
-    await writeFile(path.join(targetFolder, '01-existing.md'), 'existing 1');
-    await writeFile(path.join(targetFolder, '02-existing.md'), 'existing 2');
+    await writeFile(path.join(targetFolder, '00. existing.md'), 'existing 1');
+    await writeFile(path.join(targetFolder, '01. existing.md'), 'existing 2');
 
     const preview = await createTranscriptionImportPreview(rootPath, sourcePath, 'preview-2');
     await writeFile(path.join(targetFolder, preview.destinationFileName), 'new conflict');
 
     const result = await confirmTranscriptionImport(preview);
 
-    expect(preview.destinationFileName).toBe('03-downloaded transcription.md');
-    expect(result.destinationFileName).toBe('04-downloaded transcription.md');
-    expect(await readFile(path.join(targetFolder, '03-downloaded transcription.md'), 'utf8')).toBe(
+    expect(preview.destinationFileName).toBe('02. downloaded transcription.md');
+    expect(result.destinationFileName).toBe('03. downloaded transcription.md');
+    expect(await readFile(path.join(targetFolder, '02. downloaded transcription.md'), 'utf8')).toBe(
       'new conflict',
     );
     expect(await readFile(result.destinationPath, 'utf8')).toBe('Imported transcription content');

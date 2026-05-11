@@ -153,8 +153,8 @@ const mockScanAfterTranscriptionImport: ProjectFolderScan = {
             children: [
               ...(child.children ?? []),
               {
-                name: '01-new-transcription.md',
-                relativePath: '02-transkripsjoner/01-new-transcription.md',
+                name: '00. new-transcription.md',
+                relativePath: '02-transkripsjoner/00. new-transcription.md',
                 kind: 'file',
                 artifactType: 'transcript',
                 contextHints: ['transcript'],
@@ -183,12 +183,12 @@ const mockTranscriptionImportPreview: TranscriptionImportPreview = {
   sourceFileName: 'new-transcription.md',
   targetFolderPath: '/tmp/sidekick-project/02-transkripsjoner',
   targetFolderRelativePath: '02-transkripsjoner',
-  destinationPath: '/tmp/sidekick-project/02-transkripsjoner/01-new-transcription.md',
-  destinationFileName: '01-new-transcription.md',
+  destinationPath: '/tmp/sidekick-project/02-transkripsjoner/00. new-transcription.md',
+  destinationFileName: '00. new-transcription.md',
   numbering: {
-    nextNumber: 1,
+    nextNumber: 0,
     width: 2,
-    separator: '-',
+    separator: '. ',
     inferredFromExistingFiles: false,
   },
   warnings: [],
@@ -201,9 +201,9 @@ const mockTranscriptionImportResult: TranscriptionImportResult = {
   sourceFileName: 'new-transcription.md',
   targetFolderPath: '/tmp/sidekick-project/02-transkripsjoner',
   targetFolderRelativePath: '02-transkripsjoner',
-  destinationPath: '/tmp/sidekick-project/02-transkripsjoner/01-new-transcription.md',
-  destinationFileName: '01-new-transcription.md',
-  finalNumber: 1,
+  destinationPath: '/tmp/sidekick-project/02-transkripsjoner/00. new-transcription.md',
+  destinationFileName: '00. new-transcription.md',
+  finalNumber: 0,
   copiedBytes: 1024,
   scan: mockScanAfterTranscriptionImport,
 };
@@ -495,12 +495,12 @@ test('confirms and displays an imported transcription', async ({ page }) => {
   const transcriptionDetails = page.locator('[data-transcription-import-details]');
   await expect(transcriptionDetails).toContainText('new-transcription.md');
   await expect(transcriptionDetails).toContainText('02-transkripsjoner');
-  await expect(transcriptionDetails).toContainText('01-new-transcription.md');
+  await expect(transcriptionDetails).toContainText('00. new-transcription.md');
   await expect(page.getByText('Source file will be copied, not moved.')).toBeVisible();
 
   await page.getByRole('button', { name: 'Import transcription' }).click();
 
   await expect(page.getByRole('heading', { name: 'Transcription added' })).toBeVisible();
-  await expect(transcriptionDetails).toContainText('01-new-transcription.md');
-  await expect(page.getByRole('tree', { name: 'Scanned folder tree' }).getByText('01-new-transcription.md')).toBeVisible();
+  await expect(transcriptionDetails).toContainText('00. new-transcription.md');
+  await expect(page.getByRole('tree', { name: 'Scanned folder tree' }).getByText('00. new-transcription.md')).toBeVisible();
 });
