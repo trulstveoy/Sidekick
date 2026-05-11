@@ -126,15 +126,16 @@ Acceptance criteria:
   - failed;
   - completed.
 - The UI should not look like a full terminal. It should look like a focused Sidekick work panel.
-- After a completed Codex run, Sidekick refreshes the selected folder scan because files may have changed.
-- Failed or canceled runs do not silently refresh the folder unless a safe explicit refresh is part of the implementation.
+- After a completed edit-mode Codex run, Sidekick refreshes the selected folder scan because files may have changed.
+- Completed read-only runs do not refresh automatically.
+- Failed or canceled runs do not silently refresh the folder; the UI may offer a manual refresh later, but that is not required for the first version.
 - Errors are shown with actionable messages.
 - Tests cover command construction, process lifecycle, IPC validation, renderer state, and at least one UI smoke path with mocked Codex APIs.
 
 Initial run modes:
 - Read-only mode should run with `codex exec --sandbox read-only`.
 - Edit mode should run with `codex exec --sandbox workspace-write`.
-- Edit mode must require an explicit per-run UI choice or confirmation.
+- Edit mode must require an explicit per-run UI choice and confirmation that Codex may change files in the selected project folder.
 - `danger-full-access` is out of scope for this task.
 
 Non-goals:
@@ -163,6 +164,7 @@ Constraints:
 - Do not use `--dangerously-bypass-approvals-and-sandbox`.
 - Do not use `--sandbox danger-full-access`.
 - Avoid storing prompt/output history outside normal app runtime memory in the first version unless explicitly specified.
+- Do not persist prompt or output history in the first version.
 
 Risks:
 - Codex can modify user files in edit mode.
@@ -172,8 +174,11 @@ Risks:
 - Device-auth output may include URLs and one-time codes; UI must display enough information without logging secrets.
 - Packaged Electron apps may not inherit the same PATH as the user's terminal, especially on Windows and macOS.
 - Long-running Codex tasks may need robust cancellation and cleanup.
+- Canceling the parent `codex` process may leave child processes running unless process-tree or process-group cleanup is handled correctly.
 - Running Codex may consume account quota or API credits.
 - Prompt/output may include sensitive local project content.
+- A prompt passed as a command-line argument may appear in OS process listings and may be fragile for long prompts or special characters.
+- Login processes may wait for network, browser, or device-code interaction and must be cancellable.
 
 Resolved decisions:
 - Use a controlled Codex panel, not an embedded shell terminal.
@@ -191,7 +196,11 @@ Planning decisions:
 - User-configured CLI path is deferred.
 - First-version completion should show a "project files may have changed" message and refresh the folder scan after completed edit-mode runs.
 - Changed-file counting is deferred.
+- First-version runs should send prompts through stdin using `codex exec ... -`, not as command-line arguments.
+- First-version process management should enforce one global active Codex process.
+- Cancellation should attempt to stop the full Codex process tree or process group.
 - Login should be handled by running `codex login --device-auth` and streaming the output into the panel.
+- Login runs should have the same cancel path as normal Codex runs.
 - Automatic opening of device-auth URLs is deferred unless it is needed for usability after the first implementation.
 
 ## Implementation Plan
@@ -228,14 +237,21 @@ Responsibilities:
 - call `codex --version`;
 - call `codex login status`;
 - start `codex login --device-auth`;
-- start `codex exec --json --ephemeral --skip-git-repo-check --cd <projectRoot> --sandbox <mode> <prompt>`;
+- start `codex exec --json --ephemeral --skip-git-repo-check --cd <projectRoot> --sandbox <mode> -`;
+- write the prompt to the Codex process stdin;
 - stream stdout and stderr as structured Sidekick events;
 - parse JSONL stdout when possible and fall back to raw output lines when needed;
 - track active process by `runId`;
-- cancel a running process;
-- enforce one active process in the first version.
+- cancel a running process, including child processes when possible;
+- enforce one global active Codex process in the first version.
 
 The runner should not use shell execution. Use `spawn` with an argument array.
+
+Packaged-app behavior:
+- If Codex cannot be found through PATH, return a clear unavailable status.
+- Do not fail app startup when Codex is missing.
+- Do not add a user-configured Codex path in the first version.
+- On Windows, the first version should discover a Windows-installed `codex`; WSL-only Codex installations are not assumed to be visible to the packaged app.
 
 ### 3. Wire IPC through main and preload
 
@@ -247,6 +263,7 @@ Rules:
 - send output/completion events only to the requesting `webContents`;
 - remove active run state on exit, cancel, or error;
 - refresh the selected project scan after a completed edit-mode run.
+- do not refresh automatically after read-only, failed, or canceled runs.
 
 Update `src/preload.ts`.
 
@@ -279,24 +296,30 @@ Renderer behavior:
 - not logged in: show login action;
 - ready: allow prompt entry;
 - running: disable prompt/mode, stream output, allow cancel;
-- completed: show final status and refresh result when relevant;
+- completed read-only run: show final status without automatic refresh;
+- completed edit-mode run: show final status and refresh the selected folder scan;
 - failed: show error and keep prior scan state.
+- edit mode: require an explicit confirmation that Codex may change files in the selected project folder.
+- login run: allow cancel and show output needed to complete device authentication.
 
 ### 5. Add tests
 
 Unit tests:
 - command construction uses argument arrays and never shell strings;
+- prompt is passed through stdin and not through process arguments;
 - read-only mode maps to `--sandbox read-only`;
 - edit mode maps to `--sandbox workspace-write`;
 - runner rejects empty prompts;
 - runner rejects unknown roots through main-process validation;
-- one active run limit is enforced;
+- one global active run limit is enforced;
+- cancel attempts process-tree or process-group cleanup;
 - JSONL output parsing tolerates unknown event types.
 
 Integration-style tests with a fake Codex executable:
 - status success path;
 - missing CLI path;
 - login status path;
+- login run streaming and cancel path;
 - streaming output path;
 - cancel path.
 
@@ -342,6 +365,7 @@ Manual Codex verification:
 - read-only prompt can summarize the selected project without editing files;
 - edit-mode prompt can make a small file change in a disposable test project;
 - cancel stops a long-running run;
+- cancel does not leave obvious child processes running in the disposable verification case;
 - folder view refreshes after a completed edit-mode run.
 
 Packaging check:
