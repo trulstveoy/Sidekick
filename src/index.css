@@ -350,48 +350,56 @@ li {
   font-weight: 650;
 }
 
-.context-package-panel {
+.context-package-panel,
+.transcription-import-panel {
   display: grid;
   gap: 10px;
 }
 
-.context-package-panel h3 {
+.context-package-panel h3,
+.transcription-import-panel h3 {
   margin-bottom: 0;
   font-size: 15px;
 }
 
-.context-package-panel p {
+.context-package-panel p,
+.transcription-import-panel p {
   margin-bottom: 0;
   color: var(--muted-text);
   font-size: 13px;
 }
 
-.context-package-details {
+.context-package-details,
+.transcription-import-details {
   display: grid;
   gap: 6px;
   margin: 0;
 }
 
-.context-package-details div {
+.context-package-details div,
+.transcription-import-details div {
   padding-top: 7px;
   border-top: 1px solid var(--subtle-border);
 }
 
-.context-package-details dt {
+.context-package-details dt,
+.transcription-import-details dt {
   color: var(--soft-text);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
 }
 
-.context-package-details dd {
+.context-package-details dd,
+.transcription-import-details dd {
   margin: 3px 0 0;
   color: var(--text);
   font-size: 13px;
   overflow-wrap: anywhere;
 }
 
-.context-package-list {
+.context-package-list,
+.transcription-import-list {
   display: grid;
   gap: 6px;
   margin: 0;
@@ -399,36 +407,43 @@ li {
   list-style: none;
 }
 
-.context-package-list li {
+.context-package-list li,
+.transcription-import-list li {
   color: var(--warning);
   font-size: 13px;
 }
 
-.context-package-actions {
+.context-package-actions,
+.transcription-import-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
 .context-package-primary,
-.context-package-secondary {
+.context-package-secondary,
+.transcription-import-primary,
+.transcription-import-secondary {
   min-width: 0;
   padding: 8px 10px;
   font-size: 12px;
 }
 
-.context-package-secondary {
+.context-package-secondary,
+.transcription-import-secondary {
   border: 1px solid var(--border);
   color: var(--accent);
   background: transparent;
 }
 
-.context-package-secondary:hover:not(:disabled) {
+.context-package-secondary:hover:not(:disabled),
+.transcription-import-secondary:hover:not(:disabled) {
   border-color: #c7c1b6;
   background: var(--subtle-surface);
 }
 
-.context-package-secondary[hidden] {
+.context-package-secondary[hidden],
+.transcription-import-secondary[hidden] {
   display: none;
 }
 

@@ -1,9 +1,13 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
-import type { AppInfo } from './shared/sidekick-api';
+import type { AppInfo, TranscriptionImportPreview } from './shared/sidekick-api';
 import { generateContextPackage, getContextPackagePreview } from './main/context-package';
 import { scanProjectFolder } from './main/folder-scanner';
+import {
+  confirmTranscriptionImport,
+  createTranscriptionImportPreview,
+} from './main/transcription-importer';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -22,6 +26,7 @@ const getAppInfo = (): AppInfo => ({
 ipcMain.handle('app:get-info', getAppInfo);
 
 const selectedProjectRoots = new Set<string>();
+const pendingTranscriptionImports = new Map<string, TranscriptionImportPreview>();
 
 ipcMain.handle('project-folder:choose-and-scan', async (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
@@ -47,7 +52,7 @@ const assertKnownProjectRoot = (rootPath: unknown) => {
   }
 
   if (!selectedProjectRoots.has(rootPath)) {
-    throw new Error('Context package generation requires a folder selected in Sidekick.');
+    throw new Error('This action requires a folder selected in Sidekick.');
   }
 
   return rootPath;
@@ -60,6 +65,53 @@ ipcMain.handle('context-package:preview', (_event, rootPath) =>
 ipcMain.handle('context-package:generate', (_event, rootPath) =>
   generateContextPackage(assertKnownProjectRoot(rootPath)),
 );
+
+ipcMain.handle('transcription:preview-import', async (event, rootPath) => {
+  const projectRoot = assertKnownProjectRoot(rootPath);
+  const window = BrowserWindow.fromWebContents(event.sender);
+  const dialogOptions: Electron.OpenDialogOptions = {
+    title: 'Choose transcription',
+    properties: ['openFile'],
+    filters: [
+      {
+        name: 'Text and Markdown',
+        extensions: ['txt', 'md', 'markdown'],
+      },
+    ],
+  };
+  const result = window
+    ? await dialog.showOpenDialog(window, dialogOptions)
+    : await dialog.showOpenDialog(dialogOptions);
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+
+  const preview = await createTranscriptionImportPreview(projectRoot, result.filePaths[0]);
+  pendingTranscriptionImports.set(preview.previewId, preview);
+
+  return preview;
+});
+
+ipcMain.handle('transcription:confirm-import', async (_event, previewId) => {
+  if (typeof previewId !== 'string') {
+    throw new Error('A transcription import preview is required.');
+  }
+
+  const preview = pendingTranscriptionImports.get(previewId);
+
+  if (!preview) {
+    throw new Error('The transcription import preview has expired.');
+  }
+
+  try {
+    assertKnownProjectRoot(preview.rootPath);
+
+    return await confirmTranscriptionImport(preview);
+  } finally {
+    pendingTranscriptionImports.delete(previewId);
+  }
+});
 
 const isAllowedNavigation = (targetUrl: string) => {
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {

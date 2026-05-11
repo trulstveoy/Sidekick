@@ -8,6 +8,8 @@ import type {
   FolderTreeNode,
   ProjectFolderScan,
   ScanWarning,
+  TranscriptionImportPreview,
+  TranscriptionImportResult,
 } from './shared/sidekick-api';
 
 type ViewState =
@@ -24,6 +26,15 @@ type ContextPackageState =
   | { status: 'confirming'; preview: ContextPackagePreview }
   | { status: 'generating'; preview: ContextPackagePreview }
   | { status: 'complete'; result: ContextPackageResult }
+  | { status: 'error'; message: string };
+
+type TranscriptionImportState =
+  | { status: 'unavailable' }
+  | { status: 'ready' }
+  | { status: 'previewing' }
+  | { status: 'confirming'; preview: TranscriptionImportPreview }
+  | { status: 'importing'; preview: TranscriptionImportPreview }
+  | { status: 'complete'; result: TranscriptionImportResult }
   | { status: 'error'; message: string };
 
 const appInfoTarget = document.querySelector<HTMLSpanElement>('[data-app-info]');
@@ -47,6 +58,24 @@ const contextPackageSecondaryButton = document.querySelector<HTMLButtonElement>(
 const artifactCountsTarget = document.querySelector<HTMLUListElement>('[data-artifact-counts]');
 const recentFilesTarget = document.querySelector<HTMLUListElement>('[data-recent-files]');
 const warningsTarget = document.querySelector<HTMLUListElement>('[data-warnings]');
+const transcriptionImportTitleTarget = document.querySelector<HTMLElement>(
+  '[data-transcription-import-title]',
+);
+const transcriptionImportMessageTarget = document.querySelector<HTMLElement>(
+  '[data-transcription-import-message]',
+);
+const transcriptionImportDetailsTarget = document.querySelector<HTMLElement>(
+  '[data-transcription-import-details]',
+);
+const transcriptionImportListTarget = document.querySelector<HTMLUListElement>(
+  '[data-transcription-import-list]',
+);
+const transcriptionImportPrimaryButton = document.querySelector<HTMLButtonElement>(
+  '[data-transcription-import-primary]',
+);
+const transcriptionImportSecondaryButton = document.querySelector<HTMLButtonElement>(
+  '[data-transcription-import-secondary]',
+);
 
 const artifactLabels: Record<ArtifactType, string> = {
   'markdown-text': 'Markdown/text',
@@ -76,6 +105,7 @@ const signalLabels: Record<FolderSignal, string> = {
 let state: ViewState = { status: 'empty' };
 let expandedPaths = new Set<string>();
 let contextPackageState: ContextPackageState = { status: 'unavailable' };
+let transcriptionImportState: TranscriptionImportState = { status: 'unavailable' };
 
 const ROOT_PATH = '.';
 
@@ -127,6 +157,11 @@ const formatDate = (value?: string) => {
 
 const setContextPackageStateForScan = (scan?: ProjectFolderScan) => {
   contextPackageState = scan && window.sidekick ? { status: 'ready' } : { status: 'unavailable' };
+};
+
+const setTranscriptionImportStateForScan = (scan?: ProjectFolderScan) => {
+  transcriptionImportState =
+    scan && window.sidekick ? { status: 'ready' } : { status: 'unavailable' };
 };
 
 const getActiveScan = () =>
@@ -320,6 +355,28 @@ const renderContextPackageList = (items: string[]) => {
   contextPackageListTarget?.append(...items.map(createListItem));
 };
 
+const renderTranscriptionImportDetails = (rows: Array<[string, string]>) => {
+  clear(transcriptionImportDetailsTarget);
+
+  transcriptionImportDetailsTarget?.append(
+    ...rows.map(([label, value]) => {
+      const wrapper = document.createElement('div');
+      const term = document.createElement('dt');
+      const description = document.createElement('dd');
+      term.textContent = label;
+      description.textContent = value;
+      wrapper.append(term, description);
+
+      return wrapper;
+    }),
+  );
+};
+
+const renderTranscriptionImportList = (items: string[]) => {
+  clear(transcriptionImportListTarget);
+  transcriptionImportListTarget?.append(...items.map(createListItem));
+};
+
 const renderContextPackageActions = (
   primaryLabel: string,
   primaryDisabled: boolean,
@@ -331,6 +388,19 @@ const renderContextPackageActions = (
   }
 
   contextPackageSecondaryButton?.toggleAttribute('hidden', !secondaryVisible);
+};
+
+const renderTranscriptionImportActions = (
+  primaryLabel: string,
+  primaryDisabled: boolean,
+  secondaryVisible = false,
+) => {
+  if (transcriptionImportPrimaryButton) {
+    transcriptionImportPrimaryButton.textContent = primaryLabel;
+    transcriptionImportPrimaryButton.disabled = primaryDisabled;
+  }
+
+  transcriptionImportSecondaryButton?.toggleAttribute('hidden', !secondaryVisible);
 };
 
 const renderContextPackage = (scan?: ProjectFolderScan) => {
@@ -429,6 +499,99 @@ const renderContextPackage = (scan?: ProjectFolderScan) => {
   renderContextPackageDetails([]);
   renderContextPackageList([]);
   renderContextPackageActions('Try again', false);
+};
+
+const renderTranscriptionImport = (scan?: ProjectFolderScan) => {
+  if (!scan || !window.sidekick || transcriptionImportState.status === 'unavailable') {
+    setText(transcriptionImportTitleTarget, 'No folder selected');
+    setText(
+      transcriptionImportMessageTarget,
+      window.sidekick ? 'Choose a folder first.' : 'Open in Electron to import transcriptions.',
+    );
+    renderTranscriptionImportDetails([]);
+    renderTranscriptionImportList([]);
+    renderTranscriptionImportActions('Add transcription', true);
+    return;
+  }
+
+  if (transcriptionImportState.status === 'ready') {
+    setText(transcriptionImportTitleTarget, 'Ready');
+    setText(transcriptionImportMessageTarget, 'Copy a text or Markdown transcript into the project.');
+    renderTranscriptionImportDetails([
+      ['Accepted', '.txt, .md, .markdown'],
+      ['Target', 'Detected transcription folder'],
+    ]);
+    renderTranscriptionImportList([]);
+    renderTranscriptionImportActions('Add transcription', false);
+    return;
+  }
+
+  if (transcriptionImportState.status === 'previewing') {
+    setText(transcriptionImportTitleTarget, 'Choose file');
+    setText(transcriptionImportMessageTarget, 'Waiting for transcription file selection.');
+    renderTranscriptionImportDetails([]);
+    renderTranscriptionImportList([]);
+    renderTranscriptionImportActions('Choosing...', true);
+    return;
+  }
+
+  if (transcriptionImportState.status === 'confirming') {
+    const { preview } = transcriptionImportState;
+    setText(transcriptionImportTitleTarget, 'Confirm import');
+    setText(transcriptionImportMessageTarget, 'Review the destination before copying.');
+    renderTranscriptionImportDetails([
+      ['Source file', preview.sourceFileName],
+      ['Target folder', preview.targetFolderRelativePath],
+      ['Destination file', preview.destinationFileName],
+      [
+        'Numbering',
+        `${preview.numbering.nextNumber.toString().padStart(preview.numbering.width, '0')}${preview.numbering.separator} (${preview.numbering.inferredFromExistingFiles ? 'inferred' : 'new sequence'})`,
+      ],
+      ['Destination path', preview.destinationPath],
+    ]);
+    renderTranscriptionImportList([
+      'Source file will be copied, not moved.',
+      ...preview.warnings.map((warning) =>
+        warning.path ? `${warning.path}: ${warning.message}` : warning.message,
+      ),
+    ]);
+    renderTranscriptionImportActions('Import transcription', false, true);
+    return;
+  }
+
+  if (transcriptionImportState.status === 'importing') {
+    const { preview } = transcriptionImportState;
+    setText(transcriptionImportTitleTarget, 'Importing');
+    setText(transcriptionImportMessageTarget, 'Copying transcription into the project.');
+    renderTranscriptionImportDetails([
+      ['Destination file', preview.destinationFileName],
+      ['Destination path', preview.destinationPath],
+    ]);
+    renderTranscriptionImportList([]);
+    renderTranscriptionImportActions('Importing...', true);
+    return;
+  }
+
+  if (transcriptionImportState.status === 'complete') {
+    const { result } = transcriptionImportState;
+    setText(transcriptionImportTitleTarget, 'Transcription added');
+    setText(transcriptionImportMessageTarget, 'Copied into the transcription folder.');
+    renderTranscriptionImportDetails([
+      ['Destination file', result.destinationFileName],
+      ['Source file', result.sourceFileName],
+      ['Size', formatBytes(result.copiedBytes)],
+      ['Destination path', result.destinationPath],
+    ]);
+    renderTranscriptionImportList([]);
+    renderTranscriptionImportActions('Add another', false);
+    return;
+  }
+
+  setText(transcriptionImportTitleTarget, 'Import failed');
+  setText(transcriptionImportMessageTarget, transcriptionImportState.message);
+  renderTranscriptionImportDetails([]);
+  renderTranscriptionImportList([]);
+  renderTranscriptionImportActions('Try again', false);
 };
 
 const renderTreeToolbar = (scan?: ProjectFolderScan) => {
@@ -543,6 +706,7 @@ const render = () => {
     renderRecentFiles();
     renderWarnings();
     renderContextPackage();
+    renderTranscriptionImport();
     renderTree();
     return;
   }
@@ -551,6 +715,7 @@ const render = () => {
     setText(stateTitleTarget, 'Scanning folder');
     setText(stateMessageTarget, 'Reading structure and metadata.');
     renderContextPackage();
+    renderTranscriptionImport();
     renderTree();
     return;
   }
@@ -559,6 +724,7 @@ const render = () => {
     setText(stateTitleTarget, 'Unable to inspect folder');
     setText(stateMessageTarget, state.message);
     renderContextPackage();
+    renderTranscriptionImport();
     renderWarnings([
       {
         path: '.',
@@ -588,6 +754,7 @@ const render = () => {
   renderRecentFiles(scan);
   renderWarnings(scan.warnings);
   renderContextPackage(scan);
+  renderTranscriptionImport(scan);
   renderTree(scan);
 };
 
@@ -649,6 +816,69 @@ const handleContextPackagePrimary = () => {
   void openContextPackageConfirmation();
 };
 
+const openTranscriptionImportConfirmation = async () => {
+  const scan = getActiveScan();
+
+  if (!window.sidekick || !scan) {
+    transcriptionImportState = { status: 'unavailable' };
+    render();
+    return;
+  }
+
+  transcriptionImportState = { status: 'previewing' };
+  render();
+
+  try {
+    const preview = await window.sidekick.previewTranscriptionImport(scan.rootPath);
+    transcriptionImportState = preview ? { status: 'confirming', preview } : { status: 'ready' };
+  } catch (error) {
+    transcriptionImportState = {
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unable to prepare transcription import.',
+    };
+  }
+
+  render();
+};
+
+const importTranscription = async () => {
+  if (!window.sidekick || transcriptionImportState.status !== 'confirming') {
+    return;
+  }
+
+  const { preview } = transcriptionImportState;
+  transcriptionImportState = { status: 'importing', preview };
+  render();
+
+  try {
+    const result = await window.sidekick.confirmTranscriptionImport(preview.previewId);
+    const nextState =
+      result.scan.status === 'partial'
+        ? ({ status: 'partial', scan: result.scan } satisfies ViewState)
+        : ({ status: 'ready', scan: result.scan } satisfies ViewState);
+    state = nextState;
+    expandedPaths = new Set([...expandedPaths, ROOT_PATH, result.targetFolderRelativePath]);
+    setContextPackageStateForScan(result.scan);
+    transcriptionImportState = { status: 'complete', result };
+  } catch (error) {
+    transcriptionImportState = {
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unable to import transcription.',
+    };
+  }
+
+  render();
+};
+
+const handleTranscriptionImportPrimary = () => {
+  if (transcriptionImportState.status === 'confirming') {
+    void importTranscription();
+    return;
+  }
+
+  void openTranscriptionImportConfirmation();
+};
+
 const chooseFolder = async () => {
   if (!window.sidekick) {
     state = { status: 'error', message: 'Local folder inspection is available in the Electron app.' };
@@ -665,6 +895,7 @@ const chooseFolder = async () => {
     if (!scan) {
       expandedPaths = new Set();
       setContextPackageStateForScan();
+      setTranscriptionImportStateForScan();
       state = { status: 'empty' };
       render();
       return;
@@ -672,11 +903,13 @@ const chooseFolder = async () => {
 
     resetExpandedPaths();
     setContextPackageStateForScan(scan);
+    setTranscriptionImportStateForScan(scan);
     state = scan.status === 'partial' ? { status: 'partial', scan } : { status: 'ready', scan };
     render();
   } catch (error) {
     expandedPaths = new Set();
     setContextPackageStateForScan();
+    setTranscriptionImportStateForScan();
     state = {
       status: 'error',
       message: error instanceof Error ? error.message : 'Unable to inspect the selected folder.',
@@ -702,6 +935,11 @@ collapseAllButton?.addEventListener('click', collapseAllFolders);
 contextPackagePrimaryButton?.addEventListener('click', handleContextPackagePrimary);
 contextPackageSecondaryButton?.addEventListener('click', () => {
   contextPackageState = getActiveScan() ? { status: 'ready' } : { status: 'unavailable' };
+  render();
+});
+transcriptionImportPrimaryButton?.addEventListener('click', handleTranscriptionImportPrimary);
+transcriptionImportSecondaryButton?.addEventListener('click', () => {
+  transcriptionImportState = getActiveScan() ? { status: 'ready' } : { status: 'unavailable' };
   render();
 });
 

@@ -129,11 +129,52 @@ export type ContextPackageResult = {
   warnings: ContextPackageWarning[];
 };
 
+export type TranscriptionImportWarning = {
+  path?: string;
+  message: string;
+};
+
+export type TranscriptionImportNumbering = {
+  nextNumber: number;
+  width: number;
+  separator: string;
+  inferredFromExistingFiles: boolean;
+};
+
+export type TranscriptionImportPreview = {
+  previewId: string;
+  rootPath: string;
+  sourcePath: string;
+  sourceFileName: string;
+  targetFolderPath: string;
+  targetFolderRelativePath: string;
+  destinationPath: string;
+  destinationFileName: string;
+  numbering: TranscriptionImportNumbering;
+  warnings: TranscriptionImportWarning[];
+};
+
+export type TranscriptionImportResult = {
+  status: 'complete';
+  rootPath: string;
+  sourcePath: string;
+  sourceFileName: string;
+  targetFolderPath: string;
+  targetFolderRelativePath: string;
+  destinationPath: string;
+  destinationFileName: string;
+  finalNumber: number;
+  copiedBytes: number;
+  scan: ProjectFolderScan;
+};
+
 export type SidekickApi = {
   getAppInfo: () => Promise<AppInfo>;
   chooseProjectFolder: () => Promise<ProjectFolderScan | null>;
   previewContextPackage: (rootPath: string) => Promise<ContextPackagePreview>;
   generateContextPackage: (rootPath: string) => Promise<ContextPackageResult>;
+  previewTranscriptionImport: (rootPath: string) => Promise<TranscriptionImportPreview | null>;
+  confirmTranscriptionImport: (previewId: string) => Promise<TranscriptionImportResult>;
 };
 
 declare global {

@@ -18,6 +18,8 @@ The renderer currently receives two APIs through `window.sidekick`:
 - `chooseProjectFolder()`
 - `previewContextPackage()`
 - `generateContextPackage()`
+- `previewTranscriptionImport()`
+- `confirmTranscriptionImport()`
 
 No generic filesystem API is exposed to the renderer.
 
@@ -47,6 +49,27 @@ No generic filesystem API is exposed to the renderer.
 11. The generated file is written to the selected folder root as `<project-folder-name>.context-package.md`.
 12. The renderer displays the output path, included count, skipped-file count, tokens, characters, output size, skipped files, and warnings.
 
+## Transcription Import Flow
+
+1. The user selects a project folder through the folder inspection flow.
+2. The main process records the selected root path as a known Sidekick project root for the current app session.
+3. The renderer shows an "Add transcription" action for the selected project.
+4. The renderer calls `window.sidekick.previewTranscriptionImport(rootPath)`.
+5. The preload script invokes the `transcription:preview-import` IPC channel.
+6. The main process validates that the requested root path is absolute and was selected through Sidekick.
+7. The main process opens a native file picker for `.txt`, `.md`, and `.markdown` files.
+8. If the user cancels, the main process returns `null`.
+9. If the user chooses a file, the main process detects exactly one transcription folder in the selected project.
+10. The main process generates a destination filename by continuing the target folder's leading-number sequence.
+11. The main process stores the preview in a short-lived pending-import map and returns a `previewId` plus source and destination details to the renderer.
+12. If the user confirms, the renderer calls `window.sidekick.confirmTranscriptionImport(previewId)`.
+13. The preload script invokes the `transcription:confirm-import` IPC channel.
+14. The main process looks up the pending preview by `previewId`, revalidates the selected project root, recomputes a safe destination if needed, and copies the source file without overwriting existing files.
+15. The main process rescans the project folder and returns the import result with the fresh `ProjectFolderScan`.
+16. The renderer updates the folder tree and displays the copied destination path.
+
+The renderer never sends a destination path for a write operation. Confirmation uses only the `previewId` created by the main process.
+
 ## Shared Contract
 
 Shared TypeScript types live in `src/shared/sidekick-api.ts`.
@@ -64,6 +87,10 @@ The shared contract currently includes:
 - `ContextPackageResult`
 - `ContextPackageSkippedFile`
 - `ContextPackageWarning`
+- `TranscriptionImportPreview`
+- `TranscriptionImportResult`
+- `TranscriptionImportWarning`
+- `TranscriptionImportNumbering`
 - `SidekickApi`
 
 These types are used by main, preload, renderer, and tests to keep IPC payloads explicit.
@@ -105,13 +132,31 @@ The first version is a Sidekick-owned wrapper around Repomix:
 
 The service writes only the generated context-package file. It does not edit, move, rename, or delete source files.
 
+## Transcription Import Service
+
+The transcription import service lives in `src/main/transcription-importer.ts`.
+
+The first version is a controlled copy workflow:
+
+- accepted source files are `.txt`, `.md`, and `.markdown`
+- source files are copied, not moved
+- Sidekick does not create a transcription folder
+- exactly one transcription folder must be detected through existing folder signals
+- destination filenames continue the target folder's leading-number sequence
+- the original source basename is preserved after the generated number prefix
+- existing destination files are not overwritten
+- conflicts are handled by trying the next available number
+- after a successful copy, the selected project folder is rescanned
+
+The service never exposes a general filesystem write API to the renderer.
+
 ## UI Shape
 
 The renderer uses a three-column work surface:
 
 - left: selected project, path, runtime, and folder signals
 - center: read-only folder structure
-- right: summary, context-package action/result, artifact counts, recent files, and warnings
+- right: summary, transcription import action/result, context-package action/result, artifact counts, recent files, and warnings
 
 The UI treats folder categories as inferred hints, not facts.
 
@@ -126,7 +171,9 @@ The current architecture preserves the Electron security boundary:
 - preload exposes only task-specific methods.
 - raw `ipcRenderer` is not exposed.
 - context-package generation is allowed only for a root path selected through Sidekick in the current session.
+- transcription import is allowed only for a root path selected through Sidekick in the current session.
 - renderer requests do not provide arbitrary output paths.
+- transcription import confirmation uses a `previewId`, not renderer-supplied source or destination paths.
 - symlinks are skipped by default during folder scans.
 - external windows are denied, with HTTPS links opened through Electron only after protocol checking.
 
@@ -153,8 +200,9 @@ Automated verification is split by responsibility:
 - Unit tests cover artifact classification and folder-name signals.
 - Integration tests cover scanner behavior against a fixture project folder.
 - Unit and integration tests cover context-package filename rules, ignore rules, preview behavior, generation, skipped binary files, and self-ignore behavior.
+- Unit and integration tests cover transcription import extension rules, numbering, target-folder detection, no-overwrite behavior, copy behavior, and post-import rescanning.
 - Unit tests cover CI artifact staging rules for release package files.
-- Playwright smoke tests cover the renderer empty state, folder tree behavior, and mocked context-package confirmation/result states.
+- Playwright smoke tests cover the renderer empty state, folder tree behavior, mocked transcription import confirmation/result states, and mocked context-package confirmation/result states.
 - Electron packaging verifies the main, preload, and renderer bundles.
 - GitHub Actions runs verification and package builds before publishing release assets.
 

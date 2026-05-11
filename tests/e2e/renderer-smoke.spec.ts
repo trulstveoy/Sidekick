@@ -5,6 +5,8 @@ import type {
   ContextPackageResult,
   FolderSignal,
   ProjectFolderScan,
+  TranscriptionImportPreview,
+  TranscriptionImportResult,
 } from '../../src/shared/sidekick-api';
 
 const createArtifactCounts = () =>
@@ -138,6 +140,73 @@ const mockContextPackageResult: ContextPackageResult = {
   warnings: [],
 };
 
+const mockScanAfterTranscriptionImport: ProjectFolderScan = {
+  ...mockScan,
+  scannedAt: '2026-05-09T12:05:00.000Z',
+  tree: {
+    ...mockScan.tree,
+    children: mockScan.tree.children?.map((child) =>
+      child.relativePath === '02-transkripsjoner'
+        ? {
+            ...child,
+            children: [
+              ...(child.children ?? []),
+              {
+                name: '01-new-transcription.md',
+                relativePath: '02-transkripsjoner/01-new-transcription.md',
+                kind: 'file',
+                artifactType: 'transcript',
+                contextHints: ['transcript'],
+                size: 1024,
+                modifiedAt: '2026-05-09T12:05:00.000Z',
+              },
+            ],
+          }
+        : child,
+    ),
+  },
+  summary: {
+    ...mockScan.summary,
+    fileCount: 4,
+    artifactTypeCounts: {
+      ...mockScan.summary.artifactTypeCounts,
+      transcript: 1,
+    },
+  },
+};
+
+const mockTranscriptionImportPreview: TranscriptionImportPreview = {
+  previewId: 'preview-1',
+  rootPath: '/tmp/sidekick-project',
+  sourcePath: '/tmp/downloads/new-transcription.md',
+  sourceFileName: 'new-transcription.md',
+  targetFolderPath: '/tmp/sidekick-project/02-transkripsjoner',
+  targetFolderRelativePath: '02-transkripsjoner',
+  destinationPath: '/tmp/sidekick-project/02-transkripsjoner/01-new-transcription.md',
+  destinationFileName: '01-new-transcription.md',
+  numbering: {
+    nextNumber: 1,
+    width: 2,
+    separator: '-',
+    inferredFromExistingFiles: false,
+  },
+  warnings: [],
+};
+
+const mockTranscriptionImportResult: TranscriptionImportResult = {
+  status: 'complete',
+  rootPath: '/tmp/sidekick-project',
+  sourcePath: '/tmp/downloads/new-transcription.md',
+  sourceFileName: 'new-transcription.md',
+  targetFolderPath: '/tmp/sidekick-project/02-transkripsjoner',
+  targetFolderRelativePath: '02-transkripsjoner',
+  destinationPath: '/tmp/sidekick-project/02-transkripsjoner/01-new-transcription.md',
+  destinationFileName: '01-new-transcription.md',
+  finalNumber: 1,
+  copiedBytes: 1024,
+  scan: mockScanAfterTranscriptionImport,
+};
+
 test('renders the folder inspection empty state', async ({ page }) => {
   await page.goto('/');
 
@@ -151,6 +220,7 @@ test('renders the folder inspection empty state', async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByText('Browser preview')).toBeVisible();
   await expect(page.getByText('No warnings')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add transcription' })).toBeDisabled();
 });
 
 test('expands and collapses scanned folders', async ({ page }) => {
@@ -166,6 +236,10 @@ test('expands and collapses scanned folders', async ({ page }) => {
         chooseProjectFolder: async () => scan,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => result,
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
       };
     },
     {
@@ -205,6 +279,10 @@ test('expands and collapses all scanned folders', async ({ page }) => {
         chooseProjectFolder: async () => scan,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => result,
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
       };
     },
     {
@@ -240,6 +318,10 @@ test('confirms and displays a generated context package', async ({ page }) => {
         chooseProjectFolder: async () => scan,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => result,
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
       };
     },
     {
@@ -275,4 +357,50 @@ test('confirms and displays a generated context package', async ({ page }) => {
   await expect(contextPackageDetails).toContainText('Tokens');
   await expect(contextPackageDetails).toContainText('523');
   await expect(page.getByText('01-bakgrunn/brief.pdf: binary-extension')).toBeVisible();
+});
+
+test('confirms and displays an imported transcription', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan, contextPreview, contextResult, importPreview, importResult }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        previewContextPackage: async () => contextPreview,
+        generateContextPackage: async () => contextResult,
+        previewTranscriptionImport: async () => importPreview,
+        confirmTranscriptionImport: async () => importResult,
+      };
+    },
+    {
+      scan: mockScan,
+      contextPreview: mockContextPackagePreview,
+      contextResult: mockContextPackageResult,
+      importPreview: mockTranscriptionImportPreview,
+      importResult: mockTranscriptionImportResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Choose folder' }).click();
+
+  await expect(page.getByRole('button', { name: 'Add transcription' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Add transcription' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Confirm import' })).toBeVisible();
+  const transcriptionDetails = page.locator('[data-transcription-import-details]');
+  await expect(transcriptionDetails).toContainText('new-transcription.md');
+  await expect(transcriptionDetails).toContainText('02-transkripsjoner');
+  await expect(transcriptionDetails).toContainText('01-new-transcription.md');
+  await expect(page.getByText('Source file will be copied, not moved.')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Import transcription' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Transcription added' })).toBeVisible();
+  await expect(transcriptionDetails).toContainText('01-new-transcription.md');
+  await expect(page.getByRole('tree', { name: 'Scanned folder tree' }).getByText('01-new-transcription.md')).toBeVisible();
 });
