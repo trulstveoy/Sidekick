@@ -188,10 +188,13 @@ The first release pipeline targets Linux and Windows only:
 - release tags must match `v<package.json version>`
 - release tag commits must be reachable from `main`
 - Linux output includes DEB and RPM packages
-- Windows output uses the existing unsigned Squirrel Windows maker
+- Windows output uses the Squirrel Windows maker
+- Windows release output can be self-signed for maintainer prereleases when signing secrets are configured
 - macOS packaging, code signing, notarization, and auto-update are deferred
 
 The release pipeline uses the built-in GitHub token. Read-only jobs use `contents: read`; the publish job uses `contents: write` only when creating a GitHub prerelease.
+
+Windows self-signed signing is a release-artifact trust boundary, not an application runtime boundary. Signing material is supplied only to the Windows release job before Electron Forge runs `npm run make`. The renderer, preload, and main process do not receive certificate material. A self-signed artifact is trusted only on machines where the matching public certificate has been installed into local trust stores.
 
 ## Verification
 

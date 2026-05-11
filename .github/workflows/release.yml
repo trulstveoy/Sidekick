@@ -110,8 +110,79 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y fakeroot rpm
 
+      - name: Prepare Windows signing material
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          REQUIRE_SIGNING: ${{ vars.SIDEKICK_REQUIRE_WINDOWS_SIGNING }}
+          SIGNING_PFX_BASE64: ${{ secrets.SIDEKICK_SIGNING_PFX_BASE64 }}
+          SIGNING_PASSWORD: ${{ secrets.SIDEKICK_SIGNING_PASSWORD }}
+          SIGNING_TIMESTAMP_URL_SECRET: ${{ secrets.SIDEKICK_SIGNING_TIMESTAMP_URL }}
+          SIGNING_TIMESTAMP_URL_VAR: ${{ vars.SIDEKICK_SIGNING_TIMESTAMP_URL }}
+        run: |
+          $requireSigning = $env:REQUIRE_SIGNING -ieq "true"
+          $hasPfx = -not [string]::IsNullOrWhiteSpace($env:SIGNING_PFX_BASE64)
+          $hasPassword = -not [string]::IsNullOrWhiteSpace($env:SIGNING_PASSWORD)
+          $hasSigningSecrets = $hasPfx -and $hasPassword
+
+          "SIDEKICK_REQUIRE_WINDOWS_SIGNING=$($requireSigning.ToString().ToLowerInvariant())" >> $env:GITHUB_ENV
+          "SIDEKICK_SIGNING_ENABLED=$($hasSigningSecrets.ToString().ToLowerInvariant())" >> $env:GITHUB_ENV
+
+          if ($requireSigning -and -not $hasSigningSecrets) {
+            throw "SIDEKICK_REQUIRE_WINDOWS_SIGNING=true, but SIDEKICK_SIGNING_PFX_BASE64 and SIDEKICK_SIGNING_PASSWORD are not both configured."
+          }
+
+          if (($hasPfx -or $hasPassword) -and -not $hasSigningSecrets) {
+            throw "Windows signing is partially configured. Set both SIDEKICK_SIGNING_PFX_BASE64 and SIDEKICK_SIGNING_PASSWORD, or remove both."
+          }
+
+          if (-not $hasSigningSecrets) {
+            Write-Host "Windows signing secrets are not configured. Windows release artifacts will remain unsigned."
+            exit 0
+          }
+
+          Write-Host "::add-mask::$env:SIGNING_PASSWORD"
+
+          $signingDirectory = Join-Path $env:RUNNER_TEMP "sidekick-signing"
+          New-Item -ItemType Directory -Force -Path $signingDirectory | Out-Null
+
+          $pfxPath = Join-Path $signingDirectory "sidekick-signing.pfx"
+          [System.IO.File]::WriteAllBytes($pfxPath, [System.Convert]::FromBase64String($env:SIGNING_PFX_BASE64))
+
+          "SIDEKICK_SIGNING_PFX_PATH=$pfxPath" >> $env:GITHUB_ENV
+          "SIDEKICK_SIGNING_PASSWORD=$env:SIGNING_PASSWORD" >> $env:GITHUB_ENV
+
+          $timestampUrl = if (-not [string]::IsNullOrWhiteSpace($env:SIGNING_TIMESTAMP_URL_SECRET)) {
+            $env:SIGNING_TIMESTAMP_URL_SECRET
+          } else {
+            $env:SIGNING_TIMESTAMP_URL_VAR
+          }
+
+          if (-not [string]::IsNullOrWhiteSpace($timestampUrl)) {
+            "SIDEKICK_SIGNING_TIMESTAMP_URL=$timestampUrl" >> $env:GITHUB_ENV
+          }
+
+          Write-Host "Windows signing material prepared."
+
       - name: Make distributables
         run: npm run make
+
+      - name: Verify Windows signatures
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          SIDEKICK_SIGNING_EXPECTED_SUBJECT: ${{ vars.SIDEKICK_SIGNING_EXPECTED_SUBJECT || 'CN=Sidekick Local Code Signing' }}
+          SIDEKICK_SIGNING_EXPECTED_THUMBPRINT: ${{ vars.SIDEKICK_SIGNING_EXPECTED_THUMBPRINT }}
+        run: npm run verify:windows-signatures
+
+      - name: Remove temporary Windows signing material
+        if: always() && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not [string]::IsNullOrWhiteSpace($env:SIDEKICK_SIGNING_PFX_PATH) -and (Test-Path $env:SIDEKICK_SIGNING_PFX_PATH)) {
+            Remove-Item -Force $env:SIDEKICK_SIGNING_PFX_PATH
+            Write-Host "Removed temporary Windows signing PFX."
+          }
 
       - name: Verify packaged context package generation
         run: npm run verify:packaged-context

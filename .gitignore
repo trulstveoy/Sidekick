@@ -66,6 +66,16 @@ typings/
 .env
 .env.test
 
+# Local signing material
+*.pfx
+*.p12
+*.pfx.base64.txt
+*.p12.base64.txt
+*.key
+*.pem
+signing-output/
+SidekickSigning/
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 

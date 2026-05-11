@@ -17,6 +17,8 @@
     "test:watch": "vitest tests/unit tests/integration",
     "test:ui": "playwright test",
     "verify:packaged-context": "node scripts/ci/verify-packaged-context-package.mjs",
+    "signing:create-self-signed-cert": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/signing/create-self-signed-code-signing-cert.ps1",
+    "verify:windows-signatures": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/signing/verify-windows-signatures.ps1",
     "check": "npm run lint && npm run typecheck",
     "spike:repomix": "node scripts/spikes/repomix-spike.mjs"
   },

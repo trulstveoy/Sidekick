@@ -45,6 +45,31 @@ The release workflow verifies that the tag matches the version in `package.json`
 
 The release workflow also verifies that the tag points to a commit reachable from `main`.
 
+## Windows Signing
+
+Windows release artifacts support optional self-signed signing for maintainer prereleases.
+
+The supported signing modes are:
+
+- unsigned: allowed for early prereleases when signing is not required;
+- self-signed: allowed for maintainer prereleases after signing secrets are configured;
+- public-trust signed: deferred to a future release process.
+
+Self-signed signing is controlled by GitHub repository configuration:
+
+- secret `SIDEKICK_SIGNING_PFX_BASE64`
+- secret `SIDEKICK_SIGNING_PASSWORD`
+- optional secret or variable `SIDEKICK_SIGNING_TIMESTAMP_URL`
+- variable `SIDEKICK_REQUIRE_WINDOWS_SIGNING`
+
+When `SIDEKICK_REQUIRE_WINDOWS_SIGNING=true`, the Windows release job must sign and verify Windows artifacts before upload. If signing secrets are missing or verification fails, the job fails before the GitHub prerelease is published.
+
+When `SIDEKICK_REQUIRE_WINDOWS_SIGNING` is not true and signing secrets are missing, Windows prerelease artifacts may remain unsigned.
+
+Signing material is provided to Electron Forge before `npm run make`, so Squirrel.Windows signs artifacts while creating them. The workflow then verifies generated `.exe` signatures before uploading release assets.
+
+Self-signed artifacts are trusted only on machines where the maintainer has installed the matching public certificate. See `docs/release/windows-self-signed-signing.md` for the certificate, trust, verification, and removal procedure.
+
 ## Creating A Release
 
 Use this flow after the release workflow has been merged and the CI workflow passes on `main`:
@@ -81,11 +106,10 @@ git push origin v0.1.1
 The first release pipeline intentionally does not include:
 
 - macOS packages
-- code signing
 - notarization
 - automatic app updates
 - store distribution
 
-Windows packages are unsigned in the first version. Users may see operating system warnings when running unsigned installers.
+Windows packages are unsigned unless the self-signed maintainer workflow is configured for the release. Users may see operating system warnings when running unsigned installers or self-signed installers on machines that do not trust the Sidekick certificate.
 
 Linux output includes DEB and RPM packages when Electron Forge can produce both in CI.
