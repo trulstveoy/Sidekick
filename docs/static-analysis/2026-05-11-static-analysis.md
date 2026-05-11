@@ -604,8 +604,8 @@ D1 handoff table:
 
 | Remaining Knip finding | Final status or next owner | Reason |
 | --- | --- | --- |
-| `@electron-forge/plugin-auto-unpack-natives` unused dev dependency | D2 | Dependency cleanup belongs with dependency declaration fixes. |
-| `@electron-forge/shared-types` unlisted dependency | D2 | Direct import must be resolved by a direct dependency or a different type import. |
+| `@electron-forge/plugin-auto-unpack-natives` unused dev dependency | Fixed in D2 | Removed from `devDependencies` because no current native dependency or Forge plugin usage was found. |
+| `@electron-forge/shared-types` unlisted dependency | Fixed in D2 | Added as a direct `devDependency` because `forge.config.ts` imports it directly. |
 | `DEFAULT_SCAN_OPTIONS` unused export | D5 | Scanner export cleanup belongs with the scanner refactor if it remains valid after D5 changes. |
 | `CONTEXT_PACKAGE_SUFFIX` unused export | Follow-up cleanup recommendation | Context-package export cleanup does not belong to D2, D4, or D5. |
 | `BINARY_FILE_WARNING` unused export | Follow-up cleanup recommendation | Context-package export cleanup does not belong to D2, D4, or D5. |
@@ -619,6 +619,35 @@ Verification:
 - `npm run check`: passed.
 - `npm run test`: passed.
 - `npx knip --no-progress`: completed with the remaining findings listed in the handoff table.
+
+## Addendum: TASK-0009 D2 Dependency Declaration Fixes
+
+Date:
+- 2026-05-11
+
+Purpose:
+- Fix Knip dependency findings routed from D1 to D2.
+
+Changes made:
+- Added `@electron-forge/shared-types` as a direct `devDependency`.
+- Removed `@electron-forge/plugin-auto-unpack-natives` from `devDependencies`.
+- Regenerated `package-lock.json`.
+
+Final status:
+- SA-002: fixed.
+  - `forge.config.ts` still imports `ForgeConfig` from `@electron-forge/shared-types`.
+  - The package is now listed directly in `package.json`.
+- SA-003: fixed.
+  - No usage of `@electron-forge/plugin-auto-unpack-natives` was found in the repository.
+  - No native module usage was found that requires the plugin for the current package.
+  - The package was removed.
+
+Verification:
+- `npm ci`: passed.
+- `npm run check`: passed.
+- `npm run test`: passed.
+- `npm run package`: passed on Linux x64.
+- `npx knip --no-progress`: SA-002 and SA-003 no longer appear. Remaining output is limited to exported symbols and exported types already routed by D1.
 
 ## Deferred Findings
 

@@ -799,6 +799,11 @@ Documentation structure expectation:
   - Intentional fixture files no longer appear as deletion candidates.
   - `powershell.exe` no longer appears as an unlisted binary.
   - Remaining Knip findings were routed in `docs/static-analysis/2026-05-11-static-analysis.md`.
+- 2026-05-11: D2 started from D1's handoff table.
+- 2026-05-11: D2 changed dependency metadata:
+  - Added `@electron-forge/shared-types` as a direct `devDependency`.
+  - Removed `@electron-forge/plugin-auto-unpack-natives` because no repository usage or current native dependency need was found.
+  - Regenerated `package-lock.json`.
 
 ## Verification Log
 
@@ -806,6 +811,12 @@ Documentation structure expectation:
   - `npm run check`: passed.
   - `npm run test`: passed.
   - `npx knip --no-progress`: completed with remaining findings documented in the D1 handoff table.
+- 2026-05-11: D2 verification:
+  - `npm ci`: passed.
+  - `npm run check`: passed.
+  - `npm run test`: passed.
+  - `npm run package`: passed on Linux x64.
+  - `npx knip --no-progress`: SA-002 and SA-003 no longer appear; remaining output is exported symbols and exported types routed by D1.
 
 ## Closeout
 
