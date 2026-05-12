@@ -33,7 +33,7 @@ type ContextPackageState =
   | { status: 'confirming'; preview: ContextPackagePreview }
   | { status: 'generating'; preview: ContextPackagePreview }
   | { status: 'complete'; result: ContextPackageResult }
-  | { status: 'error'; message: string };
+  | { status: 'error'; message: string; phase: 'preview' | 'generation' };
 
 type TranscriptionImportState =
   | { status: 'unavailable' }
@@ -160,6 +160,7 @@ const collapseAllButton = document.querySelector<HTMLButtonElement>('[data-colla
 const summaryTarget = document.querySelector<HTMLElement>('[data-summary]');
 const contextPackageTitleTarget = document.querySelector<HTMLElement>('[data-context-package-title]');
 const contextPackageMessageTarget = document.querySelector<HTMLElement>('[data-context-package-message]');
+const contextPackageStateTarget = document.querySelector<HTMLElement>('[data-context-package-state]');
 const contextPackageDetailsTarget = document.querySelector<HTMLElement>('[data-context-package-details]');
 const contextPackageListTarget = document.querySelector<HTMLUListElement>('[data-context-package-list]');
 const contextPackagePrimaryButton = document.querySelector<HTMLButtonElement>('[data-context-package-primary]');
@@ -1065,6 +1066,10 @@ const renderContextPackageDetails = (rows: DetailRow[]) =>
 
 const renderContextPackageList = (items: string[]) => renderList(contextPackageListTarget, items);
 
+const renderContextPackageStateElements = (...elements: HTMLElement[]) => {
+  contextPackageStateTarget?.replaceChildren(...elements);
+};
+
 const renderTranscriptionImportDetails = (rows: DetailRow[]) =>
   renderDetails(transcriptionImportDetailsTarget, rows);
 
@@ -1075,11 +1080,11 @@ const renderTranscriptionImportStateElements = (...elements: HTMLElement[]) => {
   transcriptionImportStateTarget?.replaceChildren(...elements);
 };
 
-const createImportSteps = (activeStep: 1 | 2 | 3) => {
+const createOperationSteps = (labels: string[], activeStep: number) => {
   const steps = document.createElement('ol');
   steps.className = 'operation-steps';
 
-  ['Velg fil', 'Bekreft', 'Ferdig'].forEach((label, index) => {
+  labels.forEach((label, index) => {
     const stepNumber = index + 1;
     const step = document.createElement('li');
     step.className = 'operation-step';
@@ -1099,6 +1104,12 @@ const createImportSteps = (activeStep: 1 | 2 | 3) => {
 
   return steps;
 };
+
+const createImportSteps = (activeStep: 1 | 2 | 3) =>
+  createOperationSteps(['Velg fil', 'Bekreft', 'Ferdig'], activeStep);
+
+const createContextPackageSteps = (activeStep: 1 | 2 | 3) =>
+  createOperationSteps(['Forhåndsvis', 'Bekreft', 'Ferdig'], activeStep);
 
 const createWriteOperationBadge = () => {
   const badge = document.createElement('span');
@@ -1137,6 +1148,10 @@ const renderContextPackageActions = (
   primaryDisabled: boolean,
   secondaryVisible = false,
 ) => {
+  if (contextPackageSecondaryButton) {
+    contextPackageSecondaryButton.textContent = 'Tilbake';
+  }
+
   renderActions(
     {
       primaryButton: contextPackagePrimaryButton,
@@ -1172,53 +1187,78 @@ const renderContextPackageUnavailable = () => {
   setText(contextPackageTitleTarget, 'Ingen prosjektmappe valgt');
   setText(
     contextPackageMessageTarget,
-    window.sidekick ? 'Choose a folder first.' : 'Open in Electron to create context packages.',
+    window.sidekick
+      ? 'Velg en prosjektmappe før du lager kontekstpakke.'
+      : 'Åpne appen i Electron for å lage kontekstpakker.',
   );
+  renderContextPackageStateElements();
   renderContextPackageDetails([]);
   renderContextPackageList([]);
-  renderContextPackageActions('Create context package', true);
+  renderContextPackageActions('Forhåndsvis', true);
 };
 
-const renderContextPackageReady = () => {
-  setText(contextPackageTitleTarget, 'Ready');
-  setText(contextPackageMessageTarget, 'Create one Markdown package in the folder root.');
+const renderContextPackageReady = (scan: ProjectFolderScan) => {
+  setText(contextPackageTitleTarget, 'Lag kontekstpakke');
+  setText(
+    contextPackageMessageTarget,
+    'Forbered én Markdown-fil som samler prosjektmaterialet for bruk utenfor Sidekick.',
+  );
+  renderContextPackageStateElements(createContextPackageSteps(1));
   renderContextPackageDetails([
-    ['Scope', 'Full selected folder'],
+    ['Prosjektmappe', scan.rootName],
+    ['Omfang', 'Hele valgt prosjektmappe'],
     ['Format', 'Markdown'],
+    ['Plassering', 'Prosjektroten'],
   ]);
   renderContextPackageList([]);
-  renderContextPackageActions('Create context package', false);
+  renderContextPackageActions('Forhåndsvis', false);
 };
 
 const renderContextPackagePreviewing = () => {
-  setText(contextPackageTitleTarget, 'Preparing');
-  setText(contextPackageMessageTarget, 'Checking output path.');
+  setText(contextPackageTitleTarget, 'Forbereder kontekstpakke');
+  setText(contextPackageMessageTarget, 'Sjekker filnavn, plassering og om en pakke finnes fra før.');
+  renderContextPackageStateElements(createContextPackageSteps(1));
   renderContextPackageDetails([]);
   renderContextPackageList([]);
-  renderContextPackageActions('Preparing...', true);
+  renderContextPackageActions('Forbereder...', true);
 };
 
 const renderContextPackageConfirming = (preview: ContextPackagePreview) => {
-  setText(contextPackageTitleTarget, 'Confirm generation');
-  setText(contextPackageMessageTarget, 'Review the output before writing.');
+  setText(contextPackageTitleTarget, 'Bekreft kontekstpakke');
+  setText(contextPackageMessageTarget, 'Kontroller plassering og overskriving før Sidekick skriver filen.');
+  renderContextPackageStateElements(
+    createContextPackageSteps(2),
+    createWriteOperationBadge(),
+    createWriteWarning(
+      preview.willOverwrite
+        ? `Sidekick erstatter eksisterende ${preview.outputFileName} i prosjektroten.`
+        : `Sidekick skriver én Markdown-fil til prosjektroten: ${preview.outputFileName}.`,
+    ),
+  );
   renderContextPackageDetails([
-    ['Output file', preview.outputFileName],
-    ['Overwrite', preview.willOverwrite ? 'Yes' : 'No'],
-    ['Output path', preview.outputPath],
+    ['Filnavn', preview.outputFileName],
+    ['Plassering', 'Prosjektroten'],
+    ['Overskriver', preview.willOverwrite ? 'Ja' : 'Nei'],
+    ['Filsti', preview.outputPath],
   ]);
   renderContextPackageList([preview.binaryFileWarning, preview.selfIgnoreWarning]);
-  renderContextPackageActions('Generate package', false, true);
+  renderContextPackageActions('Generer pakke', false, true);
 };
 
 const renderContextPackageGenerating = (preview: ContextPackagePreview) => {
-  setText(contextPackageTitleTarget, 'Generating');
-  setText(contextPackageMessageTarget, 'Writing context package.');
+  setText(contextPackageTitleTarget, 'Genererer kontekstpakke');
+  setText(contextPackageMessageTarget, 'Sidekick skriver kontekstpakken til prosjektmappen.');
+  renderContextPackageStateElements(
+    createContextPackageSteps(2),
+    createWriteOperationBadge(),
+    createWriteWarning(`Sidekick skriver ${preview.outputFileName}.`),
+  );
   renderContextPackageDetails([
-    ['Output file', preview.outputFileName],
-    ['Output path', preview.outputPath],
+    ['Filnavn', preview.outputFileName],
+    ['Filsti', preview.outputPath],
   ]);
   renderContextPackageList([]);
-  renderContextPackageActions('Generating...', true);
+  renderContextPackageActions('Genererer...', true);
 };
 
 const renderContextPackageComplete = (result: ContextPackageResult) => {
@@ -1229,36 +1269,61 @@ const renderContextPackageComplete = (result: ContextPackageResult) => {
     warning.path ? `${warning.path}: ${warning.message}` : warning.message,
   );
 
-  setText(contextPackageTitleTarget, 'Package created');
+  setText(contextPackageTitleTarget, 'Kontekstpakke generert');
   setText(
     contextPackageMessageTarget,
-    result.overwritten ? 'Existing package overwritten.' : 'Context package created.',
+    result.overwritten ? 'Eksisterende kontekstpakke ble erstattet.' : 'Ny kontekstpakke ble opprettet.',
+  );
+  renderContextPackageStateElements(
+    createContextPackageSteps(3),
+    createResultBanner(
+      'success',
+      'Kontekstpakken er klar',
+      result.overwritten ? 'Filen ble skrevet over i prosjektroten.' : 'Filen ble skrevet til prosjektroten.',
+    ),
   );
   renderContextPackageDetails([
-    ['Output file', result.outputFileName],
-    ['Included', result.totalFiles.toString()],
-    ['Skipped', result.skippedFiles.length.toString()],
+    ['Filnavn', result.outputFileName],
+    ['Filsti', result.outputPath],
+    ['Overskrevet', result.overwritten ? 'Ja' : 'Nei'],
+    ['Inkludert', result.totalFiles.toString()],
+    ['Hoppet over', result.skippedFiles.length.toString()],
     ['Tokens', result.totalTokens.toString()],
-    ['Characters', result.totalCharacters.toString()],
-    ['Size', formatBytes(result.outputBytes)],
-    ['Output path', result.outputPath],
+    ['Tegn', result.totalCharacters.toString()],
+    ['Størrelse', formatBytes(result.outputBytes)],
   ]);
   renderContextPackageList([
     ...warningPreview,
     ...skippedPreview,
     ...(result.skippedFiles.length > skippedPreview.length
-      ? [`${result.skippedFiles.length - skippedPreview.length} more skipped files`]
+      ? [`${result.skippedFiles.length - skippedPreview.length} flere filer ble hoppet over`]
       : []),
   ]);
-  renderContextPackageActions('Create again', false);
+  renderContextPackageActions('Lag ny', false);
 };
 
-const renderContextPackageError = (message: string) => {
-  setText(contextPackageTitleTarget, 'Generation failed');
+const renderContextPackageError = (
+  message: string,
+  phase: Extract<ContextPackageState, { status: 'error' }>['phase'],
+) => {
+  setText(
+    contextPackageTitleTarget,
+    phase === 'preview' ? 'Kontekstpakke kan ikke forberedes' : 'Generering feilet',
+  );
   setText(contextPackageMessageTarget, message);
+  renderContextPackageStateElements(
+    createContextPackageSteps(phase === 'preview' ? 1 : 2),
+    createResultBanner(
+      'error',
+      phase === 'preview' ? 'Ingen fil ble skrevet' : 'Kontekstpakken ble ikke fullført',
+      phase === 'preview'
+        ? 'Rett problemet og prøv forhåndsvisning på nytt.'
+        : 'Kontroller prosjektmappen før du prøver igjen.',
+    ),
+  );
   renderContextPackageDetails([]);
   renderContextPackageList([]);
-  renderContextPackageActions('Try again', false);
+  renderContextPackageActions('Prøv igjen', false);
 };
 
 const renderContextPackage = (scan?: ProjectFolderScan) => {
@@ -1269,7 +1334,7 @@ const renderContextPackage = (scan?: ProjectFolderScan) => {
 
   switch (contextPackageState.status) {
     case 'ready':
-      renderContextPackageReady();
+      renderContextPackageReady(scan);
       break;
     case 'previewing':
       renderContextPackagePreviewing();
@@ -1284,7 +1349,7 @@ const renderContextPackage = (scan?: ProjectFolderScan) => {
       renderContextPackageComplete(contextPackageState.result);
       break;
     case 'error':
-      renderContextPackageError(contextPackageState.message);
+      renderContextPackageError(contextPackageState.message, contextPackageState.phase);
       break;
   }
 };
@@ -2307,6 +2372,7 @@ const openContextPackageConfirmation = async () => {
   } catch (error) {
     contextPackageState = {
       status: 'error',
+      phase: 'preview',
       message: error instanceof Error ? error.message : 'Unable to prepare context package.',
     };
   }
@@ -2336,6 +2402,7 @@ const generateContextPackage = async () => {
   } catch (error) {
     contextPackageState = {
       status: 'error',
+      phase: 'generation',
       message: error instanceof Error ? error.message : 'Unable to generate context package.',
     };
   }

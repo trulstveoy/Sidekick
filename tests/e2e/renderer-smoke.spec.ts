@@ -147,7 +147,7 @@ const mockContextPackageResult: ContextPackageResult = {
     { path: '01-bakgrunn/brief.pdf', reason: 'binary-extension' },
     { path: '02-transkripsjoner/intervju-01.docx', reason: 'binary-extension' },
   ],
-  warnings: [],
+  warnings: [{ path: '03-modeller/model.md', message: 'Suspicious file content detected.' }],
 };
 
 const mockScanAfterTranscriptionImport: ProjectFolderScan = {
@@ -949,29 +949,77 @@ test('confirms and displays a generated context package', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
 
-  await expect(page.getByRole('button', { name: 'Create context package' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Create context package' }).click();
+  await expect(page.getByRole('button', { name: 'Forhåndsvis' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Forhåndsvis' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Confirm generation' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Bekreft kontekstpakke' })).toBeVisible();
+  const contextPackageState = page.locator('[data-context-package-state]');
   const contextPackageDetails = page.locator('[data-context-package-details]');
+  await expect(contextPackageState.getByText('Skriveoperasjon')).toBeVisible();
   await expect(contextPackageDetails).toContainText('sidekick-project.context-package.md');
   await expect(contextPackageDetails).toContainText(
     '/tmp/sidekick-project/sidekick-project.context-package.md',
   );
-  await expect(contextPackageDetails).toContainText('Overwrite');
-  await expect(contextPackageDetails).toContainText('Yes');
+  await expect(contextPackageDetails).toContainText('Overskriver');
+  await expect(contextPackageDetails).toContainText('Ja');
+  await expect(page.getByText(/erstatter eksisterende sidekick-project.context-package.md/)).toBeVisible();
   await expect(page.getByText(/Binary files such as PDF/)).toBeVisible();
   await expect(page.getByText(/Generated context-package files are ignored/)).toBeVisible();
 
-  await page.getByRole('button', { name: 'Generate package' }).click();
+  await page.getByRole('button', { name: 'Tilbake' }).click();
+  await expect(page.getByRole('heading', { name: 'Lag kontekstpakke' })).toBeVisible();
 
-  await expect(page.getByRole('heading', { name: 'Package created' })).toBeVisible();
-  await expect(contextPackageDetails).toContainText('Included');
+  await page.getByRole('button', { name: 'Forhåndsvis' }).click();
+  await expect(page.getByRole('heading', { name: 'Bekreft kontekstpakke' })).toBeVisible();
+  await page.getByRole('button', { name: 'Generer pakke' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Kontekstpakke generert' })).toBeVisible();
+  await expect(page.getByText('Kontekstpakken er klar')).toBeVisible();
+  await expect(contextPackageDetails).toContainText('Inkludert');
   await expect(contextPackageDetails).toContainText('2');
-  await expect(contextPackageDetails).toContainText('Skipped');
+  await expect(contextPackageDetails).toContainText('Hoppet over');
   await expect(contextPackageDetails).toContainText('Tokens');
   await expect(contextPackageDetails).toContainText('523');
   await expect(page.getByText('01-bakgrunn/brief.pdf: binary-extension')).toBeVisible();
+  await expect(page.getByText('03-modeller/model.md: Suspicious file content detected.')).toBeVisible();
+  await expect(page.locator('[data-overview-context-package-status]')).toHaveText('Finnes');
+});
+
+test('shows no-write feedback when context package preview fails', async ({ page }) => {
+  await page.addInitScript(({ scan }) => {
+    window.sidekick = {
+      getAppInfo: async () => ({
+        name: 'Sidekick',
+        version: '1.0.0',
+        platform: 'linux',
+        isPackaged: false,
+      }),
+      chooseProjectFolder: async () => scan,
+      chooseProjectParentFolder: async () => null,
+      createProjectFolder: async () => null,
+      previewContextPackage: async () => {
+        throw new Error('Project folder path must point to a directory.');
+      },
+      generateContextPackage: async () => {
+        throw new Error('No context package result.');
+      },
+      previewTranscriptionImport: async () => null,
+      confirmTranscriptionImport: async () => {
+        throw new Error('No transcription import preview.');
+      },
+    };
+  }, { scan: mockScan });
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Forhåndsvis' }).click();
+
+  await expect(
+    page.getByRole('heading', { name: 'Kontekstpakke kan ikke forberedes' }),
+  ).toBeVisible();
+  await expect(page.getByText('Project folder path must point to a directory.')).toBeVisible();
+  await expect(page.getByText('Ingen fil ble skrevet')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Prøv igjen' })).toBeEnabled();
 });
 
 test('confirms and displays an imported transcription', async ({ page }) => {
