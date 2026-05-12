@@ -85,6 +85,23 @@
                 <button class="btn btn-primary btn-lg" type="button" data-choose-folder>
                   Velg eksisterende mappe...
                 </button>
+                <button class="btn btn-secondary btn-lg" type="button" data-initialize-project>
+                  Initialiser eksisterende mappe...
+                </button>
+                <div class="project-initialization-panel" data-project-initialization-panel hidden>
+                  <h4 data-project-initialization-title>Initialiser eksisterende mappe</h4>
+                  <p data-project-initialization-message>Velg en mappe for å se hva Sidekick vil gjøre.</p>
+                  <dl class="detail-list" data-project-initialization-details></dl>
+                  <ul class="plain-list" data-project-initialization-warnings></ul>
+                  <div class="inline-actions">
+                    <button class="btn btn-primary" type="button" data-project-initialization-confirm hidden>
+                      Bruk som prosjekt
+                    </button>
+                    <button class="btn btn-secondary" type="button" data-project-initialization-cancel hidden>
+                      Avbryt
+                    </button>
+                  </div>
+                </div>
                 <div class="entry-divider"><span>eller</span></div>
                 <button class="btn btn-secondary btn-lg" type="button" data-open-create-project>
                   Opprett ny prosjektmappe...

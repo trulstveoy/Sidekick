@@ -14,6 +14,8 @@ import type {
   AppSettingsSnapshot,
   ProjectCreationResult,
   ProjectFolderScan,
+  ProjectInitializationPreview,
+  ProjectInitializationResult,
   ScanWarning,
   TranscriptionImportPreview,
   TranscriptionImportResult,
@@ -51,6 +53,14 @@ type ProjectCreationState =
   | { status: 'creating'; message: string; parentPath: string | null }
   | { status: 'complete'; message: string; parentPath: string | null }
   | { status: 'error'; message: string; parentPath: string | null };
+
+type ProjectInitializationState =
+  | { status: 'idle'; message: string }
+  | { status: 'choosing'; message: string }
+  | { status: 'preview'; message: string; preview: ProjectInitializationPreview }
+  | { status: 'initializing'; message: string; preview: ProjectInitializationPreview }
+  | { status: 'complete'; message: string; result: ProjectInitializationResult }
+  | { status: 'error'; message: string; preview?: ProjectInitializationPreview };
 
 type OverviewContextPackageStatus =
   | { status: 'unavailable' }
@@ -106,6 +116,28 @@ const summaryStripTarget = document.querySelector<HTMLElement>('[data-summary]')
 const projectEntryTarget = document.querySelector<HTMLElement>('[data-project-entry]');
 const projectEntryErrorTarget = document.querySelector<HTMLElement>('[data-project-entry-error]');
 const chooseFolderButtons = document.querySelectorAll<HTMLButtonElement>('[data-choose-folder]');
+const initializeProjectButton = document.querySelector<HTMLButtonElement>('[data-initialize-project]');
+const projectInitializationPanelTarget = document.querySelector<HTMLElement>(
+  '[data-project-initialization-panel]',
+);
+const projectInitializationTitleTarget = document.querySelector<HTMLElement>(
+  '[data-project-initialization-title]',
+);
+const projectInitializationMessageTarget = document.querySelector<HTMLElement>(
+  '[data-project-initialization-message]',
+);
+const projectInitializationDetailsTarget = document.querySelector<HTMLElement>(
+  '[data-project-initialization-details]',
+);
+const projectInitializationWarningsTarget = document.querySelector<HTMLUListElement>(
+  '[data-project-initialization-warnings]',
+);
+const projectInitializationConfirmButton = document.querySelector<HTMLButtonElement>(
+  '[data-project-initialization-confirm]',
+);
+const projectInitializationCancelButton = document.querySelector<HTMLButtonElement>(
+  '[data-project-initialization-cancel]',
+);
 const openCreateProjectButton = document.querySelector<HTMLButtonElement>('[data-open-create-project]');
 const projectCreateDialogTarget = document.querySelector<HTMLElement>('[data-project-create-dialog]');
 const projectCreateCancelButtons = document.querySelectorAll<HTMLButtonElement>(
@@ -249,6 +281,10 @@ let projectCreationState: ProjectCreationState = {
   status: 'closed',
   message: '',
   parentPath: null,
+};
+let projectInitializationState: ProjectInitializationState = {
+  status: 'idle',
+  message: '',
 };
 let projectNameTouched = false;
 let codexState: CodexState = { status: 'unavailable', message: 'Choose a folder first.' };
@@ -1059,6 +1095,71 @@ const renderProjectCreation = () => {
   if (chooseProjectParentButton) {
     chooseProjectParentButton.textContent = isSelectingParent ? 'Velger...' : 'Velg...';
   }
+};
+
+const renderProjectInitialization = () => {
+  const isChoosing = projectInitializationState.status === 'choosing';
+  const isPreview =
+    projectInitializationState.status === 'preview' ||
+    projectInitializationState.status === 'initializing' ||
+    projectInitializationState.status === 'error';
+  const isInitializing = projectInitializationState.status === 'initializing';
+  const preview =
+    projectInitializationState.status === 'preview' ||
+    projectInitializationState.status === 'initializing' ||
+    projectInitializationState.status === 'error'
+      ? projectInitializationState.preview
+      : undefined;
+  const missingFolders =
+    preview?.requiredFolders.filter((folder) => folder.status === 'missing') ?? [];
+
+  initializeProjectButton?.toggleAttribute('disabled', isChoosing || isInitializing || !window.sidekick);
+  projectInitializationPanelTarget?.toggleAttribute(
+    'hidden',
+    projectInitializationState.status === 'idle',
+  );
+  projectInitializationConfirmButton?.toggleAttribute('hidden', !isPreview || !preview);
+  projectInitializationCancelButton?.toggleAttribute('hidden', !isPreview && !isChoosing);
+  projectInitializationConfirmButton?.toggleAttribute('disabled', isInitializing || !preview);
+  projectInitializationCancelButton?.toggleAttribute('disabled', isInitializing);
+
+  if (initializeProjectButton) {
+    initializeProjectButton.textContent = isChoosing ? 'Velger...' : 'Initialiser eksisterende mappe...';
+  }
+
+  if (projectInitializationConfirmButton) {
+    projectInitializationConfirmButton.textContent = isInitializing
+      ? 'Initialiserer...'
+      : missingFolders.length > 0
+        ? 'Opprett manglende mapper'
+        : 'Bruk som prosjekt';
+  }
+
+  setText(projectInitializationTitleTarget, 'Initialiser eksisterende mappe');
+  setText(projectInitializationMessageTarget, projectInitializationState.message);
+
+  if (!preview) {
+    renderDetails(projectInitializationDetailsTarget, []);
+    renderList(projectInitializationWarningsTarget, []);
+    return;
+  }
+
+  renderDetails(projectInitializationDetailsTarget, [
+    ['Mappe', preview.rootPath],
+    ['Eksisterende innhold', preview.existingEntryCount.toString()],
+    [
+      'Mapper som finnes',
+      preview.requiredFolders
+        .filter((folder) => folder.status === 'existing')
+        .map((folder) => folder.name)
+        .join(', ') || 'Ingen',
+    ],
+    ['Mapper som opprettes', missingFolders.map((folder) => folder.name).join(', ') || 'Ingen'],
+  ]);
+  renderList(
+    projectInitializationWarningsTarget,
+    preview.warnings.map((warning) => `${warning.path}: ${warning.message}`),
+  );
 };
 
 const renderContextPackageDetails = (rows: DetailRow[]) =>
@@ -2125,7 +2226,11 @@ const renderSettings = () => {
 };
 
 const render = () => {
-  const isBusy = state.status === 'loading' || projectCreationState.status === 'creating';
+  const isBusy =
+    state.status === 'loading' ||
+    projectCreationState.status === 'creating' ||
+    projectInitializationState.status === 'choosing' ||
+    projectInitializationState.status === 'initializing';
   const hasActiveProject = state.status === 'ready' || state.status === 'partial';
   const isEntryState = state.status === 'empty' || state.status === 'error';
 
@@ -2142,6 +2247,7 @@ const render = () => {
   projectEntryTarget?.toggleAttribute('hidden', !isEntryState);
   stateBannerTarget?.toggleAttribute('hidden', isEntryState || hasActiveProject);
   renderProjectCreation();
+  renderProjectInitialization();
   renderSettings();
 
   switch (state.status) {
@@ -2725,6 +2831,106 @@ const chooseFolder = async () => {
   }
 };
 
+const chooseProjectFolderForInitialization = async () => {
+  if (!window.sidekick) {
+    projectInitializationState = {
+      status: 'error',
+      message: 'Prosjektinitialisering er tilgjengelig i Electron-appen.',
+    };
+    render();
+    return;
+  }
+
+  projectInitializationState = {
+    status: 'choosing',
+    message: 'Velg mappen som skal brukes som Sidekick-prosjekt.',
+  };
+  render();
+
+  try {
+    const preview = await window.sidekick.chooseProjectFolderForInitialization();
+
+    if (!preview) {
+      projectInitializationState = { status: 'idle', message: '' };
+      render();
+      return;
+    }
+
+    const missingCount = preview.requiredFolders.filter((folder) => folder.status === 'missing').length;
+    projectInitializationState = {
+      status: 'preview',
+      preview,
+      message:
+        missingCount > 0
+          ? 'Kontroller mappen før Sidekick oppretter manglende standardmapper.'
+          : 'Kontroller mappen før Sidekick bruker den som aktivt prosjekt.',
+    };
+  } catch (error) {
+    projectInitializationState = {
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Kunne ikke kontrollere prosjektmappen.',
+    };
+  }
+
+  render();
+};
+
+const cancelProjectInitialization = () => {
+  if (projectInitializationState.status === 'initializing') {
+    return;
+  }
+
+  projectInitializationState = { status: 'idle', message: '' };
+  render();
+  initializeProjectButton?.focus();
+};
+
+const confirmProjectInitialization = async () => {
+  if (
+    !window.sidekick ||
+    (projectInitializationState.status !== 'preview' &&
+      projectInitializationState.status !== 'error')
+  ) {
+    return;
+  }
+
+  const previousState = state;
+  const { preview } = projectInitializationState;
+
+  if (!preview) {
+    return;
+  }
+
+  projectInitializationState = {
+    status: 'initializing',
+    preview,
+    message: 'Initialiserer prosjektmappe.',
+  };
+  state = { status: 'loading' };
+  render();
+
+  try {
+    const result = await window.sidekick.confirmProjectInitialization(preview.previewId);
+    setActiveScan(result.scan);
+    void refreshOverviewContextPackageStatus(result.scan);
+    void refreshCodexStatus(result.scan);
+    projectInitializationState = {
+      status: 'complete',
+      result,
+      message: `${result.rootName} er valgt som Sidekick-prosjekt.`,
+    };
+    render();
+  } catch (error) {
+    projectInitializationState = {
+      status: 'error',
+      preview,
+      message: error instanceof Error ? error.message : 'Kunne ikke initialisere prosjektmappen.',
+    };
+    state = previousState;
+    render();
+  }
+};
+
 const openProjectCreateDialog = () => {
   projectNameTouched = false;
   projectCreationState = {
@@ -2876,6 +3082,13 @@ chooseFolderButtons.forEach((button) => {
   });
 });
 
+initializeProjectButton?.addEventListener('click', () => {
+  void chooseProjectFolderForInitialization();
+});
+projectInitializationConfirmButton?.addEventListener('click', () => {
+  void confirmProjectInitialization();
+});
+projectInitializationCancelButton?.addEventListener('click', cancelProjectInitialization);
 openCreateProjectButton?.addEventListener('click', openProjectCreateDialog);
 projectCreateCancelButtons.forEach((button) => {
   button.addEventListener('click', closeProjectCreateDialog);

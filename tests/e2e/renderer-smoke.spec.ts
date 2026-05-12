@@ -7,6 +7,8 @@ import type {
   FolderSignal,
   ProjectCreationResult,
   ProjectFolderScan,
+  ProjectInitializationPreview,
+  ProjectInitializationResult,
   TranscriptionImportPreview,
   TranscriptionImportResult,
 } from '../../src/shared/sidekick-api';
@@ -269,6 +271,59 @@ const mockProjectCreationResult: ProjectCreationResult = {
   },
 };
 
+const mockProjectInitializationPreview: ProjectInitializationPreview = {
+  previewId: 'init-preview',
+  rootPath: '/tmp/existing-sidekick-project',
+  rootName: 'existing-sidekick-project',
+  existingEntryCount: 3,
+  requiredFolders: [
+    {
+      name: '00. Forutsetninger',
+      path: '/tmp/existing-sidekick-project/00. Forutsetninger',
+      status: 'existing',
+    },
+    {
+      name: '01. Transkripsjoner',
+      path: '/tmp/existing-sidekick-project/01. Transkripsjoner',
+      status: 'missing',
+    },
+  ],
+  warnings: [
+    {
+      path: '01. Transkriberinger',
+      message:
+        'This folder looks similar to a required project folder, but Sidekick requires the exact folder name.',
+    },
+  ],
+};
+
+const mockProjectInitializationResult: ProjectInitializationResult = {
+  status: 'complete',
+  rootPath: '/tmp/existing-sidekick-project',
+  rootName: 'existing-sidekick-project',
+  requiredFolders: [
+    {
+      name: '00. Forutsetninger',
+      path: '/tmp/existing-sidekick-project/00. Forutsetninger',
+      status: 'existing',
+    },
+    {
+      name: '01. Transkripsjoner',
+      path: '/tmp/existing-sidekick-project/01. Transkripsjoner',
+      status: 'created',
+    },
+  ],
+  scan: {
+    ...mockProjectCreationResult.scan,
+    rootPath: '/tmp/existing-sidekick-project',
+    rootName: 'existing-sidekick-project',
+    tree: {
+      ...mockProjectCreationResult.scan.tree,
+      name: 'existing-sidekick-project',
+    },
+  },
+};
+
 const mockPartialScan: ProjectFolderScan = {
   ...mockScan,
   status: 'partial',
@@ -456,6 +511,79 @@ test('creates a project and displays the required folders', async ({ page }) => 
   await expect(page.getByRole('treeitem', { name: /00. Forutsetninger/ })).toBeVisible();
   await expect(page.getByRole('treeitem', { name: /01. Transkripsjoner/ })).toBeVisible();
   await expect(page.locator('.codex-panel')).toContainText('codex-cli 0.130.0-test');
+});
+
+test('initializes an existing folder after preview confirmation', async ({ page }) => {
+  await page.addInitScript(
+    ({ preview, result }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => null,
+        chooseProjectParentFolder: async () => null,
+        createProjectFolder: async () => null,
+        chooseProjectFolderForInitialization: async () => preview,
+        confirmProjectInitialization: async (previewId) => {
+          if (previewId !== preview.previewId) {
+            throw new Error('Unexpected preview id.');
+          }
+
+          return result;
+        },
+        previewContextPackage: async () => {
+          throw new Error('No context package preview.');
+        },
+        generateContextPackage: async () => {
+          throw new Error('No context package result.');
+        },
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+        getCodexStatus: async () => ({
+          state: 'ready',
+          available: true,
+          loggedIn: true,
+          version: 'codex-cli 0.130.0-test',
+        }),
+        startCodexLogin: async () => ({ runId: 'login-run' }),
+        startCodexRun: async () => ({ runId: 'codex-run' }),
+        cancelCodexRun: async () => undefined,
+        onCodexOutput: () => () => undefined,
+        onCodexCompletion: () => () => undefined,
+      };
+    },
+    {
+      preview: mockProjectInitializationPreview,
+      result: mockProjectInitializationResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Initialiser eksisterende mappe...' }).click();
+
+  await expect(page.locator('[data-project-initialization-panel]')).toBeVisible();
+  await expect(page.locator('[data-project-initialization-details]')).toContainText(
+    '/tmp/existing-sidekick-project',
+  );
+  await expect(page.locator('[data-project-initialization-details]')).toContainText(
+    '01. Transkripsjoner',
+  );
+  await expect(page.locator('[data-project-initialization-warnings]')).toContainText(
+    '01. Transkriberinger',
+  );
+
+  await page.getByRole('button', { name: 'Opprett manglende mapper' }).click();
+
+  await expect(page.getByLabel('Valgt prosjektmappe').getByRole('heading')).toHaveText(
+    'existing-sidekick-project',
+  );
+  await expect(page.getByRole('treeitem', { name: /00. Forutsetninger/ })).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /01. Transkripsjoner/ })).toBeVisible();
 });
 
 test('validates and cancels the project creation dialog', async ({ page }) => {
