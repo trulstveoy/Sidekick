@@ -33,6 +33,11 @@ const getAppInfo = (): AppInfo => ({
 
 ipcMain.handle('app:get-info', getAppInfo);
 
+const appIconPath = () =>
+  app.isPackaged
+    ? path.join(process.resourcesPath, 'sidekick-icon.png')
+    : path.join(app.getAppPath(), 'assets', 'icons', 'generated', 'sidekick-icon.png');
+
 const selectedProjectRoots = new Set<string>();
 const pendingTranscriptionImports = new Map<string, TranscriptionImportPreview>();
 const codexRunner = new CodexRunner();
@@ -284,6 +289,7 @@ const createWindow = () => {
     minHeight: 720,
     title: 'Sidekick',
     backgroundColor: '#f7f5ef',
+    icon: appIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

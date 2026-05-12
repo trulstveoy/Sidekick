@@ -6,10 +6,14 @@ import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import path from 'node:path';
 
 const isTrue = (value: string | undefined): boolean => value?.toLowerCase() === 'true';
 
 const quoteSignToolValue = (value: string): string => `"${value.replace(/"/g, '\\"')}"`;
+export const appIconBasePath = path.resolve(__dirname, 'assets/icons/generated/sidekick-icon');
+export const appIconPngPath = `${appIconBasePath}.png`;
+export const appIconIcoPath = `${appIconBasePath}.ico`;
 
 type SigningEnvironment = Partial<Record<
   | 'SIDEKICK_REQUIRE_WINDOWS_SIGNING'
@@ -62,13 +66,26 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     executableName: 'sidekick',
+    icon: appIconBasePath,
+    extraResource: [appIconPngPath],
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel(createSquirrelConfig()),
+    new MakerSquirrel({
+      ...createSquirrelConfig(),
+      setupIcon: appIconIcoPath,
+    }),
     new MakerZIP({}, ['darwin']),
-    new MakerRpm({}),
-    new MakerDeb({}),
+    new MakerRpm({
+      options: {
+        icon: appIconPngPath,
+      },
+    }),
+    new MakerDeb({
+      options: {
+        icon: appIconPngPath,
+      },
+    }),
   ],
   plugins: [
     new VitePlugin({

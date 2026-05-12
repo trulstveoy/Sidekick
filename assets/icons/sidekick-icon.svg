@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Sidekick app icon">
+  <defs>
+    <linearGradient id="background" x1="160" y1="80" x2="864" y2="944" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2f625d"/>
+      <stop offset="1" stop-color="#1f3f3d"/>
+    </linearGradient>
+    <linearGradient id="folder" x1="256" y1="288" x2="768" y2="792" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffefa"/>
+      <stop offset="1" stop-color="#e6ded0"/>
+    </linearGradient>
+    <filter id="shadow" x="160" y="196" width="704" height="680" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="24" flood-color="#112624" flood-opacity="0.28" stdDeviation="28"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#background)"/>
+  <path fill="#244f4a" opacity="0.42" d="M188 698c96 122 218 184 366 184 126 0 226-42 300-126 18-20 34-42 48-66v110c0 56-46 102-102 102H224c-56 0-102-46-102-102V644c20 18 42 36 66 54Z"/>
+  <g filter="url(#shadow)">
+    <path fill="#d7cdbc" d="M238 276c0-46 38-84 84-84h154c24 0 46 10 62 28l70 78h112c46 0 84 38 84 84v56H238V276Z"/>
+    <path fill="url(#folder)" d="M206 398c0-52 42-94 94-94h424c52 0 94 42 94 94v260c0 52-42 94-94 94H300c-52 0-94-42-94-94V398Z"/>
+    <path fill="#f4f2ec" d="M300 356h424c24 0 44 20 44 44v10H256v-10c0-24 20-44 44-44Z" opacity="0.82"/>
+  </g>
+  <path fill="none" stroke="#2f625d" stroke-linecap="round" stroke-linejoin="round" stroke-width="58" d="M650 445H405l-55 55 55 55h215l55 55-55 55H365"/>
+  <circle cx="704" cy="318" r="72" fill="#c99534"/>
+  <path fill="#fffefa" d="M704 270l13 35 35 13-35 13-13 35-13-35-35-13 35-13 13-35Z"/>
+</svg>
