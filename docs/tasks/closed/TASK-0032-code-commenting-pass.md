@@ -1,7 +1,7 @@
 # Task: Code commenting pass
 
 ID: TASK-0032
-Status: Ready For Review
+Status: Done
 Class: Standard
 Owner: Agent
 Created: 2026-05-12
@@ -22,7 +22,7 @@ Review the codebase systematically and add targeted comments where they improve 
 
 ## Current Phase
 
-Ready For Review
+Close
 
 ## Progress Checklist
 
@@ -35,7 +35,7 @@ Ready For Review
 - [x] Verification complete
 - [x] Review complete
 - [x] Documentation complete
-- [ ] Closeout complete
+- [x] Closeout complete
 
 ## Links
 
@@ -163,3 +163,20 @@ Maintainability concerns:
 
 Follow-up items:
 - None.
+
+## Closeout
+
+Completed on: 2026-05-12
+
+Result:
+- Code commenting guidelines were added to the repository instructions and workflow.
+- The codebase received a targeted commenting pass focused on intent, security boundaries, invariants, and non-obvious behavior.
+- The task was committed, fast-forward merged into `main`, verified from `main`, and moved to the closed-task archive.
+
+Final verification:
+- `npm run check`
+
+Final branch/worktree status:
+- Branch: `task/TASK-0032-code-commenting-pass`
+- Worktree: `../Sidekick-worktrees/TASK-0032-code-commenting-pass`
+- Integrated into `main`.
