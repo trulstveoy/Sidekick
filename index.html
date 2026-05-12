@@ -186,27 +186,32 @@
             <p class="section-label">Codex</p>
             <div class="codex-panel">
               <h3 data-codex-title>Ingen prosjektmappe valgt</h3>
-              <p data-codex-message>Choose a folder first.</p>
+              <p data-codex-message>Velg en prosjektmappe først.</p>
+              <div class="operation-state" data-codex-state></div>
               <dl class="codex-details detail-list" data-codex-details></dl>
-              <label class="codex-prompt-label" for="codex-prompt">Prompt</label>
+              <label class="codex-prompt-label" for="codex-prompt">Instruksjon</label>
               <textarea
                 id="codex-prompt"
                 data-codex-prompt
                 rows="4"
-                placeholder="Ask Codex to inspect or update this project..."
+                placeholder="Be Codex undersøke eller arbeide med prosjektmappen..."
                 disabled
               ></textarea>
               <label class="codex-mode">
                 <input type="checkbox" data-codex-edit-mode disabled />
-                Allow file changes
+                <span class="codex-mode-copy">
+                  <strong data-codex-mode-title>Lesetilgang</strong>
+                  <span data-codex-mode-description>Codex kan lese prosjektmappen, men ikke endre filer.</span>
+                </span>
               </label>
+              <p class="codex-output-label">Kjørelogg</p>
               <ul class="codex-output plain-list output-list" data-codex-output></ul>
               <div class="inline-actions">
                 <button class="btn btn-primary codex-primary" type="button" data-codex-primary disabled>
-                  Run Codex
+                  Kjør Codex
                 </button>
                 <button class="btn btn-secondary codex-secondary" type="button" data-codex-secondary hidden>
-                  Cancel
+                  Avbryt
                 </button>
               </div>
             </div>
