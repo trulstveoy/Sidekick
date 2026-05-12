@@ -15,6 +15,8 @@ const ALLOWED_TRANSCRIPTION_EXTENSIONS = new Set(['.txt', '.md', '.markdown']);
 const STRICT_NUMBER_SEPARATOR = '. ';
 const STRICT_NUMBER_WIDTH = 2;
 const FIRST_STRICT_NUMBER = 0;
+// Incoming files may already be numbered by another tool. Sidekick strips that
+// loose prefix and then applies the project's strict NN. sequence.
 const NUMBERED_PREFIX_PATTERN = /^(\d+)(?:\. |[\s_-]+)(.+)$/;
 const STRICT_NUMBERED_PREFIX_PATTERN = /^(\d{2})\. (.+)$/;
 
@@ -241,6 +243,9 @@ const copyWithoutOverwrite = async (
     }
 
     try {
+      // COPYFILE_EXCL makes conflict handling race-safe: if another process
+      // creates the same numbered filename after preview, retry with a fresh
+      // directory listing instead of overwriting.
       await copyFile(sourcePath, destinationPath, fsConstants.COPYFILE_EXCL);
 
       return {

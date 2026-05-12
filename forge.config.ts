@@ -34,6 +34,9 @@ export const createSquirrelConfig = (
   const hasIncompleteSigningConfig = !certificateFile || !certificatePassword;
   const hasPartialSigningConfig = Boolean(certificateFile || certificatePassword);
 
+  // Linux CI should still be able to evaluate the config without Windows
+  // signing secrets. Windows packaging fails only when signing is required or
+  // partially configured.
   if (platform === 'win32' && (requireSigning || hasPartialSigningConfig) && hasIncompleteSigningConfig) {
     throw new Error(
       'Windows signing is enabled but SIDEKICK_SIGNING_PFX_PATH and SIDEKICK_SIGNING_PASSWORD are not both set.',
@@ -67,6 +70,7 @@ const config: ForgeConfig = {
     asar: true,
     executableName: 'sidekick',
     icon: appIconBasePath,
+    // The packaged main process reads this PNG at runtime for the window icon.
     extraResource: [appIconPngPath],
   },
   rebuildConfig: {},

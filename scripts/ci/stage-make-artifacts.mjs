@@ -68,6 +68,8 @@ export const stageMakeArtifacts = async ({ sourceDirectory, targetRoot, platform
     throw new Error(`No distributable artifacts found in ${resolvedSourceDirectory}.`);
   }
 
+  // Forge nests outputs by maker and architecture. Releases need a flat,
+  // platform-scoped artifact directory with collision-safe filenames.
   await rm(targetDirectory, { recursive: true, force: true });
   await mkdir(targetDirectory, { recursive: true });
 

@@ -45,6 +45,8 @@ export const buildCodexExecArgs = (rootPath: string, mode: CodexRunMode) => [
   rootPath,
   '--sandbox',
   mode,
+  // The prompt is written to stdin so user text is not exposed through process
+  // arguments or shell history.
   '-',
 ];
 
@@ -71,6 +73,8 @@ const isWindowsCommandShim = (filePath: string, platform: NodeJS.Platform) =>
 
 const executableForPath = (filePath: string, platform: NodeJS.Platform): CodexExecutable => ({
   command: filePath,
+  // npm-installed Windows CLIs are often .cmd shims, which require a shell to
+  // resolve correctly. Native executables keep shell=false.
   shell: isWindowsCommandShim(filePath, platform),
 });
 
@@ -142,6 +146,9 @@ export const resolveCodexExecutable = (
     ...additionalDirectories,
   ]);
 
+  // Electron apps can launch without the same PATH as a user's terminal, so we
+  // also check common Node/npm install locations before falling back to PATH
+  // resolution.
   for (const directory of candidateDirectories) {
     for (const fileName of candidateFileNames(requestedExecutable, platform)) {
       const candidatePath = path.join(directory, fileName);
@@ -342,6 +349,8 @@ export class CodexRunner extends EventEmitter {
 
     const child = spawn(this.executable.command, args, {
       cwd,
+      // POSIX runs are detached into their own process group so cancellation can
+      // terminate Codex and children it started. Windows uses taskkill instead.
       detached: process.platform !== 'win32',
       shell: this.executable.shell,
       windowsHide: true,
@@ -392,6 +401,8 @@ export class CodexRunner extends EventEmitter {
     const text = chunk.toString('utf8');
     const lines = text.split(/\r?\n/).filter((line) => line.length > 0);
 
+    // Codex emits JSONL on stdout, but stderr and startup failures can still be
+    // plain text. Preserve both the raw text and parsed JSON when available.
     for (const line of lines.length > 0 ? lines : [text]) {
       this.emitOutput({
         runId,

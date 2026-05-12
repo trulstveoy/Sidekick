@@ -11,6 +11,8 @@ import { runRepomixContextPackage } from './repomix-runner';
 export const CONTEXT_PACKAGE_SUFFIX = 'context-package.md';
 
 export const CONTEXT_PACKAGE_IGNORE_PATTERNS = [
+  // Generated packages must never include previous package output; otherwise
+  // repeated generation recursively grows the context file.
   '*.context-package.md',
   '*context-package*',
   '.git/**',
@@ -41,6 +43,8 @@ const assertAbsoluteRootPath = (rootPath: string) => {
 
 export const createContextPackageFileName = (rootPath: string) => {
   const projectName = path.basename(rootPath);
+  // The output filename is derived from the project folder, but it still has to
+  // be safe on Windows because release builds target Windows first.
   const safeProjectName = Array.from(projectName)
     .map((character) =>
       character.charCodeAt(0) < 32 || INVALID_FILENAME_CHARACTERS.has(character)

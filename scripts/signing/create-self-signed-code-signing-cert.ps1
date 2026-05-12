@@ -9,6 +9,8 @@ $ErrorActionPreference = "Stop"
 
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 
+# The certificate is intentionally user-local and exportable so a private user
+# can trust the same signer locally and upload the PFX to GitHub secrets.
 $certificate = New-SelfSignedCertificate `
   -Subject $Subject `
   -Type CodeSigningCert `
@@ -42,4 +44,3 @@ if (-not $SkipPfxExport) {
   Write-Host ""
   Write-Host "Keep the PFX and password private. Do not commit them to git."
 }
-

@@ -28,6 +28,9 @@ type ViewState =
   | { status: 'partial'; scan: ProjectFolderScan }
   | { status: 'error'; message: string };
 
+// Renderer state is modeled as explicit unions so each write-capable workflow
+// can move through preview, confirmation, execution, and result states without
+// relying on hidden DOM state.
 type ContextPackageState =
   | { status: 'unavailable' }
   | { status: 'ready' }
@@ -631,6 +634,8 @@ const focusTreeRow = (relativePath: string) => {
   );
   row?.focus();
 
+  // Some tree actions re-render immediately before focus moves. Queue a second
+  // focus pass so keyboard navigation lands on the recreated row.
   window.requestAnimationFrame(() => {
     const nextRow = treeTarget?.querySelector<HTMLElement>(
       `.tree-row[data-tree-path="${CSS.escape(relativePath)}"]`,
@@ -1190,6 +1195,8 @@ const createOperationSteps = (labels: string[], activeStep: number) => {
   const steps = document.createElement('ol');
   steps.className = 'operation-steps';
 
+  // Use a real ordered list and aria-current so write workflows expose progress
+  // to assistive technologies without custom widget behavior.
   labels.forEach((label, index) => {
     const stepNumber = index + 1;
     const step = document.createElement('li');
@@ -1957,6 +1964,8 @@ const moveTreeFocus = (relativePath: string, shouldRender = false) => {
   focusTreeRow(relativePath);
 };
 
+// The folder browser uses roving tabindex: one visible tree row is keyboard
+// focusable, while arrow keys move focus without changing the selected item.
 const handleTreeItemKeyDown = (event: KeyboardEvent, node: FolderTreeNode) => {
   const scan = getActiveScan();
 
@@ -2135,6 +2144,8 @@ const refreshOverviewContextPackageStatus = async (scan: ProjectFolderScan) => {
     const preview = await window.sidekick.previewContextPackage(rootPath);
     const activeScan = getActiveScan();
 
+    // Async preview results must not update the overview after the user has
+    // selected a different project.
     if (!activeScan || activeScan.rootPath !== rootPath) {
       return;
     }
@@ -2656,6 +2667,8 @@ const importTranscription = async () => {
     expandedPaths = new Set([...expandedPaths, ROOT_PATH, result.targetFolderRelativePath]);
     const importedRelativePath = `${result.targetFolderRelativePath}/${result.destinationFileName}`;
     const importedNode = getNodeByPath(result.scan.tree, importedRelativePath);
+    // After a successful import, focus the new file when the rescan can find it;
+    // otherwise keep the user on the target folder that changed.
     selectedTreePath = importedNode ? importedRelativePath : result.targetFolderRelativePath;
     focusedTreePath = selectedTreePath;
     setContextPackageStateForScan(result.scan);
@@ -2842,6 +2855,8 @@ const completeCodexRun = (completion: CodexCompletionEvent) => {
   }
 
   if (completion.scan) {
+    // Main sends a scan only for completed edit-mode runs, because those are the
+    // Codex runs that may have changed files on disk.
     state =
       completion.scan.status === 'partial'
         ? { status: 'partial', scan: completion.scan }
@@ -3190,6 +3205,8 @@ projectCreateDialogTarget?.addEventListener('keydown', (event) => {
     return;
   }
 
+  // The create-project surface behaves as a lightweight modal; keep tab focus
+  // inside it until the user cancels or creates the project.
   const focusableElements = getProjectDialogFocusableElements();
   const firstElement = focusableElements[0];
   const lastElement = focusableElements.at(-1);

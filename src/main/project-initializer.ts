@@ -82,6 +82,8 @@ const findSimilarFolderWarnings = (
     })
     .map((entry) => ({
       path: path.relative(rootPath, entry.path) || entry.name,
+      // Similar names are warnings only. Initialization still requires the exact
+      // standard folder names so later workflows have predictable targets.
       message:
         'This folder looks similar to a required project folder, but Sidekick requires the exact folder name.',
     }));

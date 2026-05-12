@@ -73,6 +73,9 @@ const normalise = (value: string) =>
 const includesAny = (value: string, keywords: string[]) =>
   keywords.some((keyword) => value.includes(keyword));
 
+// Folder and artifact classification is intentionally heuristic. Folder names
+// help users understand a project, but they must not become hidden rules that
+// block access to files.
 const artifactExtensionGroups: Array<{ extensions: string[]; type: ArtifactType }> = [
   { extensions: ['.md', '.markdown', '.txt'], type: 'markdown-text' },
   { extensions: ['.doc', '.docx', '.odt', '.rtf'], type: 'document' },
@@ -284,6 +287,8 @@ const sortNodes = (nodes: FolderTreeNode[]) =>
 const addRecentFile = (state: ScanState, file: RecentFile) => {
   state.recentFiles.push(file);
   state.recentFiles.sort((left, right) => right.modifiedAt.localeCompare(left.modifiedAt));
+  // Keep the scan payload compact; the overview needs only a small activity
+  // signal, not a full file history.
   state.recentFiles = state.recentFiles.slice(0, 5);
 };
 
@@ -494,6 +499,8 @@ const scanNode = async (
       message: 'Symbolic link skipped.',
     });
 
+    // Do not follow symlinks by default; a selected project folder is the trust
+    // boundary for read-only scanning.
     return null;
   }
 

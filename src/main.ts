@@ -70,6 +70,8 @@ const getSettingsStore = () => {
 const codexEnvironmentFromSettings = (snapshot: AppSettingsSnapshot) => {
   const environmentPath = normalizeCodexPath(process.env.SIDEKICK_CODEX_PATH);
 
+  // An environment override wins over saved UI settings so CI, scripts, and
+  // advanced users can force an executable without mutating app state.
   if (environmentPath || !snapshot.settings.sidekick_codex_path) {
     return process.env;
   }
@@ -194,6 +196,8 @@ const assertKnownProjectRoot = (rootPath: unknown) => {
     throw new Error('A selected project folder is required.');
   }
 
+  // Renderer requests may name only roots that were selected through a native
+  // dialog or created by Sidekick in this process.
   if (!selectedProjectRoots.has(rootPath)) {
     throw new Error('This action requires a folder selected in Sidekick.');
   }
@@ -248,6 +252,8 @@ ipcMain.handle('transcription:confirm-import', async (_event, previewId) => {
   }
 
   try {
+    // Confirm uses the stored preview rather than renderer-supplied paths, then
+    // revalidates the root in case the selected project set has changed.
     assertKnownProjectRoot(preview.rootPath);
 
     return await confirmTranscriptionImport(preview);
@@ -300,6 +306,8 @@ codexRunner.on('completion', (completion) => {
 
     if (completion.state === 'completed' && run.mode === 'workspace-write') {
       try {
+        // Edit-mode Codex runs may have changed files, so the renderer receives
+        // a fresh scan as part of the completion event.
         const scan = await scanProjectFolder(run.rootPath);
         completedEvent = {
           ...completion,
@@ -464,6 +472,8 @@ const createWindow = () => {
       void shell.openExternal(url);
     }
 
+    // New windows are never opened inside the renderer; allowed https links are
+    // delegated to the OS browser and every other target is denied.
     return { action: 'deny' };
   });
 

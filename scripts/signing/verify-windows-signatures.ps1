@@ -45,6 +45,9 @@ function Get-SignatureInfo {
     }
   } catch {
     try {
+      # Some CI/user environments can extract signer data even when Authenticode
+      # trust evaluation fails. Keep that fallback so the task can distinguish
+      # "signed but not locally trusted" from "not signed".
       $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::CreateFromSignedFile($Path)
 
       return [PSCustomObject]@{

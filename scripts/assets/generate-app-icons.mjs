@@ -286,6 +286,8 @@ const renderIconPng = (size) => {
 
       const pixelOffset = (y * size + x) * 4;
       const averagedAlpha = Math.round(alpha / sampleCount);
+      // Supersampling keeps the same vector-like source geometry crisp at tray
+      // sizes without adding a raster or SVG dependency to the build.
       pixels[pixelOffset] = averagedAlpha === 0 ? 0 : Math.round(red / alpha);
       pixels[pixelOffset + 1] = averagedAlpha === 0 ? 0 : Math.round(green / alpha);
       pixels[pixelOffset + 2] = averagedAlpha === 0 ? 0 : Math.round(blue / alpha);

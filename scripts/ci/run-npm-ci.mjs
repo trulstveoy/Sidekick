@@ -57,6 +57,8 @@ function fail(code, extraLines = []) {
   }
   finished = true;
 
+  // GitHub annotations have size limits, so keep enough npm output for
+  // diagnosis without flooding the workflow log.
   const outputLines =
     capturedLines.length > 100
       ? [...capturedLines.slice(0, 30), '... output truncated ...', ...capturedLines.slice(-70)]

@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { CodexCompletionEvent, CodexOutputEvent, SidekickApi } from './shared/sidekick-api';
 
+// Keep the renderer on a typed, task-specific surface. It never receives raw
+// ipcRenderer, filesystem, process, or shell access.
 const sidekickApi: SidekickApi = {
   getAppInfo: () => ipcRenderer.invoke('app:get-info'),
   chooseProjectFolder: () => ipcRenderer.invoke('project-folder:choose-and-scan'),

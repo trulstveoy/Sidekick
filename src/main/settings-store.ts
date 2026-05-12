@@ -65,6 +65,9 @@ export const validateCodexPath = async (
     const basename = platformPath.basename(codexPath).toLowerCase();
     const allowedNames = new Set(['codex', 'codex.exe', 'codex.cmd', 'codex.bat']);
 
+    // On Windows, constrain saved executable paths to likely Codex launchers so
+    // settings cannot silently turn the controlled panel into arbitrary process
+    // execution.
     if (!allowedNames.has(basename)) {
       throw new Error('Codex CLI path must point to codex, codex.exe, codex.cmd, or codex.bat.');
     }
@@ -142,6 +145,8 @@ export class AppSettingsStore {
     await mkdir(path.dirname(this.settingsPath), { recursive: true });
     const temporaryPath = `${this.settingsPath}.tmp`;
     await writeFile(temporaryPath, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
+    // Write-then-rename avoids leaving a partially written settings file if the
+    // app exits during save.
     await rename(temporaryPath, this.settingsPath);
     this.warning = undefined;
   }

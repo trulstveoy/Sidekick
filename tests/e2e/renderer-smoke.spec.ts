@@ -13,6 +13,9 @@ import type {
   TranscriptionImportResult,
 } from '../../src/shared/sidekick-api';
 
+// These smoke tests run the renderer in a browser and inject the same typed
+// preload API shape that Electron exposes, so UI behavior can be verified
+// without privileged filesystem access.
 const mockSettingsSnapshot: AppSettingsSnapshot = {
   settings: {
     sidekick_codex_path: null,

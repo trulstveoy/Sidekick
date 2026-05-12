@@ -68,6 +68,9 @@ interface TokenCountBatchTask {
 type MetricsWorkerTask = TokenCountTask | TokenCountBatchTask;
 type MetricsWorkerResult = number | number[];
 
+// Repomix normally uses a worker file for token metrics. In a packaged Electron
+// app that worker path can point inside app.asar, so Sidekick supplies an
+// in-process runner to keep context-package generation portable.
 const createInProcessMetricsTaskRunner = (
   _numOfTasks: number,
   encoding: TokenEncoding,
@@ -233,6 +236,8 @@ const validateFileSafetyInProcess = async (
 
   if (config.security.enableSecurityCheck) {
     progressCallback('Running security check...');
+    // Keep Repomix security checks enabled even though we override the runner;
+    // suspicious files are skipped from the generated package below.
     const allResults = await runSecurityCheckInProcess(
       rawFiles,
       progressCallback,
@@ -277,6 +282,8 @@ export const runRepomixContextPackage = async ({
     ignore: ignorePatterns.join(','),
   };
   const config = mergeConfigs(rootPath, {}, buildCliConfig(cliOptions));
+  // Pack only the selected project root. The caller is responsible for choosing
+  // rootPath through Sidekick's project-root allowlist.
   const packResult = await pack([path.resolve(rootPath)], config, () => undefined, {
     createMetricsTaskRunner: createInProcessMetricsTaskRunner,
     validateFileSafety: validateFileSafetyInProcess,

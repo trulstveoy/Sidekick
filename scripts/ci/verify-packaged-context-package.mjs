@@ -87,6 +87,9 @@ const runVerification = async () => {
       'utf8',
     );
 
+    // Load the packaged main bundle in Node with a minimal Electron stub. This
+    // catches packaging-only failures, such as missing asar dependencies or
+    // worker paths, without launching the GUI in CI.
     Module._load = function load(request, parent, isMain) {
       if (request === 'electron') {
         return createElectronStub(projectRoot, ipcHandlers);

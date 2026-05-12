@@ -57,6 +57,8 @@ export const getProjectRootPath = (parentPath: string, projectName: string) => {
   const rootPath = path.resolve(parentRoot, rootName);
   const relativeTarget = path.relative(parentRoot, rootPath);
 
+  // A project name is accepted only as one direct child of the chosen parent;
+  // this prevents path traversal and accidental nested creation.
   if (
     !relativeTarget ||
     relativeTarget.startsWith('..') ||

@@ -283,6 +283,8 @@ export type CodexCompletionEvent = {
 
 export type CodexEventUnsubscribe = () => void;
 
+// Public renderer contract exposed by preload. Keep this narrow: every method
+// should map to one intentional app capability, not a generic system primitive.
 export type SidekickApi = {
   getAppInfo: () => Promise<AppInfo>;
   chooseProjectFolder: () => Promise<ProjectFolderScan | null>;

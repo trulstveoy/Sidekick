@@ -11,6 +11,8 @@ const createFakeCodex = async () => {
   const rootPath = await mkdtemp(path.join(os.tmpdir(), 'sidekick-fake-codex-'));
   tempRoots.push(rootPath);
   const executablePath = path.join(rootPath, 'fake-codex');
+  // The fake executable models the Codex CLI contract Sidekick depends on:
+  // status commands, device login, stdin prompt input, and JSONL output.
   await writeFile(
     executablePath,
     `#!/usr/bin/env node

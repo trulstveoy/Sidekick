@@ -1289,6 +1289,7 @@ textarea:disabled {
 .context-package-list li::before,
 .transcription-import-list li::before,
 .warning-list li::before {
+  /* Warning rows need a non-color cue for accessibility, not just amber text. */
   content: '!';
   display: inline-grid;
   width: 15px;
