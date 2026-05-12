@@ -1138,6 +1138,7 @@ The agent should:
 - stop implementation work unless the human asks for changes;
 - keep the working state available for human testing;
 - clearly state what changed and what was verified;
+- give practical human verification instructions that explain exactly how to inspect or test the result;
 - avoid closing the task before human review when review is required.
 
 The agent should not:
@@ -1146,12 +1147,39 @@ The agent should not:
 - move completed tasks to the closed-task archive before approval;
 - start dependent build work unless the human explicitly allows it.
 
+### Ready For Review Handoff Message
+
+When moving a task to `Ready For Review`, the agent's user-facing handoff must include:
+
+- where the work can be found, such as worktree path, branch, local URL, installer path, or relevant file;
+- a short summary of the visible change;
+- verification already performed by the agent;
+- a short "How to verify" section for the human;
+- confirmation that no merge or closeout has happened yet, unless the human requested otherwise.
+
+The "How to verify" section should be practical and specific. For GUI work, describe the exact flow to run through in the app and what the human should expect to see. For command-line, packaging, or documentation work, give the exact command, file, artifact, or release page to inspect. Keep it short enough to follow while testing.
+
+Example:
+
+```text
+Tasken er satt til Ready For Review. Ingen merge eller commit er gjort enda.
+
+How to verify:
+- Start appen fra worktree-et med `npm start`.
+- Velg en prosjektmappe som har én transkripsjonsmappe.
+- Klikk `Velg fil...` under Transkripsjoner og velg en `.md` eller `.txt` fil.
+- Bekreft at forhåndsvisningen viser kildefil, målmappe, nytt filnavn og at dette er en skriveoperasjon.
+- Klikk `Tilbake` og bekreft at ingen fil importeres.
+- Gjenta importen, klikk `Importer fil`, og bekreft at filen dukker opp i mappetreet med riktig `NN. filename`-navn.
+```
+
 ### Completion Checklist
 
 - [ ] Build Log is current.
 - [ ] Verification Log is current.
 - [ ] Review Notes contain the agent's self-review.
-- [ ] Human has been told how to inspect or test the result.
+- [ ] Human has been told exactly how to inspect or test the result.
+- [ ] Handoff includes practical expected outcomes for manual verification.
 - [ ] Task status moved to `Ready For Review`.
 
 ## Phase 7: Review
