@@ -1005,21 +1005,108 @@ test('confirms and displays an imported transcription', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
 
-  await expect(page.getByRole('button', { name: 'Add transcription' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Add transcription' }).click();
+  await expect(page.getByRole('button', { name: 'Velg fil...' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Velg fil...' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Confirm import' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Bekreft import' })).toBeVisible();
   const transcriptionDetails = page.locator('[data-transcription-import-details]');
+  const transcriptionState = page.locator('[data-transcription-import-state]');
+  await expect(transcriptionState.getByText('Skriveoperasjon')).toBeVisible();
   await expect(transcriptionDetails).toContainText('new-transcription.md');
+  await expect(transcriptionDetails).toContainText('/tmp/downloads/new-transcription.md');
   await expect(transcriptionDetails).toContainText('02-transkripsjoner');
   await expect(transcriptionDetails).toContainText('00. new-transcription.md');
-  await expect(page.getByText('Source file will be copied, not moved.')).toBeVisible();
+  await expect(page.getByText(/Ingen andre filer endres/)).toBeVisible();
 
-  await page.getByRole('button', { name: 'Import transcription' }).click();
+  await page.getByRole('button', { name: 'Tilbake' }).click();
+  await expect(page.getByRole('heading', { name: 'Importer transkripsjon' })).toBeVisible();
 
-  await expect(page.getByRole('heading', { name: 'Transcription added' })).toBeVisible();
+  await page.getByRole('button', { name: 'Velg fil...' }).click();
+  await expect(page.getByRole('heading', { name: 'Bekreft import' })).toBeVisible();
+  await page.getByRole('button', { name: 'Importer fil' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Transkripsjon importert' })).toBeVisible();
+  await expect(page.getByText('Originalfilen er uendret på kildestedet.')).toBeVisible();
   await expect(transcriptionDetails).toContainText('00. new-transcription.md');
-  await expect(page.getByRole('tree', { name: 'Scanned folder tree' }).getByText('00. new-transcription.md')).toBeVisible();
+  await expect(
+    page.getByRole('tree', { name: 'Scanned folder tree' }).getByText('00. new-transcription.md'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('treeitem', { name: '00. new-transcription.md' }),
+  ).toHaveAttribute('aria-selected', 'true');
+});
+
+test('keeps the transcript import ready state when file selection is cancelled', async ({ page }) => {
+  await page.addInitScript(({ scan, contextPreview, contextResult }) => {
+    window.sidekick = {
+      getAppInfo: async () => ({
+        name: 'Sidekick',
+        version: '1.0.0',
+        platform: 'linux',
+        isPackaged: false,
+      }),
+      chooseProjectFolder: async () => scan,
+      chooseProjectParentFolder: async () => null,
+      createProjectFolder: async () => null,
+      previewContextPackage: async () => contextPreview,
+      generateContextPackage: async () => contextResult,
+      previewTranscriptionImport: async () => null,
+      confirmTranscriptionImport: async () => {
+        throw new Error('No transcription import preview.');
+      },
+    };
+  }, {
+    scan: mockScan,
+    contextPreview: mockContextPackagePreview,
+    contextResult: mockContextPackageResult,
+  });
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg fil...' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Importer transkripsjon' })).toBeVisible();
+  await expect(page.locator('[data-transcription-import-state]').getByText('Skriveoperasjon')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Velg fil...' })).toBeEnabled();
+});
+
+test('shows no-change feedback when transcript import preview fails', async ({ page }) => {
+  await page.addInitScript(({ scan, contextPreview, contextResult }) => {
+    window.sidekick = {
+      getAppInfo: async () => ({
+        name: 'Sidekick',
+        version: '1.0.0',
+        platform: 'linux',
+        isPackaged: false,
+      }),
+      chooseProjectFolder: async () => scan,
+      chooseProjectParentFolder: async () => null,
+      createProjectFolder: async () => null,
+      previewContextPackage: async () => {
+        return contextPreview;
+      },
+      generateContextPackage: async () => contextResult,
+      previewTranscriptionImport: async () => {
+        throw new Error('No transcription folder was detected in this project.');
+      },
+      confirmTranscriptionImport: async () => {
+        throw new Error('No transcription import preview.');
+      },
+    };
+  }, {
+    scan: mockScan,
+    contextPreview: mockContextPackagePreview,
+    contextResult: mockContextPackageResult,
+  });
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg fil...' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Importen kan ikke fullføres' })).toBeVisible();
+  await expect(page.getByText('No transcription folder was detected in this project.')).toBeVisible();
+  await expect(page.getByText('Ingen filer ble endret')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Prøv igjen' })).toBeEnabled();
 });
 
 test('runs Codex from the controlled panel with mocked output', async ({ page }) => {

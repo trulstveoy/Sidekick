@@ -173,6 +173,9 @@ const transcriptionImportTitleTarget = document.querySelector<HTMLElement>(
 const transcriptionImportMessageTarget = document.querySelector<HTMLElement>(
   '[data-transcription-import-message]',
 );
+const transcriptionImportStateTarget = document.querySelector<HTMLElement>(
+  '[data-transcription-import-state]',
+);
 const transcriptionImportDetailsTarget = document.querySelector<HTMLElement>(
   '[data-transcription-import-details]',
 );
@@ -398,6 +401,37 @@ const getFolderSignalLabel = (node: FolderTreeNode) => {
   const signal = node.folderSignals?.[0] ?? node.contextHints[0];
 
   return signal ? signalLabels[signal] : 'Ingen tydelig signal';
+};
+
+const findNodesByFolderSignal = (
+  node: FolderTreeNode,
+  signal: FolderSignal,
+  matches: FolderTreeNode[] = [],
+) => {
+  if (
+    isFolderNode(node) &&
+    (node.folderSignals?.includes(signal) || node.contextHints.includes(signal))
+  ) {
+    matches.push(node);
+  }
+
+  getChildren(node).forEach((child) => findNodesByFolderSignal(child, signal, matches));
+
+  return matches;
+};
+
+const getTranscriptionFolderLabel = (scan: ProjectFolderScan) => {
+  const folders = findNodesByFolderSignal(scan.tree, 'transcript');
+
+  if (folders.length === 1) {
+    return folders[0].relativePath;
+  }
+
+  if (folders.length > 1) {
+    return 'Flere mulige transkripsjonsmapper';
+  }
+
+  return 'Ingen transkripsjonsmappe funnet';
 };
 
 const overviewWarnings = (scan?: ProjectFolderScan) => {
@@ -1037,6 +1071,67 @@ const renderTranscriptionImportDetails = (rows: DetailRow[]) =>
 const renderTranscriptionImportList = (items: string[]) =>
   renderList(transcriptionImportListTarget, items);
 
+const renderTranscriptionImportStateElements = (...elements: HTMLElement[]) => {
+  transcriptionImportStateTarget?.replaceChildren(...elements);
+};
+
+const createImportSteps = (activeStep: 1 | 2 | 3) => {
+  const steps = document.createElement('ol');
+  steps.className = 'operation-steps';
+
+  ['Velg fil', 'Bekreft', 'Ferdig'].forEach((label, index) => {
+    const stepNumber = index + 1;
+    const step = document.createElement('li');
+    step.className = 'operation-step';
+
+    if (stepNumber < activeStep) {
+      step.classList.add('operation-step--done');
+    }
+
+    if (stepNumber === activeStep) {
+      step.classList.add('operation-step--active');
+      step.setAttribute('aria-current', 'step');
+    }
+
+    step.textContent = label;
+    steps.append(step);
+  });
+
+  return steps;
+};
+
+const createWriteOperationBadge = () => {
+  const badge = document.createElement('span');
+  badge.className = 'write-operation-badge';
+  badge.textContent = 'Skriveoperasjon';
+
+  return badge;
+};
+
+const createWriteWarning = (message: string) => {
+  const warning = document.createElement('div');
+  warning.className = 'write-warning';
+  warning.textContent = message;
+
+  return warning;
+};
+
+const createResultBanner = (
+  variant: 'success' | 'error',
+  title: string,
+  message: string,
+) => {
+  const banner = document.createElement('div');
+  banner.className = `result-banner result-banner--${variant}`;
+  const heading = document.createElement('strong');
+  const body = document.createElement('span');
+  heading.textContent = title;
+  body.textContent = message;
+  banner.replaceChildren(heading, body);
+
+  return banner;
+};
+
 const renderContextPackageActions = (
   primaryLabel: string,
   primaryDisabled: boolean,
@@ -1058,6 +1153,10 @@ const renderTranscriptionImportActions = (
   primaryDisabled: boolean,
   secondaryVisible = false,
 ) => {
+  if (transcriptionImportSecondaryButton) {
+    transcriptionImportSecondaryButton.textContent = 'Tilbake';
+  }
+
   renderActions(
     {
       primaryButton: transcriptionImportPrimaryButton,
@@ -1194,86 +1293,122 @@ const renderTranscriptionImportUnavailable = () => {
   setText(transcriptionImportTitleTarget, 'Ingen prosjektmappe valgt');
   setText(
     transcriptionImportMessageTarget,
-    window.sidekick ? 'Choose a folder first.' : 'Open in Electron to import transcriptions.',
+    window.sidekick
+      ? 'Velg en prosjektmappe før du importerer transkripsjoner.'
+      : 'Åpne appen i Electron for å importere transkripsjoner.',
   );
+  renderTranscriptionImportStateElements();
   renderTranscriptionImportDetails([]);
   renderTranscriptionImportList([]);
-  renderTranscriptionImportActions('Add transcription', true);
+  renderTranscriptionImportActions('Velg fil...', true);
 };
 
-const renderTranscriptionImportReady = () => {
-  setText(transcriptionImportTitleTarget, 'Ready');
-  setText(transcriptionImportMessageTarget, 'Copy a text or Markdown transcript into the project.');
+const renderTranscriptionImportReady = (scan: ProjectFolderScan) => {
+  setText(transcriptionImportTitleTarget, 'Importer transkripsjon');
+  setText(
+    transcriptionImportMessageTarget,
+    'Velg en tekst- eller Markdown-fil som skal kopieres inn i prosjektets transkripsjonsmappe.',
+  );
+  renderTranscriptionImportStateElements(createImportSteps(1));
   renderTranscriptionImportDetails([
-    ['Accepted', '.txt, .md, .markdown'],
-    ['Target', 'Detected transcription folder'],
+    ['Tillatte filer', '.txt, .md, .markdown'],
+    ['Målmappe', getTranscriptionFolderLabel(scan)],
+    ['Handling', 'Kopierer filen. Originalen blir liggende der den er.'],
   ]);
   renderTranscriptionImportList([]);
-  renderTranscriptionImportActions('Add transcription', false);
+  renderTranscriptionImportActions('Velg fil...', false);
 };
 
 const renderTranscriptionImportPreviewing = () => {
-  setText(transcriptionImportTitleTarget, 'Choose file');
-  setText(transcriptionImportMessageTarget, 'Waiting for transcription file selection.');
+  setText(transcriptionImportTitleTarget, 'Velger fil');
+  setText(transcriptionImportMessageTarget, 'Venter på at du velger en transkripsjonsfil.');
+  renderTranscriptionImportStateElements(createImportSteps(1));
   renderTranscriptionImportDetails([]);
   renderTranscriptionImportList([]);
-  renderTranscriptionImportActions('Choosing...', true);
+  renderTranscriptionImportActions('Velger...', true);
 };
 
 const formatNumberingPreview = (preview: TranscriptionImportPreview) =>
   `${preview.numbering.nextNumber.toString().padStart(preview.numbering.width, '0')}${
     preview.numbering.separator
-  } (${preview.numbering.inferredFromExistingFiles ? 'inferred' : 'new sequence'})`;
+  } (${preview.numbering.inferredFromExistingFiles ? 'funnet fra eksisterende filer' : 'ny sekvens'})`;
 
 const renderTranscriptionImportConfirming = (preview: TranscriptionImportPreview) => {
-  setText(transcriptionImportTitleTarget, 'Confirm import');
-  setText(transcriptionImportMessageTarget, 'Review the destination before copying.');
+  setText(transcriptionImportTitleTarget, 'Bekreft import');
+  setText(transcriptionImportMessageTarget, 'Kontroller plassering og filnavn før Sidekick kopierer filen.');
+  renderTranscriptionImportStateElements(
+    createImportSteps(2),
+    createWriteOperationBadge(),
+    createWriteWarning(
+      `Sidekick kopierer én fil til ${preview.targetFolderRelativePath}. Ingen andre filer endres.`,
+    ),
+  );
   renderTranscriptionImportDetails([
-    ['Source file', preview.sourceFileName],
-    ['Target folder', preview.targetFolderRelativePath],
-    ['Destination file', preview.destinationFileName],
-    ['Numbering', formatNumberingPreview(preview)],
-    ['Destination path', preview.destinationPath],
+    ['Kildefil', preview.sourceFileName],
+    ['Kildesti', preview.sourcePath],
+    ['Transkripsjonsmappe', preview.targetFolderRelativePath],
+    ['Nytt filnavn', preview.destinationFileName],
+    ['Nummerering', formatNumberingPreview(preview)],
+    ['Destinasjonssti', preview.destinationPath],
+    ['Handling', 'Kopier, ikke flytt'],
   ]);
-  renderTranscriptionImportList([
-    'Source file will be copied, not moved.',
-    ...preview.warnings.map((warning) =>
+  renderTranscriptionImportList(
+    preview.warnings.map((warning) =>
       warning.path ? `${warning.path}: ${warning.message}` : warning.message,
     ),
-  ]);
-  renderTranscriptionImportActions('Import transcription', false, true);
+  );
+  renderTranscriptionImportActions('Importer fil', false, true);
 };
 
 const renderTranscriptionImportImporting = (preview: TranscriptionImportPreview) => {
-  setText(transcriptionImportTitleTarget, 'Importing');
-  setText(transcriptionImportMessageTarget, 'Copying transcription into the project.');
+  setText(transcriptionImportTitleTarget, 'Importerer fil');
+  setText(transcriptionImportMessageTarget, 'Kopierer transkripsjonen inn i prosjektet.');
+  renderTranscriptionImportStateElements(
+    createImportSteps(2),
+    createWriteOperationBadge(),
+    createWriteWarning(`Sidekick skriver ${preview.destinationFileName} til prosjektmappen.`),
+  );
   renderTranscriptionImportDetails([
-    ['Destination file', preview.destinationFileName],
-    ['Destination path', preview.destinationPath],
+    ['Nytt filnavn', preview.destinationFileName],
+    ['Destinasjonssti', preview.destinationPath],
   ]);
   renderTranscriptionImportList([]);
-  renderTranscriptionImportActions('Importing...', true);
+  renderTranscriptionImportActions('Importerer...', true);
 };
 
 const renderTranscriptionImportComplete = (result: TranscriptionImportResult) => {
-  setText(transcriptionImportTitleTarget, 'Transcription added');
-  setText(transcriptionImportMessageTarget, 'Copied into the transcription folder.');
+  setText(transcriptionImportTitleTarget, 'Transkripsjon importert');
+  setText(transcriptionImportMessageTarget, 'Prosjektet er skannet på nytt med den importerte filen.');
+  renderTranscriptionImportStateElements(
+    createImportSteps(3),
+    createResultBanner(
+      'success',
+      'Filen er lagt til',
+      'Originalfilen er uendret på kildestedet.',
+    ),
+  );
   renderTranscriptionImportDetails([
-    ['Destination file', result.destinationFileName],
-    ['Source file', result.sourceFileName],
-    ['Size', formatBytes(result.copiedBytes)],
-    ['Destination path', result.destinationPath],
+    ['Importert fil', result.destinationFileName],
+    ['Kilde', result.sourceFileName],
+    ['Størrelse', formatBytes(result.copiedBytes)],
+    ['Nummer', result.finalNumber.toString().padStart(2, '0')],
+    ['Destinasjonssti', result.destinationPath],
+    ['Original', 'Uendret'],
   ]);
   renderTranscriptionImportList([]);
-  renderTranscriptionImportActions('Add another', false);
+  renderTranscriptionImportActions('Importer ny', false);
 };
 
 const renderTranscriptionImportError = (message: string) => {
-  setText(transcriptionImportTitleTarget, 'Import failed');
+  setText(transcriptionImportTitleTarget, 'Importen kan ikke fullføres');
   setText(transcriptionImportMessageTarget, message);
+  renderTranscriptionImportStateElements(
+    createImportSteps(1),
+    createResultBanner('error', 'Ingen filer ble endret', 'Prøv igjen med en gyldig transkripsjonsfil.'),
+  );
   renderTranscriptionImportDetails([]);
   renderTranscriptionImportList([]);
-  renderTranscriptionImportActions('Try again', false);
+  renderTranscriptionImportActions('Prøv igjen', false);
 };
 
 const renderTranscriptionImport = (scan?: ProjectFolderScan) => {
@@ -1284,7 +1419,7 @@ const renderTranscriptionImport = (scan?: ProjectFolderScan) => {
 
   switch (transcriptionImportState.status) {
     case 'ready':
-      renderTranscriptionImportReady();
+      renderTranscriptionImportReady(scan);
       break;
     case 'previewing':
       renderTranscriptionImportPreviewing();
@@ -2259,6 +2394,10 @@ const importTranscription = async () => {
         : ({ status: 'ready', scan: result.scan } satisfies ViewState);
     state = nextState;
     expandedPaths = new Set([...expandedPaths, ROOT_PATH, result.targetFolderRelativePath]);
+    const importedRelativePath = `${result.targetFolderRelativePath}/${result.destinationFileName}`;
+    const importedNode = getNodeByPath(result.scan.tree, importedRelativePath);
+    selectedTreePath = importedNode ? importedRelativePath : result.targetFolderRelativePath;
+    focusedTreePath = selectedTreePath;
     setContextPackageStateForScan(result.scan);
     setOverviewContextPackageStatusForScan(result.scan);
     transcriptionImportState = { status: 'complete', result };
