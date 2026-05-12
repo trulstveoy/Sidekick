@@ -620,7 +620,7 @@ test('renders the refreshed project overview at minimum viewport', async ({ page
   await expect(page.getByRole('treeitem', { name: /01-bakgrunn/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Generer kontekstpakke' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Importer transkripsjon' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Kjør Codex' })).toBeVisible();
+  await expect(page.locator('[data-overview-action-run-codex]')).toBeVisible();
 });
 
 test('shows partial scan status and warnings in the overview', async ({ page }) => {
@@ -1157,7 +1157,7 @@ test('shows no-change feedback when transcript import preview fails', async ({ p
   await expect(page.getByRole('button', { name: 'Prøv igjen' })).toBeEnabled();
 });
 
-test('runs Codex from the controlled panel with mocked output', async ({ page }) => {
+test('runs Codex in read-only mode from the controlled panel', async ({ page }) => {
   await page.addInitScript(
     ({ scan, contextPreview, contextResult }) => {
       let outputListener:
@@ -1172,12 +1172,13 @@ test('runs Codex from the controlled panel with mocked output', async ({ page })
         | ((event: {
             runId: string;
             state: 'completed';
-            mode: 'read-only';
+            mode: 'read-only' | 'workspace-write' | 'login';
             exitCode: number;
             signal: null;
             createdAt: string;
           }) => void)
         | undefined;
+      (window as unknown as { __codexRequests: unknown[] }).__codexRequests = [];
 
       window.sidekick = {
         getAppInfo: async () => ({
@@ -1202,7 +1203,8 @@ test('runs Codex from the controlled panel with mocked output', async ({ page })
           version: 'codex-cli 0.130.0-test',
         }),
         startCodexLogin: async () => ({ runId: 'login-run' }),
-        startCodexRun: async () => {
+        startCodexRun: async (request) => {
+          (window as unknown as { __codexRequests: unknown[] }).__codexRequests.push(request);
           window.setTimeout(() => {
             outputListener?.({
               runId: 'codex-run',
@@ -1248,14 +1250,386 @@ test('runs Codex from the controlled panel with mocked output', async ({ page })
   await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
 
   const codexPanel = page.locator('.codex-panel');
-  await expect(codexPanel.getByRole('heading', { name: 'Ready' })).toBeVisible();
+  await expect(codexPanel.getByRole('heading', { name: 'Codex er klar' })).toBeVisible();
   await expect(codexPanel).toContainText('codex-cli 0.130.0-test');
+  await expect(codexPanel).toContainText('Lesetilgang');
+  await expect(codexPanel).toContainText('/tmp/sidekick-project');
 
-  await codexPanel.getByLabel('Prompt').fill('Summarize this project');
-  await codexPanel.getByRole('button', { name: 'Run Codex' }).click();
+  await codexPanel.getByLabel('Instruksjon').fill('Summarize this project');
+  await codexPanel.getByRole('button', { name: 'Kjør Codex' }).click();
 
-  await expect(codexPanel.getByRole('heading', { name: 'Codex completed' })).toBeVisible();
+  await expect(codexPanel.getByRole('heading', { name: 'Codex fullført' })).toBeVisible();
   await expect(codexPanel).toContainText('Project summary complete');
+  await expect(codexPanel).toContainText('Kjørelogg');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __codexRequests: Array<{ mode: string }> }).__codexRequests[0]?.mode,
+      ),
+    )
+    .toBe('read-only');
+});
+
+test('shows Codex write-mode warning before running', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan, contextPreview, contextResult }) => {
+      (window as unknown as { __codexRequests: unknown[] }).__codexRequests = [];
+
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
+        createProjectFolder: async () => null,
+        previewContextPackage: async () => contextPreview,
+        generateContextPackage: async () => contextResult,
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+        getCodexStatus: async () => ({
+          state: 'ready',
+          available: true,
+          loggedIn: true,
+          version: 'codex-cli 0.130.0-test',
+        }),
+        startCodexLogin: async () => ({ runId: 'login-run' }),
+        startCodexRun: async (request) => {
+          (window as unknown as { __codexRequests: unknown[] }).__codexRequests.push(request);
+          return { runId: 'codex-write-run' };
+        },
+        cancelCodexRun: async () => undefined,
+        onCodexOutput: () => () => undefined,
+        onCodexCompletion: () => () => undefined,
+      };
+    },
+    {
+      scan: mockScan,
+      contextPreview: mockContextPackagePreview,
+      contextResult: mockContextPackageResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+
+  const codexPanel = page.locator('.codex-panel');
+  await codexPanel.getByLabel('Instruksjon').fill('Update the project notes');
+  await codexPanel.locator('[data-codex-edit-mode]').check();
+
+  await expect(codexPanel).toContainText('Skrivetilgang');
+  await expect(codexPanel).toContainText('Skriveoperasjon');
+  await expect(codexPanel).toContainText('Codex kan endre filer direkte i /tmp/sidekick-project');
+
+  await codexPanel.getByRole('button', { name: 'Kjør Codex' }).click();
+  await expect(codexPanel.getByRole('heading', { name: 'Codex kjører' })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __codexRequests: Array<{ mode: string }> }).__codexRequests[0]?.mode,
+      ),
+    )
+    .toBe('workspace-write');
+});
+
+test('shows Codex login state and returns to ready after device login', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan, contextPreview, contextResult }) => {
+      let statusChecks = 0;
+      let outputListener:
+        | ((event: {
+            runId: string;
+            stream: 'stdout' | 'stderr';
+            text: string;
+            createdAt: string;
+          }) => void)
+        | undefined;
+      let completionListener:
+        | ((event: {
+            runId: string;
+            state: 'completed';
+            mode: 'login';
+            exitCode: number;
+            signal: null;
+            createdAt: string;
+          }) => void)
+        | undefined;
+
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
+        createProjectFolder: async () => null,
+        previewContextPackage: async () => contextPreview,
+        generateContextPackage: async () => contextResult,
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+        getCodexStatus: async () => {
+          statusChecks += 1;
+          return statusChecks === 1
+            ? {
+                state: 'logged-out',
+                available: true,
+                loggedIn: false,
+                version: 'codex-cli 0.130.0-test',
+                message: 'Device login required.',
+              }
+            : {
+                state: 'ready',
+                available: true,
+                loggedIn: true,
+                version: 'codex-cli 0.130.0-test',
+              };
+        },
+        startCodexLogin: async () => {
+          window.setTimeout(() => {
+            outputListener?.({
+              runId: 'login-run',
+              stream: 'stdout',
+              text: 'Open the device login URL.',
+              createdAt: '2026-05-11T12:00:00.000Z',
+            });
+          }, 20);
+          window.setTimeout(() => {
+            completionListener?.({
+              runId: 'login-run',
+              state: 'completed',
+              mode: 'login',
+              exitCode: 0,
+              signal: null,
+              createdAt: '2026-05-11T12:00:01.000Z',
+            });
+          }, 150);
+
+          return { runId: 'login-run' };
+        },
+        startCodexRun: async () => ({ runId: 'codex-run' }),
+        cancelCodexRun: async () => undefined,
+        onCodexOutput: (listener) => {
+          outputListener = listener;
+          return () => {
+            outputListener = undefined;
+          };
+        },
+        onCodexCompletion: (listener) => {
+          completionListener = listener;
+          return () => {
+            completionListener = undefined;
+          };
+        },
+      };
+    },
+    {
+      scan: mockScan,
+      contextPreview: mockContextPackagePreview,
+      contextResult: mockContextPackageResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+
+  const codexPanel = page.locator('.codex-panel');
+  await expect(codexPanel.getByRole('heading', { name: 'Innlogging kreves' })).toBeVisible();
+  await expect(codexPanel).toContainText('Codex er ikke logget inn');
+  await codexPanel.getByRole('button', { name: 'Logg inn' }).click();
+
+  await expect(codexPanel.getByRole('heading', { name: 'Innlogging kjører' })).toBeVisible();
+  await expect(codexPanel).toContainText('Open the device login URL.');
+  await expect(codexPanel.getByRole('heading', { name: 'Codex er klar' })).toBeVisible();
+});
+
+test('cancels a running Codex operation from the controlled panel', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan, contextPreview, contextResult }) => {
+      let completionListener:
+        | ((event: {
+            runId: string;
+            state: 'canceled';
+            mode: 'read-only';
+            exitCode: null;
+            signal: null;
+            message: string;
+            createdAt: string;
+          }) => void)
+        | undefined;
+
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
+        createProjectFolder: async () => null,
+        previewContextPackage: async () => contextPreview,
+        generateContextPackage: async () => contextResult,
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+        getCodexStatus: async () => ({
+          state: 'ready',
+          available: true,
+          loggedIn: true,
+          version: 'codex-cli 0.130.0-test',
+        }),
+        startCodexLogin: async () => ({ runId: 'login-run' }),
+        startCodexRun: async () => ({ runId: 'cancel-run' }),
+        cancelCodexRun: async () => {
+          completionListener?.({
+            runId: 'cancel-run',
+            state: 'canceled',
+            mode: 'read-only',
+            exitCode: null,
+            signal: null,
+            message: 'Kjøringen ble avbrutt.',
+            createdAt: '2026-05-11T12:00:01.000Z',
+          });
+        },
+        onCodexOutput: () => () => undefined,
+        onCodexCompletion: (listener) => {
+          completionListener = listener;
+          return () => {
+            completionListener = undefined;
+          };
+        },
+      };
+    },
+    {
+      scan: mockScan,
+      contextPreview: mockContextPackagePreview,
+      contextResult: mockContextPackageResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+
+  const codexPanel = page.locator('.codex-panel');
+  await codexPanel.getByLabel('Instruksjon').fill('Inspect the project');
+  await codexPanel.getByRole('button', { name: 'Kjør Codex' }).click();
+  await expect(codexPanel.getByRole('heading', { name: 'Codex kjører' })).toBeVisible();
+  await codexPanel.getByRole('button', { name: 'Avbryt' }).click();
+
+  await expect(codexPanel.getByRole('heading', { name: 'Codex avbrutt' })).toBeVisible();
+  await expect(codexPanel).toContainText('Kjøringen ble avbrutt.');
+});
+
+test('shows Codex failure state and refreshes scan after write completion', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan, scanAfterWrite, contextPreview, contextResult }) => {
+      let completionListener:
+        | ((event: {
+            runId: string;
+            state: 'failed' | 'completed';
+            mode: 'read-only' | 'workspace-write';
+            exitCode: number | null;
+            signal: null;
+            message?: string;
+            createdAt: string;
+            scan?: unknown;
+          }) => void)
+        | undefined;
+
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
+        createProjectFolder: async () => null,
+        previewContextPackage: async () => contextPreview,
+        generateContextPackage: async () => contextResult,
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+        getCodexStatus: async () => ({
+          state: 'ready',
+          available: true,
+          loggedIn: true,
+          version: 'codex-cli 0.130.0-test',
+        }),
+        startCodexLogin: async () => ({ runId: 'login-run' }),
+        startCodexRun: async (request) => {
+          window.setTimeout(() => {
+            completionListener?.(
+              request.mode === 'workspace-write'
+                ? {
+                    runId: 'codex-run',
+                    state: 'completed',
+                    mode: 'workspace-write',
+                    exitCode: 0,
+                    signal: null,
+                    message: 'Skrivekjøring fullført.',
+                    createdAt: '2026-05-11T12:00:01.000Z',
+                    scan: scanAfterWrite,
+                  }
+                : {
+                    runId: 'codex-run',
+                    state: 'failed',
+                    mode: 'read-only',
+                    exitCode: 1,
+                    signal: null,
+                    message: 'Codex returned an error.',
+                    createdAt: '2026-05-11T12:00:01.000Z',
+                  },
+            );
+          }, 0);
+
+          return { runId: 'codex-run' };
+        },
+        cancelCodexRun: async () => undefined,
+        onCodexOutput: () => () => undefined,
+        onCodexCompletion: (listener) => {
+          completionListener = listener;
+          return () => {
+            completionListener = undefined;
+          };
+        },
+      };
+    },
+    {
+      scan: mockScan,
+      scanAfterWrite: mockScanAfterTranscriptionImport,
+      contextPreview: mockContextPackagePreview,
+      contextResult: mockContextPackageResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+
+  const codexPanel = page.locator('.codex-panel');
+  await codexPanel.getByLabel('Instruksjon').fill('Fail this read-only run');
+  await codexPanel.getByRole('button', { name: 'Kjør Codex' }).click();
+  await expect(codexPanel.getByRole('heading', { name: 'Codex feilet' })).toBeVisible();
+  await expect(codexPanel).toContainText('Codex returned an error.');
+
+  await codexPanel.getByLabel('Instruksjon').fill('Update the project');
+  await codexPanel.locator('[data-codex-edit-mode]').check();
+  await codexPanel.getByRole('button', { name: 'Kjør igjen' }).click();
+
+  await expect(codexPanel.getByRole('heading', { name: 'Codex fullført' })).toBeVisible();
+  await expect(codexPanel).toContainText('Skrivekjøring fullført.');
+  await expect(page.locator('[data-overview-stats]')).toContainText('4');
 });
 
 test('opens settings and manages Codex CLI path', async ({ page }) => {

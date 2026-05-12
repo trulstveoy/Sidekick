@@ -191,9 +191,14 @@ const transcriptionImportSecondaryButton = document.querySelector<HTMLButtonElem
 );
 const codexTitleTarget = document.querySelector<HTMLElement>('[data-codex-title]');
 const codexMessageTarget = document.querySelector<HTMLElement>('[data-codex-message]');
+const codexStateTarget = document.querySelector<HTMLElement>('[data-codex-state]');
 const codexDetailsTarget = document.querySelector<HTMLElement>('[data-codex-details]');
 const codexPromptInput = document.querySelector<HTMLTextAreaElement>('[data-codex-prompt]');
 const codexEditModeInput = document.querySelector<HTMLInputElement>('[data-codex-edit-mode]');
+const codexModeTitleTarget = document.querySelector<HTMLElement>('[data-codex-mode-title]');
+const codexModeDescriptionTarget = document.querySelector<HTMLElement>(
+  '[data-codex-mode-description]',
+);
 const codexOutputTarget = document.querySelector<HTMLUListElement>('[data-codex-output]');
 const codexPrimaryButton = document.querySelector<HTMLButtonElement>('[data-codex-primary]');
 const codexSecondaryButton = document.querySelector<HTMLButtonElement>('[data-codex-secondary]');
@@ -1128,7 +1133,7 @@ const createWriteWarning = (message: string) => {
 };
 
 const createResultBanner = (
-  variant: 'success' | 'error',
+  variant: 'success' | 'warning' | 'error',
   title: string,
   message: string,
 ) => {
@@ -1509,6 +1514,10 @@ const renderCodexActions = (
   primaryDisabled: boolean,
   secondaryVisible = false,
 ) => {
+  if (codexSecondaryButton) {
+    codexSecondaryButton.textContent = 'Avbryt';
+  }
+
   renderActions(
     {
       primaryButton: codexPrimaryButton,
@@ -1520,6 +1529,28 @@ const renderCodexActions = (
   );
 };
 
+const renderCodexStateElements = (...elements: HTMLElement[]) => {
+  codexStateTarget?.replaceChildren(...elements);
+};
+
+const createCodexSteps = (activeStep: 1 | 2 | 3) =>
+  createOperationSteps(['Instruksjon', 'Kjøring', 'Ferdig'], activeStep);
+
+const codexModeLabel = (mode: CodexRunMode | 'login') => {
+  if (mode === 'workspace-write') {
+    return 'Skrivetilgang';
+  }
+
+  if (mode === 'login') {
+    return 'Innlogging';
+  }
+
+  return 'Lesetilgang';
+};
+
+const codexExitLabel = (completion: CodexCompletionEvent) =>
+  completion.exitCode?.toString() ?? completion.signal ?? 'Ukjent';
+
 const setCodexInputsDisabled = (disabled: boolean) => {
   if (codexPromptInput) {
     codexPromptInput.disabled = disabled;
@@ -1528,6 +1559,18 @@ const setCodexInputsDisabled = (disabled: boolean) => {
   if (codexEditModeInput) {
     codexEditModeInput.disabled = disabled;
   }
+};
+
+const renderCodexModeCopy = () => {
+  const isWriteMode = Boolean(codexEditModeInput?.checked);
+
+  setText(codexModeTitleTarget, isWriteMode ? 'Skrivetilgang' : 'Lesetilgang');
+  setText(
+    codexModeDescriptionTarget,
+    isWriteMode
+      ? 'Codex kan lese og endre filer direkte i prosjektmappen for denne kjøringen.'
+      : 'Codex kan lese prosjektmappen, men ikke endre filer.',
+  );
 };
 
 const renderCodexDetails = (rows: DetailRow[]) => renderDetails(codexDetailsTarget, rows);
@@ -1540,7 +1583,7 @@ const renderCodexOutput = (output: CodexOutputEvent[] = []) => {
   }
 
   if (output.length === 0) {
-    codexOutputTarget.append(createListItem('No output yet'));
+    codexOutputTarget.append(createListItem('Ingen kjørelogg ennå.'));
     return;
   }
 
@@ -1552,63 +1595,96 @@ const renderCodexOutput = (output: CodexOutputEvent[] = []) => {
   );
 };
 
-const renderCodexUnavailable = (message = 'Choose a folder first.') => {
+const renderCodexUnavailable = (message = 'Velg en prosjektmappe først.') => {
   setText(codexTitleTarget, 'Ingen prosjektmappe valgt');
-  setText(codexMessageTarget, window.sidekick ? message : 'Open in Electron to use Codex.');
+  setText(codexMessageTarget, window.sidekick ? message : 'Åpne Sidekick i Electron for å bruke Codex.');
+  renderCodexStateElements();
   renderCodexDetails([]);
   renderCodexOutput([]);
   setCodexInputsDisabled(true);
-  renderCodexActions('Run Codex', true);
+  renderCodexModeCopy();
+  renderCodexActions('Kjør Codex', true);
 };
 
 const renderCodexChecking = () => {
-  setText(codexTitleTarget, 'Checking Codex');
-  setText(codexMessageTarget, 'Looking for Codex CLI and login status.');
+  setText(codexTitleTarget, 'Sjekker Codex');
+  setText(codexMessageTarget, 'Ser etter Codex CLI og innloggingsstatus.');
+  renderCodexStateElements(createCodexSteps(1));
   renderCodexDetails([]);
   renderCodexOutput([]);
   setCodexInputsDisabled(true);
-  renderCodexActions('Checking...', true);
+  renderCodexModeCopy();
+  renderCodexActions('Sjekker...', true);
 };
 
 const renderCodexLoggedOut = (codexStatus: CodexStatus) => {
-  setText(codexTitleTarget, 'Login required');
-  setText(codexMessageTarget, codexStatus.message ?? 'Codex is available but not logged in.');
+  setText(codexTitleTarget, 'Innlogging kreves');
+  setText(codexMessageTarget, codexStatus.message ?? 'Codex er tilgjengelig, men ikke logget inn.');
+  renderCodexStateElements(
+    createResultBanner('error', 'Codex er ikke logget inn', 'Start innlogging med Codex sin enhetsflyt.'),
+  );
   renderCodexDetails([
-    ['Version', codexStatus.version ?? 'Unknown'],
-    ['Mode', 'Device auth'],
+    ['Versjon', codexStatus.version ?? 'Ukjent'],
+    ['Innlogging', 'Enhetsflyt'],
   ]);
   renderCodexOutput([]);
   setCodexInputsDisabled(true);
-  renderCodexActions('Login', false);
+  renderCodexModeCopy();
+  renderCodexActions('Logg inn', false);
 };
 
-const renderCodexReady = (codexStatus: CodexStatus) => {
-  setText(codexTitleTarget, 'Ready');
-  setText(codexMessageTarget, 'Run Codex in the selected project folder.');
+const renderCodexReady = (codexStatus: CodexStatus, scan: ProjectFolderScan) => {
+  const isWriteMode = Boolean(codexEditModeInput?.checked);
+
+  setText(codexTitleTarget, 'Codex er klar');
+  setText(codexMessageTarget, 'Kjør Codex direkte mot valgt prosjektmappe.');
+  renderCodexStateElements(
+    ...(isWriteMode
+      ? [
+          createWriteOperationBadge(),
+          createWriteWarning(`Codex kan endre filer direkte i ${scan.rootPath} for denne kjøringen.`),
+        ]
+      : [createCodexSteps(1)]),
+  );
   renderCodexDetails([
-    ['Version', codexStatus.version ?? 'Unknown'],
-    ['Default sandbox', 'read-only'],
+    ['Prosjektmappe', scan.rootPath],
+    ['Versjon', codexStatus.version ?? 'Ukjent'],
+    ['Standard tilgang', 'Lesetilgang'],
   ]);
   renderCodexOutput([]);
   setCodexInputsDisabled(false);
-  renderCodexActions('Run Codex', false);
+  renderCodexModeCopy();
+  renderCodexActions('Kjør Codex', false);
 };
 
-const renderCodexRunning = (run: Extract<CodexState, { status: 'running' }>) => {
-  setText(codexTitleTarget, run.mode === 'login' ? 'Login running' : 'Codex running');
+const renderCodexRunning = (
+  run: Extract<CodexState, { status: 'running' }>,
+  scan: ProjectFolderScan,
+) => {
+  setText(codexTitleTarget, run.mode === 'login' ? 'Innlogging kjører' : 'Codex kjører');
   setText(
     codexMessageTarget,
     run.mode === 'workspace-write'
-      ? 'Codex may edit files in this project.'
-      : 'Streaming Codex output.',
+      ? 'Codex har skrivetilgang til valgt prosjektmappe i denne kjøringen.'
+      : 'Sidekick viser kontrollert kjørelogg fra Codex.',
+  );
+  renderCodexStateElements(
+    ...(run.mode === 'workspace-write'
+      ? [
+          createWriteOperationBadge(),
+          createWriteWarning(`Codex kan endre filer direkte i ${scan.rootPath}.`),
+        ]
+      : [createCodexSteps(2)]),
   );
   renderCodexDetails([
-    ['Run ID', run.runId],
-    ['Mode', run.mode],
+    ['Kjøring', run.runId],
+    ['Tilgang', codexModeLabel(run.mode)],
+    ['Prosjektmappe', scan.rootPath],
   ]);
   renderCodexOutput(run.output);
   setCodexInputsDisabled(true);
-  renderCodexActions('Running...', true, true);
+  renderCodexModeCopy();
+  renderCodexActions(run.mode === 'login' ? 'Logger inn...' : 'Kjører...', true, true);
 };
 
 const renderCodexFinished = (
@@ -1616,28 +1692,36 @@ const renderCodexFinished = (
 ) => {
   const title =
     finished.status === 'completed'
-      ? 'Codex completed'
+      ? 'Codex fullført'
       : finished.status === 'canceled'
-        ? 'Codex canceled'
-        : 'Codex failed';
+        ? 'Codex avbrutt'
+        : 'Codex feilet';
   const message =
     finished.completion.message ??
     (finished.status === 'completed'
-      ? 'Run finished.'
+      ? 'Kjøringen er ferdig.'
       : finished.status === 'canceled'
-        ? 'Run was canceled.'
-        : 'Run failed.');
+        ? 'Kjøringen ble avbrutt.'
+        : 'Kjøringen feilet.');
 
   setText(codexTitleTarget, title);
   setText(codexMessageTarget, message);
+  renderCodexStateElements(
+    createResultBanner(
+      finished.status === 'failed' ? 'error' : finished.status === 'canceled' ? 'warning' : 'success',
+      title,
+      message,
+    ),
+  );
   renderCodexDetails([
-    ['Run ID', finished.completion.runId],
-    ['Mode', finished.completion.mode],
-    ['Exit', finished.completion.exitCode?.toString() ?? finished.completion.signal ?? 'Unknown'],
+    ['Kjøring', finished.completion.runId],
+    ['Tilgang', codexModeLabel(finished.completion.mode)],
+    ['Avslutning', codexExitLabel(finished.completion)],
   ]);
   renderCodexOutput(finished.output);
   setCodexInputsDisabled(false);
-  renderCodexActions('Run again', false);
+  renderCodexModeCopy();
+  renderCodexActions('Kjør igjen', false);
 };
 
 const renderCodex = (scan?: ProjectFolderScan) => {
@@ -1654,10 +1738,10 @@ const renderCodex = (scan?: ProjectFolderScan) => {
       renderCodexLoggedOut(codexState.codexStatus);
       break;
     case 'ready':
-      renderCodexReady(codexState.codexStatus);
+      renderCodexReady(codexState.codexStatus, scan);
       break;
     case 'running':
-      renderCodexRunning(codexState);
+      renderCodexRunning(codexState, scan);
       break;
     case 'completed':
     case 'failed':
@@ -2490,7 +2574,7 @@ const handleTranscriptionImportPrimary = () => {
 
 const refreshCodexStatus = async (scan: ProjectFolderScan) => {
   if (!window.sidekick) {
-    codexState = { status: 'unavailable', message: 'Open in Electron to use Codex.' };
+    codexState = { status: 'unavailable', message: 'Åpne Sidekick i Electron for å bruke Codex.' };
     render();
     return;
   }
@@ -2510,13 +2594,13 @@ const refreshCodexStatus = async (scan: ProjectFolderScan) => {
         status: 'unavailable',
         message:
           codexStatus.message ??
-          'Codex CLI was not found. Install Codex CLI or set SIDEKICK_CODEX_PATH to the full Codex executable path.',
+          'Codex CLI ble ikke funnet. Installer Codex CLI eller sett en Codex-sti i innstillingene.',
       };
     }
   } catch (error) {
     codexState = {
       status: 'unavailable',
-      message: error instanceof Error ? error.message : 'Unable to check Codex status.',
+      message: error instanceof Error ? error.message : 'Kunne ikke sjekke Codex-status.',
     };
   }
 
@@ -2534,7 +2618,7 @@ const startCodexLogin = async (scan: ProjectFolderScan) => {
   } catch (error) {
     codexState = {
       status: 'unavailable',
-      message: error instanceof Error ? error.message : 'Unable to start Codex login.',
+      message: error instanceof Error ? error.message : 'Kunne ikke starte Codex-innlogging.',
     };
   }
 
@@ -2557,7 +2641,7 @@ const startCodexRun = async (scan: ProjectFolderScan) => {
         mode: 'read-only',
         exitCode: null,
         signal: null,
-        message: 'Enter a Codex prompt before running.',
+        message: 'Skriv en instruksjon før du kjører Codex.',
         createdAt: new Date().toISOString(),
       },
       output: [],
@@ -2567,13 +2651,6 @@ const startCodexRun = async (scan: ProjectFolderScan) => {
   }
 
   const mode: CodexRunMode = codexEditModeInput?.checked ? 'workspace-write' : 'read-only';
-
-  if (
-    mode === 'workspace-write' &&
-    !window.confirm('Allow Codex to change files in the selected project folder?')
-  ) {
-    return;
-  }
 
   try {
     const { runId } = await window.sidekick.startCodexRun({
@@ -2591,7 +2668,7 @@ const startCodexRun = async (scan: ProjectFolderScan) => {
         mode,
         exitCode: null,
         signal: null,
-        message: error instanceof Error ? error.message : 'Unable to start Codex.',
+        message: error instanceof Error ? error.message : 'Kunne ikke starte Codex.',
         createdAt: new Date().toISOString(),
       },
       output: [],
@@ -2630,7 +2707,7 @@ const cancelCodexRun = async () => {
       mode: codexState.mode,
       exitCode: null,
       signal: null,
-      message: error instanceof Error ? error.message : 'Unable to cancel Codex.',
+      message: error instanceof Error ? error.message : 'Kunne ikke avbryte Codex.',
       createdAt: new Date().toISOString(),
     };
     codexState = { status: 'failed', completion, output: codexState.output };
@@ -2953,6 +3030,9 @@ transcriptionImportPrimaryButton?.addEventListener('click', handleTranscriptionI
 overviewImportTranscriptionButton?.addEventListener('click', handleTranscriptionImportPrimary);
 transcriptionImportSecondaryButton?.addEventListener('click', () => {
   transcriptionImportState = getActiveScan() ? { status: 'ready' } : { status: 'unavailable' };
+  render();
+});
+codexEditModeInput?.addEventListener('change', () => {
   render();
 });
 codexPrimaryButton?.addEventListener('click', handleCodexPrimary);

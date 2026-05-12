@@ -1185,6 +1185,16 @@ textarea:disabled {
   color: var(--success-text);
 }
 
+.result-banner--warning {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+}
+
+.result-banner--warning strong,
+.result-banner--warning span {
+  color: var(--warning-text);
+}
+
 .result-banner--error {
   border-color: var(--error-border);
   background: var(--error-bg);
@@ -1261,10 +1271,43 @@ textarea:disabled {
 
 .codex-mode {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--border-1);
+  border-radius: 7px;
+  padding: 10px 12px;
   color: var(--text-2);
+  background: var(--surface-2);
   font-size: 13px;
+}
+
+.codex-mode:has(input:checked) {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+}
+
+.codex-mode input {
+  margin-top: 2px;
+}
+
+.codex-mode-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.codex-mode-copy strong {
+  color: var(--text-1);
+}
+
+.codex-mode-copy span {
+  color: var(--text-2);
+}
+
+.codex-output-label {
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .output-list {
