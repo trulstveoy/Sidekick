@@ -289,6 +289,47 @@ const mockPartialScan: ProjectFolderScan = {
   },
 };
 
+const mockDeepScan: ProjectFolderScan = {
+  ...mockScan,
+  tree: {
+    ...mockScan.tree,
+    children: mockScan.tree.children?.map((child) =>
+      child.relativePath === '01-bakgrunn'
+        ? {
+            ...child,
+            children: [
+              ...(child.children ?? []),
+              {
+                name: 'research',
+                relativePath: '01-bakgrunn/research',
+                kind: 'folder',
+                folderSignals: ['background'],
+                contextHints: ['background'],
+                modifiedAt: '2026-05-09T12:00:00.000Z',
+                children: [
+                  {
+                    name: 'deep-note.md',
+                    relativePath: '01-bakgrunn/research/deep-note.md',
+                    kind: 'file',
+                    artifactType: 'markdown-text',
+                    contextHints: ['background'],
+                    size: 768,
+                    modifiedAt: '2026-05-09T12:00:00.000Z',
+                  },
+                ],
+              },
+            ],
+          }
+        : child,
+    ),
+  },
+  summary: {
+    ...mockScan.summary,
+    fileCount: 4,
+    folderCount: 3,
+  },
+};
+
 const mockEmptyScan: ProjectFolderScan = {
   ...mockScan,
   rootPath: '/tmp/empty-sidekick-project',
@@ -775,6 +816,106 @@ test('expands and collapses all scanned folders', async ({ page }) => {
   await expect(page.getByRole('treeitem', { name: /01-bakgrunn/ })).toBeVisible();
   await expect(page.getByText('brief.pdf')).toHaveCount(0);
   await expect(page.getByText('intervju-01.docx')).toHaveCount(0);
+});
+
+test('selects folders and shows selected folder detail', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan, preview, result }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
+        createProjectFolder: async () => null,
+        previewContextPackage: async () => preview,
+        generateContextPackage: async () => result,
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+      };
+    },
+    {
+      scan: mockScan,
+      preview: mockContextPackagePreview,
+      result: mockContextPackageResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.locator('.tree-row[data-tree-path="01-bakgrunn"]').click();
+
+  const selectedItem = page.locator('[role="treeitem"][data-tree-path="01-bakgrunn"]');
+  await expect(selectedItem).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('[data-selection-title]')).toHaveText('01-bakgrunn');
+  await expect(page.locator('[data-selection-details]')).toContainText(
+    '/tmp/sidekick-project/01-bakgrunn',
+  );
+  await expect(page.locator('[data-selection-details]')).toContainText('2 filer');
+  await expect(page.locator('[data-selection-contents]')).toContainText('brief.pdf');
+  await expect(page.locator('[data-selection-contents]')).toContainText('notes.md');
+});
+
+test('supports keyboard navigation and breadcrumb selection in the folder tree', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan, preview, result }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
+        createProjectFolder: async () => null,
+        previewContextPackage: async () => preview,
+        generateContextPackage: async () => result,
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+      };
+    },
+    {
+      scan: mockDeepScan,
+      preview: mockContextPackagePreview,
+      result: mockContextPackageResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+
+  const rootRow = page.locator('.tree-row[data-tree-path="."]');
+  await rootRow.focus();
+  await rootRow.press('ArrowDown');
+  await page.locator('.tree-row[data-tree-path="01-bakgrunn"]').press('Enter');
+
+  await expect(page.locator('[role="treeitem"][data-tree-path="01-bakgrunn"]')).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(page.locator('[data-selection-title]')).toHaveText('01-bakgrunn');
+
+  await page.locator('.tree-row[data-tree-path="01-bakgrunn"]').press('ArrowRight');
+  await expect(page.locator('[role="treeitem"][data-tree-path="01-bakgrunn"]')).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+
+  await page.locator('.tree-row[data-tree-path="01-bakgrunn/research"]').click();
+  await expect(page.locator('[data-selection-title]')).toHaveText('research');
+  await expect(page.locator('[data-selection-breadcrumb]')).toContainText('01-bakgrunn');
+  await expect(page.locator('[data-selection-contents]')).toContainText('deep-note.md');
+
+  await page.locator('[data-selection-breadcrumb]').getByRole('button', { name: '01-bakgrunn' }).click();
+  await expect(page.locator('[data-selection-title]')).toHaveText('01-bakgrunn');
 });
 
 test('confirms and displays a generated context package', async ({ page }) => {

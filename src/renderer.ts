@@ -73,6 +73,12 @@ type CodexState =
 
 type DetailRow = [string, string];
 
+type VisibleTreeEntry = {
+  node: FolderTreeNode;
+  level: number;
+  parentPath?: string;
+};
+
 type AppView = 'workspace' | 'settings';
 
 type SettingsState =
@@ -132,6 +138,12 @@ const overviewScanStatusTarget = document.querySelector<HTMLElement>('[data-over
 const overviewContextPackageStatusTarget = document.querySelector<HTMLElement>(
   '[data-overview-context-package-status]',
 );
+const selectionPanelTarget = document.querySelector<HTMLElement>('[data-selection-panel]');
+const selectionLabelTarget = document.querySelector<HTMLElement>('[data-selection-label]');
+const selectionTitleTarget = document.querySelector<HTMLElement>('[data-selection-title]');
+const selectionBreadcrumbTarget = document.querySelector<HTMLElement>('[data-selection-breadcrumb]');
+const selectionDetailsTarget = document.querySelector<HTMLElement>('[data-selection-details]');
+const selectionContentsTarget = document.querySelector<HTMLElement>('[data-selection-contents]');
 const overviewGenerateContextButton = document.querySelector<HTMLButtonElement>(
   '[data-overview-action-generate-context]',
 );
@@ -195,6 +207,8 @@ const settingsResetCodexButton = document.querySelector<HTMLButtonElement>(
   '[data-settings-reset-codex]',
 );
 
+const ROOT_PATH = '.';
+
 const artifactLabels: Record<ArtifactType, string> = {
   'markdown-text': 'Markdown/tekst',
   document: 'Dokumenter',
@@ -222,6 +236,8 @@ const signalLabels: Record<FolderSignal, string> = {
 
 let state: ViewState = { status: 'empty' };
 let expandedPaths = new Set<string>();
+let selectedTreePath = ROOT_PATH;
+let focusedTreePath = ROOT_PATH;
 let contextPackageState: ContextPackageState = { status: 'unavailable' };
 let overviewContextPackageStatus: OverviewContextPackageStatus = { status: 'unavailable' };
 let transcriptionImportState: TranscriptionImportState = { status: 'unavailable' };
@@ -234,8 +250,6 @@ let projectNameTouched = false;
 let codexState: CodexState = { status: 'unavailable', message: 'Choose a folder first.' };
 let appView: AppView = 'workspace';
 let settingsState: SettingsState = { status: 'idle', message: '' };
-
-const ROOT_PATH = '.';
 
 const setText = (target: Element | null, value: string) => {
   if (target) {
@@ -432,6 +446,8 @@ const setCodexStateForScan = (scan?: ProjectFolderScan) => {
 
 const setActiveScan = (scan: ProjectFolderScan) => {
   resetExpandedPaths();
+  selectedTreePath = scan.tree.relativePath;
+  focusedTreePath = scan.tree.relativePath;
   setContextPackageStateForScan(scan);
   setOverviewContextPackageStatusForScan(scan);
   setTranscriptionImportStateForScan(scan);
@@ -447,6 +463,115 @@ const isFolderNode = (node: FolderTreeNode) => node.kind === 'folder';
 const getChildren = (node: FolderTreeNode) => node.children ?? [];
 
 const hasChildren = (node: FolderTreeNode) => getChildren(node).length > 0;
+
+const getNodeByPath = (node: FolderTreeNode, relativePath: string): FolderTreeNode | undefined => {
+  if (node.relativePath === relativePath) {
+    return node;
+  }
+
+  for (const child of getChildren(node)) {
+    const match = getNodeByPath(child, relativePath);
+    if (match) {
+      return match;
+    }
+  }
+
+  return undefined;
+};
+
+const flattenVisibleTree = (
+  node: FolderTreeNode,
+  level = 1,
+  parentPath?: string,
+  entries: VisibleTreeEntry[] = [],
+) => {
+  entries.push({ node, level, parentPath });
+
+  if (isFolderNode(node) && expandedPaths.has(node.relativePath)) {
+    getChildren(node).forEach((child) => {
+      flattenVisibleTree(child, level + 1, node.relativePath, entries);
+    });
+  }
+
+  return entries;
+};
+
+const getTreeEntryByPath = (
+  node: FolderTreeNode,
+  relativePath: string,
+  level = 1,
+  parentPath?: string,
+): VisibleTreeEntry | undefined => {
+  if (node.relativePath === relativePath) {
+    return { node, level, parentPath };
+  }
+
+  for (const child of getChildren(node)) {
+    const match = getTreeEntryByPath(child, relativePath, level + 1, node.relativePath);
+    if (match) {
+      return match;
+    }
+  }
+
+  return undefined;
+};
+
+const getParentPath = (scan: ProjectFolderScan, relativePath: string) =>
+  getTreeEntryByPath(scan.tree, relativePath)?.parentPath;
+
+const getPathAncestors = (scan: ProjectFolderScan, relativePath: string) => {
+  const ancestors: FolderTreeNode[] = [];
+  let currentPath: string | undefined = relativePath;
+
+  while (currentPath) {
+    const entry = getTreeEntryByPath(scan.tree, currentPath);
+    if (!entry) {
+      break;
+    }
+
+    ancestors.unshift(entry.node);
+    currentPath = entry.parentPath;
+  }
+
+  return ancestors;
+};
+
+const ensureVisibleTreeSelection = (scan: ProjectFolderScan) => {
+  const selectedNode = getNodeByPath(scan.tree, selectedTreePath);
+  const focusedNode = getNodeByPath(scan.tree, focusedTreePath);
+
+  if (!selectedNode) {
+    selectedTreePath = scan.tree.relativePath;
+  }
+
+  if (!focusedNode) {
+    focusedTreePath = selectedTreePath;
+  }
+};
+
+const focusTreeRow = (relativePath: string) => {
+  const row = treeTarget?.querySelector<HTMLElement>(
+    `.tree-row[data-tree-path="${CSS.escape(relativePath)}"]`,
+  );
+  row?.focus();
+
+  window.requestAnimationFrame(() => {
+    const nextRow = treeTarget?.querySelector<HTMLElement>(
+      `.tree-row[data-tree-path="${CSS.escape(relativePath)}"]`,
+    );
+    nextRow?.focus();
+  });
+};
+
+const selectTreePath = (relativePath: string, shouldFocus = false) => {
+  selectedTreePath = relativePath;
+  focusedTreePath = relativePath;
+  render();
+
+  if (shouldFocus) {
+    focusTreeRow(relativePath);
+  }
+};
 
 const getDirectChildSummary = (node: FolderTreeNode) => {
   const children = getChildren(node);
@@ -509,6 +634,10 @@ const collapseAllFolders = () => {
   const scan = getActiveScan();
 
   expandedPaths = scan ? new Set([ROOT_PATH]) : new Set();
+  if (scan) {
+    selectedTreePath = scan.tree.relativePath;
+    focusedTreePath = scan.tree.relativePath;
+  }
   render();
 };
 
@@ -651,6 +780,166 @@ const renderOverviewContextPackageStatus = (scan?: ProjectFolderScan) => {
   overviewContextPackageStatusTarget.textContent = statusText;
   overviewContextPackageStatusTarget.dataset.status =
     statusText === 'Finnes' ? 'success' : statusText === 'Mangler' ? 'warning' : 'neutral';
+};
+
+const getFileExtension = (fileName: string) => {
+  const extension = fileName.split('.').pop();
+  return extension && extension !== fileName ? `.${extension}` : 'fil';
+};
+
+const getDisplayPath = (scan: ProjectFolderScan, node: FolderTreeNode) =>
+  node.relativePath === ROOT_PATH ? scan.rootPath : `${scan.rootPath}/${node.relativePath}`;
+
+const getNodeWarnings = (scan: ProjectFolderScan, node: FolderTreeNode) =>
+  scan.warnings.filter((warning) => {
+    if (node.relativePath === ROOT_PATH) {
+      return true;
+    }
+
+    return warning.path === node.relativePath || warning.path.startsWith(`${node.relativePath}/`);
+  });
+
+const renderSelectionBreadcrumb = (scan: ProjectFolderScan, node: FolderTreeNode) => {
+  clear(selectionBreadcrumbTarget);
+
+  if (!selectionBreadcrumbTarget) {
+    return;
+  }
+
+  const ancestors = getPathAncestors(scan, node.relativePath);
+
+  ancestors.forEach((ancestor, index) => {
+    if (index > 0) {
+      const separator = document.createElement('span');
+      separator.className = 'breadcrumb-separator';
+      separator.textContent = '›';
+      selectionBreadcrumbTarget.append(separator);
+    }
+
+    const isCurrent = index === ancestors.length - 1;
+    if (isCurrent) {
+      const current = document.createElement('span');
+      current.className = 'breadcrumb-current';
+      current.textContent = ancestor.relativePath === ROOT_PATH ? 'Prosjektoversikt' : ancestor.name;
+      selectionBreadcrumbTarget.append(current);
+      return;
+    }
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'breadcrumb-button';
+    button.textContent = ancestor.relativePath === ROOT_PATH ? 'Prosjektoversikt' : ancestor.name;
+    button.addEventListener('click', () => {
+      selectTreePath(ancestor.relativePath, true);
+    });
+    selectionBreadcrumbTarget.append(button);
+  });
+};
+
+const createDirectContentRow = (node: FolderTreeNode) => {
+  const row = document.createElement('button');
+  row.type = 'button';
+  row.className = `direct-content-row direct-content-row--${node.kind}`;
+  row.addEventListener('click', () => {
+    if (isFolderNode(node)) {
+      expandedPaths.add(node.relativePath);
+    }
+    selectTreePath(node.relativePath, true);
+  });
+
+  const badge = document.createElement('span');
+  badge.className = 'artifact-badge';
+  badge.textContent = isFolderNode(node) ? 'mappe' : getFileExtension(node.name);
+
+  const name = document.createElement('span');
+  name.className = 'direct-content-name';
+  name.textContent = node.name;
+
+  const meta = document.createElement('span');
+  meta.className = 'direct-content-meta';
+  meta.textContent = isFolderNode(node)
+    ? getDirectChildSummary(node)
+    : [node.artifactType ? artifactLabels[node.artifactType] : 'Fil', formatBytes(node.size)]
+        .filter(Boolean)
+        .join(' · ');
+
+  row.append(badge, name, meta);
+
+  return row;
+};
+
+const renderSelectionContents = (node: FolderTreeNode) => {
+  clear(selectionContentsTarget);
+
+  if (!selectionContentsTarget) {
+    return;
+  }
+
+  const title = document.createElement('p');
+  title.className = 'selection-contents-title';
+  title.textContent = isFolderNode(node) ? 'Direkte innhold' : 'Artefakt';
+  selectionContentsTarget.append(title);
+
+  if (!isFolderNode(node)) {
+    const summary = document.createElement('p');
+    summary.className = 'selection-empty';
+    summary.textContent = 'Filen kan inspiseres som metadata i Sidekick. Åpning av filer er ikke del av denne oppgaven.';
+    selectionContentsTarget.append(summary);
+    return;
+  }
+
+  const children = getChildren(node);
+  if (children.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'selection-empty';
+    empty.textContent = 'Denne mappen er tom.';
+    selectionContentsTarget.append(empty);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'direct-content-list';
+  children.forEach((child) => list.append(createDirectContentRow(child)));
+  selectionContentsTarget.append(list);
+};
+
+const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
+  if (!scan) {
+    selectionPanelTarget?.toggleAttribute('hidden', true);
+    return;
+  }
+
+  ensureVisibleTreeSelection(scan);
+  selectionPanelTarget?.toggleAttribute('hidden', false);
+
+  const node = getNodeByPath(scan.tree, selectedTreePath) ?? scan.tree;
+  const warnings = getNodeWarnings(scan, node);
+  const childFolders = getChildren(node).filter(isFolderNode).length;
+  const childFiles = getChildren(node).length - childFolders;
+
+  setText(selectionLabelTarget, isFolderNode(node) ? 'Valgt mappe' : 'Valgt fil');
+  setText(selectionTitleTarget, node.relativePath === ROOT_PATH ? scan.rootName : node.name);
+  renderSelectionBreadcrumb(scan, node);
+
+  if (isFolderNode(node)) {
+    renderDetails(selectionDetailsTarget, [
+      ['Sti', getDisplayPath(scan, node)],
+      ['Direkte innhold', `${childFolders} mapper / ${childFiles} filer`],
+      ['Filer totalt', countFilesInNode(node).toString()],
+      ['Signal', getFolderSignalLabel(node)],
+      ['Varsler', warnings.length > 0 ? warnings.length.toString() : 'Ingen'],
+    ]);
+  } else {
+    renderDetails(selectionDetailsTarget, [
+      ['Sti', getDisplayPath(scan, node)],
+      ['Type', node.artifactType ? artifactLabels[node.artifactType] : 'Fil'],
+      ['Størrelse', formatBytes(node.size) || 'Ukjent'],
+      ['Sist endret', formatDate(node.modifiedAt) || 'Ukjent'],
+      ['Varsler', warnings.length > 0 ? warnings.length.toString() : 'Ingen'],
+    ]);
+  }
+
+  renderSelectionContents(node);
 };
 
 const normalizeDisplayPath = (pathValue: string) => pathValue.replace(/[\\/]+$/, '');
@@ -1248,6 +1537,7 @@ const appendFolderToggle = (item: HTMLLIElement, row: HTMLDivElement, node: Fold
   const toggle = document.createElement('button');
   toggle.type = 'button';
   toggle.className = 'tree-toggle';
+  toggle.tabIndex = -1;
   toggle.textContent = canExpand ? (isExpanded ? 'v' : '>') : '';
   toggle.disabled = !canExpand;
   toggle.setAttribute(
@@ -1260,21 +1550,136 @@ const appendFolderToggle = (item: HTMLLIElement, row: HTMLDivElement, node: Fold
   if (canExpand) {
     item.setAttribute('aria-expanded', isExpanded.toString());
     row.classList.add('tree-row--interactive');
-    row.addEventListener('click', () => {
-      toggleFolder(node.relativePath);
-    });
     toggle.addEventListener('click', (event) => {
       event.stopPropagation();
+      focusedTreePath = node.relativePath;
       toggleFolder(node.relativePath);
+      focusTreeRow(node.relativePath);
     });
   }
 
   row.append(toggle);
 };
 
+const moveTreeFocus = (relativePath: string, shouldRender = false) => {
+  focusedTreePath = relativePath;
+  if (shouldRender) {
+    render();
+  }
+  focusTreeRow(relativePath);
+};
+
+const handleTreeItemKeyDown = (event: KeyboardEvent, node: FolderTreeNode) => {
+  const scan = getActiveScan();
+
+  if (!scan) {
+    return;
+  }
+
+  const visibleEntries = flattenVisibleTree(scan.tree);
+  const currentIndex = visibleEntries.findIndex((entry) => entry.node.relativePath === node.relativePath);
+  const currentEntry = visibleEntries[currentIndex];
+
+  switch (event.key) {
+    case 'ArrowDown': {
+      event.preventDefault();
+      const next = visibleEntries[Math.min(currentIndex + 1, visibleEntries.length - 1)];
+      if (next) {
+        moveTreeFocus(next.node.relativePath);
+      }
+      break;
+    }
+    case 'ArrowUp': {
+      event.preventDefault();
+      const previous = visibleEntries[Math.max(currentIndex - 1, 0)];
+      if (previous) {
+        moveTreeFocus(previous.node.relativePath);
+      }
+      break;
+    }
+    case 'ArrowRight': {
+      if (!isFolderNode(node) || !hasChildren(node)) {
+        return;
+      }
+
+      event.preventDefault();
+      if (!expandedPaths.has(node.relativePath)) {
+        expandedPaths.add(node.relativePath);
+        moveTreeFocus(node.relativePath, true);
+        return;
+      }
+
+      const firstChild = getChildren(node)[0];
+      if (firstChild) {
+        moveTreeFocus(firstChild.relativePath);
+      }
+      break;
+    }
+    case 'ArrowLeft': {
+      event.preventDefault();
+      if (isFolderNode(node) && expandedPaths.has(node.relativePath) && node.relativePath !== ROOT_PATH) {
+        expandedPaths.delete(node.relativePath);
+        moveTreeFocus(node.relativePath, true);
+        return;
+      }
+
+      const parentPath = currentEntry?.parentPath ?? getParentPath(scan, node.relativePath);
+      if (parentPath) {
+        moveTreeFocus(parentPath);
+      }
+      break;
+    }
+    case 'Enter':
+    case ' ': {
+      event.preventDefault();
+      selectTreePath(node.relativePath, true);
+      break;
+    }
+  }
+};
+
+const handleGlobalTreeKeyDown = (event: KeyboardEvent) => {
+  if (event.defaultPrevented || !treeTarget) {
+    return;
+  }
+
+  const activeElement = document.activeElement;
+  if (!(activeElement instanceof HTMLElement) || !treeTarget.contains(activeElement)) {
+    return;
+  }
+
+  const treeItem = activeElement.closest<HTMLElement>('[role="treeitem"][data-tree-path]');
+  const scan = getActiveScan();
+  const relativePath = treeItem?.dataset.treePath;
+
+  if (!scan || !relativePath) {
+    return;
+  }
+
+  const node = getNodeByPath(scan.tree, relativePath);
+  if (node) {
+    handleTreeItemKeyDown(event, node);
+  }
+};
+
 const createTreeRow = (item: HTMLLIElement, node: FolderTreeNode) => {
   const row = document.createElement('div');
   row.className = 'tree-row';
+  row.dataset.treePath = node.relativePath;
+  row.dataset.treeKind = node.kind;
+
+  item.tabIndex = -1;
+  item.dataset.treePath = node.relativePath;
+  item.setAttribute('aria-selected', (node.relativePath === selectedTreePath).toString());
+  item.classList.toggle('tree-node--selected', node.relativePath === selectedTreePath);
+  item.classList.toggle('tree-node--focused', node.relativePath === focusedTreePath);
+  row.tabIndex = node.relativePath === focusedTreePath ? 0 : -1;
+  row.addEventListener('focus', () => {
+    focusedTreePath = node.relativePath;
+  });
+  row.addEventListener('keydown', (event) => {
+    handleTreeItemKeyDown(event, node);
+  });
 
   if (isFolderNode(node)) {
     appendFolderToggle(item, row, node);
@@ -1285,6 +1690,13 @@ const createTreeRow = (item: HTMLLIElement, node: FolderTreeNode) => {
   appendTreeNodeName(row, node);
   appendTreeNodeMeta(row, node);
   appendTreeNodeHints(row, node);
+
+  row.addEventListener('click', () => {
+    if (isFolderNode(node)) {
+      focusedTreePath = node.relativePath;
+    }
+    selectTreePath(node.relativePath, true);
+  });
 
   return row;
 };
@@ -1316,6 +1728,7 @@ const renderTree = (scan?: ProjectFolderScan) => {
     return;
   }
 
+  ensureVisibleTreeSelection(scan);
   treeTarget.append(renderTreeNode(scan.tree));
 };
 
@@ -1458,6 +1871,7 @@ const renderReadyState = (scan: ProjectFolderScan, status: 'ready' | 'partial') 
   renderOverviewWarnings(scan);
   renderOverviewScanStatus(scan);
   renderOverviewContextPackageStatus(scan);
+  renderSelectedTreeContext(scan);
   renderContextPackage(scan);
   renderTranscriptionImport(scan);
   renderCodex(scan);
@@ -2299,6 +2713,7 @@ document.addEventListener('keydown', (event) => {
     closeProjectCreateDialog();
   }
 });
+document.addEventListener('keydown', handleGlobalTreeKeyDown);
 
 openSettingsButton?.addEventListener('click', openSettings);
 openWorkspaceButton?.addEventListener('click', openWorkspace);
