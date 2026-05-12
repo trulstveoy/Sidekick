@@ -1,7 +1,7 @@
 # Task: Initialize Existing Folder As Project
 
 ID: TASK-0027
-Status: Ready For Review
+Status: Done
 Class: Major
 Owner: Pair
 Created: 2026-05-12
@@ -38,9 +38,9 @@ Initialization means Sidekick keeps the selected folder as the project root, cre
 
 ## Current Phase
 
-Ready For Review
+Close
 
-Build and verification are complete. The task is ready for human review.
+Build, verification, human review, and closeout are complete.
 
 ## Progress Checklist
 
@@ -53,7 +53,7 @@ Build and verification are complete. The task is ready for human review.
 - [x] Verification complete
 - [x] Review complete
 - [x] Documentation complete
-- [ ] Closeout complete
+- [x] Closeout complete
 
 ## Backlog Source
 
@@ -420,4 +420,31 @@ Suggested commit:
 
 ## Closeout
 
-Not started.
+Changed:
+- Added a controlled "initialize existing folder" workflow.
+- Added main-process preview and confirm logic for existing project folders.
+- Added typed preload/API methods for initialization.
+- Added project-entry UI for previewing required folders, warnings, confirmation, cancel, success, and error states.
+- Added tests for initialization domain behavior and UI smoke coverage.
+
+Verified:
+- `npm run check` passed.
+- `npm run test` passed: 62 tests.
+- `npm run test:ui` passed: 19 tests.
+- `npm run package` passed for Linux x64.
+
+Known gaps:
+- Similar-folder warning rules are intentionally simple for now and tracked separately in `BL-0006`.
+
+Next:
+- Merge TASK-0027 into `main` when integration is approved.
+- Remove the task worktree only after integration is complete.
+
+Final branch:
+- `task/TASK-0027-initialize-existing-folder-as-project`
+
+Final worktree:
+- `../Sidekick-worktrees/TASK-0027-initialize-existing-folder-as-project`
+
+Final status:
+- Done
