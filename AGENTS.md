@@ -30,6 +30,12 @@ Use this short loop as the quick reminder. The full process is defined in `docs/
 - For every task deliverable, make the concrete output clear: what files or artifacts should exist, what should be verified, and what happens next.
 - When one step produces input for a later step, state that dependency explicitly.
 
+## Code Comments
+
+- Use comments to explain intent, security boundaries, invariants, non-obvious tradeoffs, and fragile edge cases.
+- Do not add comments that merely repeat what the code says.
+- Keep comments current when behavior changes, and remove misleading comments instead of preserving them.
+
 ## Electron Rules
 
 - Keep privileged code in the main process or preload.

@@ -1020,6 +1020,28 @@ The agent should not:
 
 If implementation reveals that the plan is impossible or would require changes affecting security, architecture, or the data model, the agent must stop and consult the human before continuing. Minor deviations, such as a different filename or an ordering change within the same scope, may be handled directly but must be recorded in the Build Log.
 
+### Code Commenting Guidelines
+
+Comments are part of code quality, but they should be used deliberately. The agent should add or update comments when they help a future reviewer understand intent, safety, or non-obvious behavior faster than reading the code alone.
+
+Use comments for:
+
+- security boundaries, such as Electron main/preload separation, IPC validation, filesystem writes, shell/process execution, and external navigation;
+- important invariants, such as "context packages must not include themselves" or "transcript imports must never overwrite an existing file";
+- non-obvious algorithms, heuristics, ordering rules, fallback behavior, or race-condition handling;
+- deliberate tradeoffs where a simpler-looking implementation would be wrong;
+- exported APIs, public contracts, or typed bridges where callers need to know behavior, constraints, or failure modes.
+
+Avoid comments that:
+
+- restate simple code flow or syntax;
+- describe what a variable assignment, loop, or function call already makes obvious;
+- preserve outdated history that belongs in git, a task record, or a decision record;
+- hide confusing code instead of making the code clearer;
+- promise behavior that is not covered by tests or actual implementation.
+
+When editing existing code, the agent should treat nearby comments as part of the change surface. If the behavior changes, update affected comments in the same patch. If a comment is misleading or no longer useful, remove it. Prefer concise comments close to the code they explain, and use structured documentation comments only where an exported function, type, or bridge API has a real contract future callers need to understand.
+
 ### Artifact: Build Log
 
 Add or update this section in the Task Record for standard and major tasks.
@@ -1054,6 +1076,8 @@ Files changed:
 - [ ] No unrelated refactors added.
 - [ ] New logic has appropriate tests or verification.
 - [ ] Risky assumptions are recorded.
+- [ ] Comments explain intent, safety, or non-obvious behavior where needed.
+- [ ] No stale or noise comments added.
 - [ ] Deviations from plan are recorded.
 - [ ] Task status moved to `Building` or next appropriate state.
 
@@ -1197,6 +1221,7 @@ The agent should:
 - check local style and patterns;
 - check error handling and edge cases;
 - apply the security checklist when relevant;
+- check that comments are useful, current, and not merely restating the code;
 - check whether docs are needed;
 - identify residual risk.
 
@@ -1247,6 +1272,7 @@ Follow-up items:
 - [ ] No obvious scope creep.
 - [ ] Errors and edge cases considered.
 - [ ] Security checklist considered where relevant.
+- [ ] Code comments are useful and current where comments exist or are needed.
 - [ ] Maintainability concerns considered.
 - [ ] Documentation impact checked.
 - [ ] Decision record updated if the review uncovered a durable decision.
