@@ -24,7 +24,7 @@ describe('project creator', () => {
   it('creates a project root with the required folders', async () => {
     const result = await createProjectFolder({
       parentPath,
-      request: { projectName: 'My Project' },
+      request: { projectName: 'My Project', parentPath },
     });
 
     expect(result.rootName).toBe('My Project');
@@ -37,13 +37,13 @@ describe('project creator', () => {
   it('rejects an existing target project folder', async () => {
     await createProjectFolder({
       parentPath,
-      request: { projectName: 'Existing Project' },
+      request: { projectName: 'Existing Project', parentPath },
     });
 
     await expect(
       createProjectFolder({
         parentPath,
-        request: { projectName: 'Existing Project' },
+        request: { projectName: 'Existing Project', parentPath },
       }),
     ).rejects.toThrow('Project folder already exists.');
   });
@@ -52,7 +52,7 @@ describe('project creator', () => {
     const rootPath = path.join(parentPath, 'Recovered Project');
     await createProjectFolder({
       parentPath,
-      request: { projectName: 'Recovered Project' },
+      request: { projectName: 'Recovered Project', parentPath },
     });
 
     const result = await ensureRequiredProjectFolders(rootPath);

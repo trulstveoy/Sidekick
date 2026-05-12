@@ -65,6 +65,31 @@
             </div>
           </dl>
 
+          <section class="project-entry" data-project-entry>
+            <div class="project-entry-card">
+              <div class="project-entry-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+                </svg>
+              </div>
+              <h3>Velg en prosjektmappe</h3>
+              <p>
+                Sidekick hjelper deg forstå og jobbe med innholdet i en lokal prosjektmappe.
+                Velg en eksisterende mappe, eller opprett en ny.
+              </p>
+              <div class="entry-error" data-project-entry-error hidden></div>
+              <div class="project-entry-actions">
+                <button class="btn btn-primary btn-lg" type="button" data-choose-folder>
+                  Velg eksisterende mappe...
+                </button>
+                <div class="entry-divider"><span>eller</span></div>
+                <button class="btn btn-secondary btn-lg" type="button" data-open-create-project>
+                  Opprett ny prosjektmappe...
+                </button>
+              </div>
+            </div>
+          </section>
+
           <section class="state-banner state-banner--info" data-state-banner>
             <h3 data-state-title>Choose a project folder</h3>
             <p data-state-message>Read-only scan of structure, metadata, and artifact types.</p>
@@ -76,14 +101,6 @@
         </section>
 
         <aside class="context-surface" data-context-surface aria-label="Kontekst og handlinger">
-          <section class="surface-section project-create" aria-label="Create project">
-            <p class="section-label">Nytt prosjekt</p>
-            <label for="project-name">Project name</label>
-            <input id="project-name" type="text" data-project-name autocomplete="off" />
-            <button class="btn btn-secondary" type="button" data-create-project>Create project</button>
-            <p class="project-create-message" data-create-project-message></p>
-          </section>
-
           <section class="surface-section">
             <p class="section-label">Transcriptions</p>
             <div class="transcription-import-panel">
@@ -229,6 +246,65 @@
               </div>
             </div>
           </section>
+        </div>
+      </section>
+
+      <section
+        class="modal-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="project-create-title"
+        data-project-create-dialog
+        hidden
+      >
+        <div class="modal-panel">
+          <header class="modal-header">
+            <div>
+              <p class="section-label">Skriveoperasjon</p>
+              <h2 id="project-create-title">Opprett ny prosjektmappe</h2>
+            </div>
+            <button class="btn btn-ghost btn-sm" type="button" data-project-create-cancel aria-label="Lukk">
+              Lukk
+            </button>
+          </header>
+
+          <div class="modal-body">
+            <p class="modal-copy">
+              En ny mappe opprettes med standard undermapper for Sidekick-prosjekter.
+            </p>
+
+            <div class="form-field">
+              <label for="project-name">Prosjektnavn</label>
+              <input id="project-name" type="text" data-project-name autocomplete="off" />
+              <p class="field-message" data-project-name-message></p>
+            </div>
+
+            <div class="form-field">
+              <label>Overordnet plassering</label>
+              <div class="path-picker">
+                <p data-project-parent-path>Ingen plassering valgt.</p>
+                <button class="btn btn-secondary" type="button" data-choose-project-parent>
+                  Velg...
+                </button>
+              </div>
+            </div>
+
+            <div class="target-preview" data-project-target-preview>
+              Velg prosjektnavn og plassering for å se hva som opprettes.
+            </div>
+
+            <p class="write-hint">
+              En tom prosjektmappe og undermappene `00. Forutsetninger` og `01. Transkripsjoner`
+              opprettes på valgt sted.
+            </p>
+
+            <p class="project-create-message" data-create-project-message></p>
+          </div>
+
+          <footer class="modal-footer">
+            <button class="btn btn-secondary" type="button" data-project-create-cancel>Avbryt</button>
+            <button class="btn btn-primary" type="button" data-create-project disabled>Opprett mappe</button>
+          </footer>
         </div>
       </section>
 

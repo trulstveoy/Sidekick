@@ -97,6 +97,7 @@ export type ScanOptions = {
 
 export type ProjectCreationRequest = {
   projectName: string;
+  parentPath: string;
 };
 
 export type RequiredProjectFolderName = '00. Forutsetninger' | '01. Transkripsjoner';
@@ -255,6 +256,7 @@ export type CodexEventUnsubscribe = () => void;
 export type SidekickApi = {
   getAppInfo: () => Promise<AppInfo>;
   chooseProjectFolder: () => Promise<ProjectFolderScan | null>;
+  chooseProjectParentFolder: () => Promise<string | null>;
   createProjectFolder: (
     request: ProjectCreationRequest,
   ) => Promise<ProjectCreationResult | null>;
