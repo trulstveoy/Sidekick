@@ -1279,7 +1279,28 @@ textarea:disabled {
 .context-package-list li,
 .transcription-import-list li,
 .warning-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
   color: var(--warning-text);
+}
+
+.context-package-list li::before,
+.transcription-import-list li::before,
+.warning-list li::before {
+  content: '!';
+  display: inline-grid;
+  width: 15px;
+  height: 15px;
+  place-items: center;
+  border: 1px solid var(--warning-border);
+  border-radius: 999px;
+  color: var(--warning-text);
+  background: var(--warning-bg);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .inline-actions {

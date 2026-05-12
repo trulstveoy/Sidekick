@@ -1228,6 +1228,7 @@ const createWriteOperationBadge = () => {
 const createWriteWarning = (message: string) => {
   const warning = document.createElement('div');
   warning.className = 'write-warning';
+  warning.setAttribute('role', 'note');
   warning.textContent = message;
 
   return warning;
@@ -1240,6 +1241,8 @@ const createResultBanner = (
 ) => {
   const banner = document.createElement('div');
   banner.className = `result-banner result-banner--${variant}`;
+  banner.setAttribute('role', variant === 'error' ? 'alert' : 'status');
+  banner.setAttribute('aria-live', variant === 'error' ? 'assertive' : 'polite');
   const heading = document.createElement('strong');
   const body = document.createElement('span');
   heading.textContent = title;
@@ -1928,8 +1931,8 @@ const appendFolderToggle = (item: HTMLLIElement, row: HTMLDivElement, node: Fold
   toggle.setAttribute(
     'aria-label',
     canExpand
-      ? `${isExpanded ? 'Collapse' : 'Expand'} ${node.name}`
-      : `${node.name} has no child items`,
+      ? `${isExpanded ? 'Lukk' : 'Utvid'} ${node.name}`
+      : `${node.name} har ingen underpunkter`,
   );
 
   if (canExpand) {
