@@ -42,6 +42,7 @@ const appIconPath = () =>
     : path.join(app.getAppPath(), 'assets', 'icons', 'generated', 'sidekick-icon.png');
 
 const selectedProjectRoots = new Set<string>();
+const selectedProjectParentFolders = new Set<string>();
 const pendingTranscriptionImports = new Map<string, TranscriptionImportPreview>();
 let settingsStore: AppSettingsStore | undefined;
 const codexRunner = new CodexRunner();
@@ -98,11 +99,7 @@ ipcMain.handle('project-folder:choose-and-scan', async (event) => {
   return scanProjectFolder(result.filePaths[0]);
 });
 
-ipcMain.handle('project-folder:create', async (event, request: ProjectCreationRequest) => {
-  if (!request || typeof request.projectName !== 'string') {
-    throw new Error('Project name is required.');
-  }
-
+ipcMain.handle('project-folder:choose-parent', async (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   const dialogOptions: Electron.OpenDialogOptions = {
     title: 'Choose where to create the project',
@@ -116,8 +113,21 @@ ipcMain.handle('project-folder:create', async (event, request: ProjectCreationRe
     return null;
   }
 
+  selectedProjectParentFolders.add(result.filePaths[0]);
+  return result.filePaths[0];
+});
+
+ipcMain.handle('project-folder:create', async (event, request: ProjectCreationRequest) => {
+  if (!request || typeof request.projectName !== 'string') {
+    throw new Error('Project name is required.');
+  }
+
+  if (typeof request.parentPath !== 'string' || !selectedProjectParentFolders.has(request.parentPath)) {
+    throw new Error('Choose where the project should be created.');
+  }
+
   const createdProject = await createProjectFolder({
-    parentPath: result.filePaths[0],
+    parentPath: request.parentPath,
     request,
   });
   selectedProjectRoots.add(createdProject.rootPath);

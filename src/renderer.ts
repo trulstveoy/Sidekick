@@ -45,10 +45,12 @@ type TranscriptionImportState =
   | { status: 'error'; message: string };
 
 type ProjectCreationState =
-  | { status: 'idle'; message: string }
-  | { status: 'creating'; message: string }
-  | { status: 'complete'; message: string }
-  | { status: 'error'; message: string };
+  | { status: 'closed'; message: string; parentPath: string | null }
+  | { status: 'editing'; message: string; parentPath: string | null }
+  | { status: 'selecting-parent'; message: string; parentPath: string | null }
+  | { status: 'creating'; message: string; parentPath: string | null }
+  | { status: 'complete'; message: string; parentPath: string | null }
+  | { status: 'error'; message: string; parentPath: string | null };
 
 type CodexState =
   | { status: 'unavailable'; message: string }
@@ -79,13 +81,32 @@ type ActionTargets = {
 };
 
 const appInfoTarget = document.querySelector<HTMLSpanElement>('[data-app-info]');
+const appMainTarget = document.querySelector<HTMLElement>('[data-app-main]');
 const workspaceViewTarget = document.querySelector<HTMLElement>('[data-workspace-view]');
 const settingsViewTarget = document.querySelector<HTMLElement>('[data-settings-view]');
 const openWorkspaceButton = document.querySelector<HTMLButtonElement>('[data-open-workspace]');
 const openSettingsButton = document.querySelector<HTMLButtonElement>('[data-open-settings]');
 const closeSettingsButton = document.querySelector<HTMLButtonElement>('[data-close-settings]');
-const chooseFolderButton = document.querySelector<HTMLButtonElement>('[data-choose-folder]');
+const actionBarTarget = document.querySelector<HTMLElement>('[data-action-bar]');
+const contextSurfaceTarget = document.querySelector<HTMLElement>('[data-context-surface]');
+const summaryStripTarget = document.querySelector<HTMLElement>('[data-summary]');
+const projectEntryTarget = document.querySelector<HTMLElement>('[data-project-entry]');
+const projectEntryErrorTarget = document.querySelector<HTMLElement>('[data-project-entry-error]');
+const chooseFolderButtons = document.querySelectorAll<HTMLButtonElement>('[data-choose-folder]');
+const openCreateProjectButton = document.querySelector<HTMLButtonElement>('[data-open-create-project]');
+const projectCreateDialogTarget = document.querySelector<HTMLElement>('[data-project-create-dialog]');
+const projectCreateCancelButtons = document.querySelectorAll<HTMLButtonElement>(
+  '[data-project-create-cancel]',
+);
 const projectNameInput = document.querySelector<HTMLInputElement>('[data-project-name]');
+const projectNameMessageTarget = document.querySelector<HTMLElement>('[data-project-name-message]');
+const projectParentPathTarget = document.querySelector<HTMLElement>('[data-project-parent-path]');
+const chooseProjectParentButton = document.querySelector<HTMLButtonElement>(
+  '[data-choose-project-parent]',
+);
+const projectTargetPreviewTarget = document.querySelector<HTMLElement>(
+  '[data-project-target-preview]',
+);
 const createProjectButton = document.querySelector<HTMLButtonElement>('[data-create-project]');
 const createProjectMessageTarget = document.querySelector<HTMLElement>(
   '[data-create-project-message]',
@@ -94,6 +115,7 @@ const selectedNameTarget = document.querySelector<HTMLElement>('[data-selected-n
 const selectedPathTarget = document.querySelector<HTMLElement>('[data-selected-path]');
 const statusMessageTarget = document.querySelector<HTMLElement>('[data-status-message]');
 const folderSignalsTarget = document.querySelector<HTMLUListElement>('[data-folder-signals]');
+const stateBannerTarget = document.querySelector<HTMLElement>('[data-state-banner]');
 const stateTitleTarget = document.querySelector<HTMLElement>('[data-state-title]');
 const stateMessageTarget = document.querySelector<HTMLElement>('[data-state-message]');
 const treeToolbarTarget = document.querySelector<HTMLElement>('[data-tree-toolbar]');
@@ -179,7 +201,12 @@ let state: ViewState = { status: 'empty' };
 let expandedPaths = new Set<string>();
 let contextPackageState: ContextPackageState = { status: 'unavailable' };
 let transcriptionImportState: TranscriptionImportState = { status: 'unavailable' };
-let projectCreationState: ProjectCreationState = { status: 'idle', message: '' };
+let projectCreationState: ProjectCreationState = {
+  status: 'closed',
+  message: '',
+  parentPath: null,
+};
+let projectNameTouched = false;
 let codexState: CodexState = { status: 'unavailable', message: 'Choose a folder first.' };
 let appView: AppView = 'workspace';
 let settingsState: SettingsState = { status: 'idle', message: '' };
@@ -449,14 +476,52 @@ const renderWarnings = (warnings: ScanWarning[] = []) => {
   );
 };
 
-const renderProjectCreation = () => {
-  const isCreating = projectCreationState.status === 'creating';
+const normalizeDisplayPath = (pathValue: string) => pathValue.replace(/[\\/]+$/, '');
 
+const getProjectNameValidationMessage = (projectName: string) => {
+  const trimmedName = projectName.trim();
+
+  if (!trimmedName) {
+    return 'Prosjektnavn er påkrevd.';
+  }
+
+  if (
+    trimmedName === '.' ||
+    trimmedName === '..' ||
+    trimmedName.includes('/') ||
+    trimmedName.includes('\\') ||
+    trimmedName.includes('\0') ||
+    /^[a-zA-Z]:/.test(trimmedName)
+  ) {
+    return 'Prosjektnavnet må være et mappenavn, ikke en sti.';
+  }
+
+  return '';
+};
+
+const getProjectTargetPath = (parentPath: string, projectName: string) =>
+  `${normalizeDisplayPath(parentPath)}/${projectName.trim()}`;
+
+const renderProjectCreation = () => {
+  const projectName = projectNameInput?.value ?? '';
+  const validationMessage = getProjectNameValidationMessage(projectName);
+  const isDialogOpen = projectCreationState.status !== 'closed';
+  const isSelectingParent = projectCreationState.status === 'selecting-parent';
+  const isCreating = projectCreationState.status === 'creating';
+  const hasValidRequest = !validationMessage && Boolean(projectCreationState.parentPath);
+  const shouldShowValidationMessage =
+    isDialogOpen && Boolean(validationMessage) && projectNameTouched;
+
+  projectCreateDialogTarget?.toggleAttribute('hidden', !isDialogOpen);
   projectNameInput?.toggleAttribute('disabled', isCreating || !window.sidekick);
-  createProjectButton?.toggleAttribute('disabled', isCreating || !window.sidekick);
+  chooseProjectParentButton?.toggleAttribute('disabled', isCreating || isSelectingParent || !window.sidekick);
+  createProjectButton?.toggleAttribute('disabled', isCreating || !hasValidRequest || !window.sidekick);
+  projectCreateCancelButtons.forEach((button) => {
+    button.toggleAttribute('disabled', isCreating);
+  });
 
   if (createProjectMessageTarget) {
-    if (projectCreationState.status === 'idle') {
+    if (projectCreationState.status === 'closed' || projectCreationState.status === 'editing') {
       createProjectMessageTarget.removeAttribute('data-status');
     } else {
       createProjectMessageTarget.dataset.status = projectCreationState.status;
@@ -464,9 +529,34 @@ const renderProjectCreation = () => {
   }
 
   setText(createProjectMessageTarget, projectCreationState.message);
+  setText(projectNameMessageTarget, shouldShowValidationMessage ? validationMessage : '');
+  setText(projectParentPathTarget, projectCreationState.parentPath ?? 'Ingen plassering valgt.');
+
+  if (projectTargetPreviewTarget) {
+    const targetText =
+      projectCreationState.parentPath && !validationMessage
+        ? getProjectTargetPath(projectCreationState.parentPath, projectName)
+        : 'Velg prosjektnavn og plassering for å se hva som opprettes.';
+
+    if (projectCreationState.parentPath && !validationMessage) {
+      const target = document.createElement('strong');
+      const assumptions = document.createElement('span');
+      const transcriptions = document.createElement('span');
+      target.textContent = targetText;
+      assumptions.textContent = '00. Forutsetninger';
+      transcriptions.textContent = '01. Transkripsjoner';
+      projectTargetPreviewTarget.replaceChildren(target, assumptions, transcriptions);
+    } else {
+      projectTargetPreviewTarget.textContent = targetText;
+    }
+  }
 
   if (createProjectButton) {
-    createProjectButton.textContent = isCreating ? 'Creating...' : 'Create project';
+    createProjectButton.textContent = isCreating ? 'Oppretter...' : 'Opprett mappe';
+  }
+
+  if (chooseProjectParentButton) {
+    chooseProjectParentButton.textContent = isSelectingParent ? 'Velger...' : 'Velg...';
   }
 };
 
@@ -1055,8 +1145,10 @@ const renderEmptyState = () => {
     window.sidekick ? 'Velg en mappe for å inspisere innholdet.' : 'Åpne i Electron for å inspisere lokale mapper.',
   );
   setText(statusMessageTarget, 'Ingen prosjektmappe valgt');
-  setText(stateTitleTarget, 'Choose a project folder');
-  setText(stateMessageTarget, 'Read-only scan of structure, metadata, and artifact types.');
+  setText(projectEntryErrorTarget, '');
+  projectEntryErrorTarget?.toggleAttribute('hidden', true);
+  setText(stateTitleTarget, 'Velg en prosjektmappe');
+  setText(stateMessageTarget, 'Sidekick skanner lokale mapper lesebeskyttet.');
   renderSummary();
   renderArtifactCounts();
   renderFolderSignals();
@@ -1066,15 +1158,17 @@ const renderEmptyState = () => {
 };
 
 const renderLoadingState = () => {
-  setText(statusMessageTarget, 'Skanner prosjektmappe...');
-  setText(stateTitleTarget, 'Scanning folder');
-  setText(stateMessageTarget, 'Reading structure and metadata.');
+  setText(statusMessageTarget, 'Leser mappeinnhold...');
+  setText(stateTitleTarget, 'Leser mappeinnhold');
+  setText(stateMessageTarget, 'Ingen filer endres. Kun lesing.');
   renderNoScanPanels();
 };
 
 const renderErrorState = (message: string) => {
-  setText(statusMessageTarget, 'Skanning feilet');
-  setText(stateTitleTarget, 'Unable to inspect folder');
+  setText(statusMessageTarget, 'Feil ved åpning av mappe');
+  setText(projectEntryErrorTarget, message);
+  projectEntryErrorTarget?.toggleAttribute('hidden', false);
+  setText(stateTitleTarget, 'Kan ikke åpne mappen');
   setText(stateMessageTarget, message);
   renderContextPackage();
   renderTranscriptionImport();
@@ -1166,8 +1260,18 @@ const renderSettings = () => {
 
 const render = () => {
   const isBusy = state.status === 'loading' || projectCreationState.status === 'creating';
+  const hasActiveProject = state.status === 'ready' || state.status === 'partial';
+  const isEntryState = state.status === 'empty' || state.status === 'error';
 
-  chooseFolderButton?.toggleAttribute('disabled', isBusy || !window.sidekick);
+  chooseFolderButtons.forEach((button) => {
+    button.toggleAttribute('disabled', isBusy || !window.sidekick);
+  });
+  appMainTarget?.classList.toggle('app-main--single', !hasActiveProject);
+  contextSurfaceTarget?.toggleAttribute('hidden', !hasActiveProject);
+  actionBarTarget?.toggleAttribute('hidden', !hasActiveProject);
+  summaryStripTarget?.toggleAttribute('hidden', !hasActiveProject);
+  projectEntryTarget?.toggleAttribute('hidden', !isEntryState);
+  stateBannerTarget?.toggleAttribute('hidden', isEntryState);
   renderProjectCreation();
   renderSettings();
 
@@ -1734,29 +1838,114 @@ const chooseFolder = async () => {
   }
 };
 
+const openProjectCreateDialog = () => {
+  projectNameTouched = false;
+  projectCreationState = {
+    status: 'editing',
+    message: '',
+    parentPath: projectCreationState.parentPath,
+  };
+  render();
+  projectNameInput?.focus();
+};
+
+const closeProjectCreateDialog = () => {
+  if (projectCreationState.status === 'creating') {
+    return;
+  }
+
+  projectCreationState = {
+    status: 'closed',
+    message: '',
+    parentPath: projectCreationState.parentPath,
+  };
+  render();
+  openCreateProjectButton?.focus();
+};
+
+const getProjectDialogFocusableElements = () =>
+  Array.from(
+    projectCreateDialogTarget?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+    ) ?? [],
+  ).filter((element) => element.offsetParent !== null);
+
+const chooseProjectParentFolder = async () => {
+  if (!window.sidekick) {
+    projectCreationState = {
+      ...projectCreationState,
+      status: 'error',
+      message: 'Prosjektopprettelse er tilgjengelig i Electron-appen.',
+    };
+    render();
+    return;
+  }
+
+  projectCreationState = {
+    ...projectCreationState,
+    status: 'selecting-parent',
+    message: 'Velg hvor prosjektmappen skal opprettes.',
+  };
+  render();
+
+  try {
+    const parentPath = await window.sidekick.chooseProjectParentFolder();
+
+    projectCreationState = {
+      status: 'editing',
+      message: parentPath ? '' : 'Ingen plassering valgt.',
+      parentPath: parentPath ?? projectCreationState.parentPath,
+    };
+  } catch (error) {
+    projectCreationState = {
+      ...projectCreationState,
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Kunne ikke velge plassering.',
+    };
+  }
+
+  render();
+};
+
 const createProject = async () => {
   if (!window.sidekick) {
     projectCreationState = {
+      ...projectCreationState,
       status: 'error',
-      message: 'Project creation is available in the Electron app.',
+      message: 'Prosjektopprettelse er tilgjengelig i Electron-appen.',
     };
     render();
     return;
   }
 
   const projectName = projectNameInput?.value ?? '';
+  const validationMessage = getProjectNameValidationMessage(projectName);
+
+  if (validationMessage || !projectCreationState.parentPath) {
+    projectNameTouched = true;
+    projectCreationState = {
+      ...projectCreationState,
+      status: 'error',
+      message: validationMessage || 'Velg hvor prosjektmappen skal opprettes.',
+    };
+    render();
+    return;
+  }
+
   const previousState = state;
-  projectCreationState = { status: 'creating', message: 'Choose where to create the project.' };
+  const parentPath = projectCreationState.parentPath;
+  projectCreationState = { status: 'creating', message: 'Oppretter prosjektmappe.', parentPath };
   state = { status: 'loading' };
   render();
 
   try {
     const result: ProjectCreationResult | null = await window.sidekick.createProjectFolder({
       projectName,
+      parentPath,
     });
 
     if (!result) {
-      projectCreationState = { status: 'idle', message: '' };
+      projectCreationState = { status: 'editing', message: '', parentPath };
       state = previousState;
       render();
       return;
@@ -1769,14 +1958,16 @@ const createProject = async () => {
     setActiveScan(result.scan);
     void refreshCodexStatus(result.scan);
     projectCreationState = {
-      status: 'complete',
-      message: `Created ${result.rootName}.`,
+      status: 'closed',
+      message: `Opprettet ${result.rootName}.`,
+      parentPath,
     };
     render();
   } catch (error) {
     projectCreationState = {
+      ...projectCreationState,
       status: 'error',
-      message: error instanceof Error ? error.message : 'Unable to create project.',
+      message: error instanceof Error ? error.message : 'Kunne ikke opprette prosjektmappe.',
     };
     state = previousState;
     render();
@@ -1791,8 +1982,54 @@ if (window.sidekick) {
   setText(appInfoTarget, 'Browser preview');
 }
 
-chooseFolderButton?.addEventListener('click', () => {
-  void chooseFolder();
+chooseFolderButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    void chooseFolder();
+  });
+});
+
+openCreateProjectButton?.addEventListener('click', openProjectCreateDialog);
+projectCreateCancelButtons.forEach((button) => {
+  button.addEventListener('click', closeProjectCreateDialog);
+});
+chooseProjectParentButton?.addEventListener('click', () => {
+  void chooseProjectParentFolder();
+});
+projectNameInput?.addEventListener('input', () => {
+  projectNameTouched = true;
+  render();
+});
+projectCreateDialogTarget?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && event.target === projectNameInput && !createProjectButton?.disabled) {
+    event.preventDefault();
+    void createProject();
+  }
+
+  if (event.key !== 'Tab') {
+    return;
+  }
+
+  const focusableElements = getProjectDialogFocusableElements();
+  const firstElement = focusableElements[0];
+  const lastElement = focusableElements.at(-1);
+
+  if (!firstElement || !lastElement) {
+    return;
+  }
+
+  if (event.shiftKey && document.activeElement === firstElement) {
+    event.preventDefault();
+    lastElement.focus();
+  } else if (!event.shiftKey && document.activeElement === lastElement) {
+    event.preventDefault();
+    firstElement.focus();
+  }
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && projectCreationState.status !== 'closed') {
+    event.preventDefault();
+    closeProjectCreateDialog();
+  }
 });
 
 openSettingsButton?.addEventListener('click', openSettings);

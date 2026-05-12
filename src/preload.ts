@@ -4,6 +4,7 @@ import type { CodexCompletionEvent, CodexOutputEvent, SidekickApi } from './shar
 const sidekickApi: SidekickApi = {
   getAppInfo: () => ipcRenderer.invoke('app:get-info'),
   chooseProjectFolder: () => ipcRenderer.invoke('project-folder:choose-and-scan'),
+  chooseProjectParentFolder: () => ipcRenderer.invoke('project-folder:choose-parent'),
   createProjectFolder: (request) => ipcRenderer.invoke('project-folder:create', request),
   previewContextPackage: (rootPath) => ipcRenderer.invoke('context-package:preview', rootPath),
   generateContextPackage: (rootPath) => ipcRenderer.invoke('context-package:generate', rootPath),

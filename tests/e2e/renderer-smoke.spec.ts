@@ -274,22 +274,19 @@ test('renders the folder inspection empty state', async ({ page }) => {
 
   await expect(page.locator('[data-app-topbar]')).toBeVisible();
   await expect(page.locator('[data-primary-workspace]')).toBeVisible();
-  await expect(page.locator('[data-context-surface]')).toBeVisible();
-  await expect(page.locator('[data-action-bar]')).toBeVisible();
+  await expect(page.locator('[data-context-surface]')).toBeHidden();
+  await expect(page.locator('[data-action-bar]')).toBeHidden();
   await expect(page.locator('[data-status-bar]')).toBeVisible();
   await expect(page.locator('.app-brand__name')).toHaveText('Sidekick');
-  await expect(page.getByRole('button', { name: 'Velg mappe' })).toBeVisible();
-  await expect(page.getByText('Choose a project folder')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Velg en prosjektmappe' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Velg eksisterende mappe...' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Opprett ny prosjektmappe...' })).toBeVisible();
   await expect(
     page.getByLabel('Valgt prosjektmappe').getByRole('heading', {
       name: 'Ingen prosjektmappe valgt',
     }),
   ).toBeVisible();
   await expect(page.getByText('Browser preview')).toBeVisible();
-  await expect(page.getByText('No warnings')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Add transcription' })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Create project' })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Run Codex' })).toBeDisabled();
 });
 
 test('creates a project and displays the required folders', async ({ page }) => {
@@ -303,8 +300,11 @@ test('creates a project and displays the required folders', async ({ page }) => 
           isPackaged: false,
         }),
         chooseProjectFolder: async () => null,
+        chooseProjectParentFolder: async () => '/tmp',
         createProjectFolder: async (request) =>
-          request.projectName === 'new-sidekick-project' ? createdProject : null,
+          request.projectName === 'new-sidekick-project' && request.parentPath === '/tmp'
+            ? createdProject
+            : null,
         previewContextPackage: async () => {
           throw new Error('No context package preview.');
         },
@@ -334,17 +334,130 @@ test('creates a project and displays the required folders', async ({ page }) => 
   );
 
   await page.goto('/');
-  await page.getByLabel('Project name').fill('new-sidekick-project');
-  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Opprett ny prosjektmappe...' }).click();
+  await expect(page.getByRole('dialog', { name: 'Opprett ny prosjektmappe' })).toBeVisible();
+  await expect(page.getByLabel('Prosjektnavn')).toBeFocused();
+  await expect(page.getByText('Prosjektnavn er påkrevd.')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Avbryt' }).focus();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Lukk' })).toBeFocused();
+  await page.getByLabel('Prosjektnavn').focus();
+  await page.getByLabel('Prosjektnavn').fill('new-sidekick-project');
+  await page.getByRole('button', { name: 'Velg...' }).click();
+  await expect(page.locator('[data-project-target-preview]')).toContainText(
+    '/tmp/new-sidekick-project',
+  );
+  await page.getByRole('button', { name: 'Opprett mappe' }).click();
 
   await expect(page.getByLabel('Valgt prosjektmappe').getByRole('heading')).toHaveText(
     'new-sidekick-project',
   );
   await expect(page.getByLabel('Valgt prosjektmappe')).toContainText('/tmp/new-sidekick-project');
-  await expect(page.getByText('Created new-sidekick-project.')).toBeVisible();
   await expect(page.getByRole('treeitem', { name: /00. Forutsetninger/ })).toBeVisible();
   await expect(page.getByRole('treeitem', { name: /01. Transkripsjoner/ })).toBeVisible();
   await expect(page.locator('.codex-panel')).toContainText('codex-cli 0.130.0-test');
+});
+
+test('validates and cancels the project creation dialog', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.sidekick = {
+      getAppInfo: async () => ({
+        name: 'Sidekick',
+        version: '1.0.0',
+        platform: 'linux',
+        isPackaged: false,
+      }),
+      chooseProjectFolder: async () => null,
+      chooseProjectParentFolder: async () => null,
+      createProjectFolder: async () => {
+        throw new Error('Create should not be called.');
+      },
+      previewContextPackage: async () => {
+        throw new Error('No context package preview.');
+      },
+      generateContextPackage: async () => {
+        throw new Error('No context package result.');
+      },
+      previewTranscriptionImport: async () => null,
+      confirmTranscriptionImport: async () => {
+        throw new Error('No transcription import preview.');
+      },
+      getCodexStatus: async () => ({
+        state: 'ready',
+        available: true,
+        loggedIn: true,
+        version: 'codex-cli 0.130.0-test',
+      }),
+      startCodexLogin: async () => ({ runId: 'login-run' }),
+      startCodexRun: async () => ({ runId: 'codex-run' }),
+      cancelCodexRun: async () => undefined,
+      onCodexOutput: () => () => undefined,
+      onCodexCompletion: () => () => undefined,
+    };
+  });
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Opprett ny prosjektmappe...' }).click();
+  await page.getByLabel('Prosjektnavn').fill('../outside');
+
+  await expect(page.getByText('Prosjektnavnet må være et mappenavn, ikke en sti.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Opprett mappe' })).toBeDisabled();
+
+  await page.getByRole('button', { name: 'Velg...' }).click();
+  await expect(page.locator('[data-project-parent-path]')).toHaveText('Ingen plassering valgt.');
+
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Opprett ny prosjektmappe' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Velg en prosjektmappe' })).toBeVisible();
+});
+
+test('shows a project creation error and keeps the dialog usable', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.sidekick = {
+      getAppInfo: async () => ({
+        name: 'Sidekick',
+        version: '1.0.0',
+        platform: 'linux',
+        isPackaged: false,
+      }),
+      chooseProjectFolder: async () => null,
+      chooseProjectParentFolder: async () => '/tmp',
+      createProjectFolder: async () => {
+        throw new Error('Project folder already exists.');
+      },
+      previewContextPackage: async () => {
+        throw new Error('No context package preview.');
+      },
+      generateContextPackage: async () => {
+        throw new Error('No context package result.');
+      },
+      previewTranscriptionImport: async () => null,
+      confirmTranscriptionImport: async () => {
+        throw new Error('No transcription import preview.');
+      },
+      getCodexStatus: async () => ({
+        state: 'ready',
+        available: true,
+        loggedIn: true,
+        version: 'codex-cli 0.130.0-test',
+      }),
+      startCodexLogin: async () => ({ runId: 'login-run' }),
+      startCodexRun: async () => ({ runId: 'codex-run' }),
+      cancelCodexRun: async () => undefined,
+      onCodexOutput: () => () => undefined,
+      onCodexCompletion: () => () => undefined,
+    };
+  });
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Opprett ny prosjektmappe...' }).click();
+  await page.getByLabel('Prosjektnavn').fill('existing-project');
+  await page.getByRole('button', { name: 'Velg...' }).click();
+  await page.getByRole('button', { name: 'Opprett mappe' }).click();
+
+  await expect(page.getByRole('dialog', { name: 'Opprett ny prosjektmappe' })).toBeVisible();
+  await expect(page.getByText('Project folder already exists.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Opprett mappe' })).toBeEnabled();
 });
 
 test('expands and collapses scanned folders', async ({ page }) => {
@@ -358,6 +471,7 @@ test('expands and collapses scanned folders', async ({ page }) => {
           isPackaged: false,
         }),
         chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
         createProjectFolder: async () => null,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => result,
@@ -375,7 +489,7 @@ test('expands and collapses scanned folders', async ({ page }) => {
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg mappe' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
 
   await expect(page.getByRole('tree', { name: 'Scanned folder tree' })).toBeVisible();
   await expect(page.getByRole('treeitem', { name: /sidekick-project/ })).toBeVisible();
@@ -402,6 +516,7 @@ test('expands and collapses all scanned folders', async ({ page }) => {
           isPackaged: false,
         }),
         chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
         createProjectFolder: async () => null,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => result,
@@ -419,7 +534,7 @@ test('expands and collapses all scanned folders', async ({ page }) => {
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg mappe' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
   await page.getByRole('button', { name: 'Utvid alle mapper' }).click();
 
   await expect(page.getByText('brief.pdf')).toBeVisible();
@@ -442,6 +557,7 @@ test('confirms and displays a generated context package', async ({ page }) => {
           isPackaged: false,
         }),
         chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
         createProjectFolder: async () => null,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => result,
@@ -459,7 +575,7 @@ test('confirms and displays a generated context package', async ({ page }) => {
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg mappe' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
 
   await expect(page.getByRole('button', { name: 'Create context package' })).toBeEnabled();
   await page.getByRole('button', { name: 'Create context package' }).click();
@@ -497,6 +613,7 @@ test('confirms and displays an imported transcription', async ({ page }) => {
           isPackaged: false,
         }),
         chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
         createProjectFolder: async () => null,
         previewContextPackage: async () => contextPreview,
         generateContextPackage: async () => contextResult,
@@ -514,7 +631,7 @@ test('confirms and displays an imported transcription', async ({ page }) => {
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg mappe' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
 
   await expect(page.getByRole('button', { name: 'Add transcription' })).toBeEnabled();
   await page.getByRole('button', { name: 'Add transcription' }).click();
@@ -563,6 +680,7 @@ test('runs Codex from the controlled panel with mocked output', async ({ page })
           isPackaged: false,
         }),
         chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
         createProjectFolder: async () => null,
         previewContextPackage: async () => contextPreview,
         generateContextPackage: async () => contextResult,
@@ -620,7 +738,7 @@ test('runs Codex from the controlled panel with mocked output', async ({ page })
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg mappe' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
 
   const codexPanel = page.locator('.codex-panel');
   await expect(codexPanel.getByRole('heading', { name: 'Ready' })).toBeVisible();
@@ -645,6 +763,7 @@ test('opens settings and manages Codex CLI path', async ({ page }) => {
         isPackaged: false,
       }),
       chooseProjectFolder: async () => null,
+        chooseProjectParentFolder: async () => null,
       createProjectFolder: async () => null,
       previewContextPackage: async () => {
         throw new Error('No context package preview.');
