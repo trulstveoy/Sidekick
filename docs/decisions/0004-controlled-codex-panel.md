@@ -39,10 +39,12 @@ The first version will not expose:
 - `--dangerously-bypass-approvals-and-sandbox`;
 - autonomous background Codex actions.
 
+Codex executable discovery is still owned by the main process. Sidekick may search PATH, common local Codex/npm command locations, and the `SIDEKICK_CODEX_PATH` environment variable. The renderer cannot choose an executable path.
+
 ## Consequences
 
 The renderer remains inside the existing Electron security boundary. It can request Codex-specific operations, but it cannot spawn arbitrary commands or choose arbitrary filesystem locations.
 
-The implementation depends on the Codex CLI being available on PATH. If Codex is missing, the app reports an unavailable state instead of failing startup. Packaged apps may not inherit the same PATH as a terminal, especially on Windows and macOS; a user-configured Codex path is deferred.
+The implementation depends on a locally installed Codex CLI. If Codex is missing, the app reports an unavailable state instead of failing startup. Packaged apps may not inherit the same PATH as a terminal, especially on Windows and macOS, so discovery includes common npm command locations and an optional `SIDEKICK_CODEX_PATH` override.
 
 Edit-mode Codex runs can still change user files. Sidekick limits the working root to the selected project folder and refreshes the folder scan after successful edit-mode completion, but it does not provide a full diff viewer, rollback mechanism, or Git workflow in this version.

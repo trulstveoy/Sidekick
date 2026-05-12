@@ -1241,7 +1241,9 @@ const refreshCodexStatus = async (scan: ProjectFolderScan) => {
     } else {
       codexState = {
         status: 'unavailable',
-        message: codexStatus.message ?? 'Codex CLI was not found on PATH.',
+        message:
+          codexStatus.message ??
+          'Codex CLI was not found. Install Codex CLI or set SIDEKICK_CODEX_PATH to the full Codex executable path.',
       };
     }
   } catch (error) {

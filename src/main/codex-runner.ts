@@ -1,5 +1,8 @@
 import { EventEmitter } from 'node:events';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import type {
   CodexCompletionEvent,
   CodexOutputEvent,
@@ -15,11 +18,18 @@ type ProcessResult = {
   error?: Error;
 };
 
+type CodexExecutable = {
+  command: string;
+  shell: boolean;
+};
+
 type ActiveRun = {
   process: ChildProcessWithoutNullStreams;
   mode: CodexRunMode | 'login';
   canceled: boolean;
 };
+
+type CodexEnvironment = NodeJS.ProcessEnv;
 
 export type CodexRunnerEvents = {
   output: [CodexOutputEvent];
@@ -54,14 +64,112 @@ export const parseCodexJsonLine = (line: string): unknown | undefined => {
   }
 };
 
+const hasPathSeparator = (value: string) => /[\\/]/.test(value);
+
+const isWindowsCommandShim = (filePath: string, platform: NodeJS.Platform) =>
+  platform === 'win32' && /\.(cmd|bat)$/i.test(filePath);
+
+const executableForPath = (filePath: string, platform: NodeJS.Platform): CodexExecutable => ({
+  command: filePath,
+  shell: isWindowsCommandShim(filePath, platform),
+});
+
+const pathEntries = (environment: CodexEnvironment, platform: NodeJS.Platform) => {
+  const delimiter = platform === 'win32' ? ';' : ':';
+
+  return (environment.PATH ?? environment.Path ?? '')
+    .split(delimiter)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+};
+
+const windowsCandidateDirectories = (environment: CodexEnvironment) => [
+  environment.APPDATA ? path.join(environment.APPDATA, 'npm') : undefined,
+  environment.LOCALAPPDATA ? path.join(environment.LOCALAPPDATA, 'Programs', 'nodejs') : undefined,
+  environment.ProgramFiles ? path.join(environment.ProgramFiles, 'nodejs') : undefined,
+  environment['ProgramFiles(x86)'] ? path.join(environment['ProgramFiles(x86)'], 'nodejs') : undefined,
+];
+
+const unixCandidateDirectories = (environment: CodexEnvironment) => {
+  const homeDirectory = environment.HOME || os.homedir();
+
+  return [
+    homeDirectory ? path.join(homeDirectory, '.npm-global', 'bin') : undefined,
+    homeDirectory ? path.join(homeDirectory, '.local', 'bin') : undefined,
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+    '/usr/bin',
+    '/bin',
+  ];
+};
+
+const uniqueExistingDirectories = (directories: Array<string | undefined>) => [
+  ...new Set(
+    directories
+      .filter((directory): directory is string => Boolean(directory))
+      .filter((directory) => existsSync(directory)),
+  ),
+];
+
+const candidateFileNames = (executable: string, platform: NodeJS.Platform) => {
+  if (platform !== 'win32' || path.extname(executable)) {
+    return [executable];
+  }
+
+  const pathExts = ['.exe', '.cmd', '.bat', '.com'];
+
+  return [...new Set([executable, ...pathExts.map((extension) => `${executable}${extension}`)])];
+};
+
+export const resolveCodexExecutable = (
+  executable = 'codex',
+  environment: CodexEnvironment = process.env,
+  platform: NodeJS.Platform = process.platform,
+): CodexExecutable => {
+  const configuredExecutable = environment.SIDEKICK_CODEX_PATH?.trim();
+  const requestedExecutable = configuredExecutable || executable;
+
+  if (hasPathSeparator(requestedExecutable) || path.isAbsolute(requestedExecutable)) {
+    return executableForPath(requestedExecutable, platform);
+  }
+
+  const additionalDirectories =
+    platform === 'win32'
+      ? windowsCandidateDirectories(environment)
+      : unixCandidateDirectories(environment);
+  const candidateDirectories = uniqueExistingDirectories([
+    ...pathEntries(environment, platform),
+    ...additionalDirectories,
+  ]);
+
+  for (const directory of candidateDirectories) {
+    for (const fileName of candidateFileNames(requestedExecutable, platform)) {
+      const candidatePath = path.join(directory, fileName);
+
+      if (existsSync(candidatePath)) {
+        return executableForPath(candidatePath, platform);
+      }
+    }
+  }
+
+  return {
+    command: requestedExecutable,
+    shell: platform === 'win32',
+  };
+};
+
 export class CodexRunner extends EventEmitter {
-  private readonly executable: string;
+  private readonly executable: CodexExecutable;
 
   private activeRun?: ActiveRun;
 
-  constructor(executable = 'codex') {
+  constructor(
+    executable = 'codex',
+    environment: CodexEnvironment = process.env,
+    platform: NodeJS.Platform = process.platform,
+  ) {
     super();
-    this.executable = executable;
+    this.executable = resolveCodexExecutable(executable, environment, platform);
   }
 
   override on<EventName extends keyof CodexRunnerEvents>(
@@ -88,9 +196,9 @@ export class CodexRunner extends EventEmitter {
 
   private runCommand(args: string[], cwd: string): Promise<ProcessResult> {
     return new Promise((resolve) => {
-      const child = spawn(this.executable, args, {
+      const child = spawn(this.executable.command, args, {
         cwd,
-        shell: false,
+        shell: this.executable.shell,
         windowsHide: true,
       });
       const stdout: Buffer[] = [];
@@ -128,7 +236,8 @@ export class CodexRunner extends EventEmitter {
         state: 'unavailable',
         available: false,
         loggedIn: false,
-        message: 'Codex CLI was not found on PATH.',
+        message:
+          'Codex CLI was not found. Install Codex CLI or set SIDEKICK_CODEX_PATH to the full Codex executable path.',
       };
     }
 
@@ -217,10 +326,10 @@ export class CodexRunner extends EventEmitter {
       throw new Error('A Codex run is already active.');
     }
 
-    const child = spawn(this.executable, args, {
+    const child = spawn(this.executable.command, args, {
       cwd,
       detached: process.platform !== 'win32',
-      shell: false,
+      shell: this.executable.shell,
       windowsHide: true,
     });
 
