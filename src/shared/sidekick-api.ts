@@ -207,6 +207,26 @@ export type CodexRunRequest = {
   mode: CodexRunMode;
 };
 
+export type AppSettings = {
+  sidekick_codex_path: string | null;
+};
+
+export type CodexPathSource = 'automatic' | 'environment' | 'saved';
+
+export type AppSettingsSnapshot = {
+  settings: AppSettings;
+  codexPathSource: CodexPathSource;
+  effectiveCodexPath: string | null;
+  warning?: string;
+};
+
+export type CodexPathTestResult = {
+  ok: boolean;
+  message: string;
+  version?: string;
+  state?: CodexStatusState;
+};
+
 export type CodexRunStartResult = {
   runId: string;
 };
@@ -246,6 +266,11 @@ export type SidekickApi = {
   startCodexLogin: (rootPath: string) => Promise<CodexRunStartResult>;
   startCodexRun: (request: CodexRunRequest) => Promise<CodexRunStartResult>;
   cancelCodexRun: (runId: string) => Promise<void>;
+  getSettings: () => Promise<AppSettingsSnapshot>;
+  saveCodexPath: (codexPath: string | null) => Promise<AppSettingsSnapshot>;
+  resetCodexPath: () => Promise<AppSettingsSnapshot>;
+  chooseCodexPath: () => Promise<string | null>;
+  testCodexPath: (codexPath: string | null) => Promise<CodexPathTestResult>;
   onCodexOutput: (listener: (event: CodexOutputEvent) => void) => CodexEventUnsubscribe;
   onCodexCompletion: (listener: (event: CodexCompletionEvent) => void) => CodexEventUnsubscribe;
 };

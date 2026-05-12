@@ -17,6 +17,11 @@
           <h1>Sidekick</h1>
         </div>
 
+        <nav class="app-nav" aria-label="Application views">
+          <button class="nav-button" type="button" data-open-workspace aria-current="page">Workspace</button>
+          <button class="nav-button" type="button" data-open-settings>Settings</button>
+        </nav>
+
         <section class="selected-project" aria-label="Selected project folder">
           <p class="section-label">Selected project</p>
           <h2 data-selected-name>No folder selected</h2>
@@ -44,7 +49,7 @@
         </div>
       </aside>
 
-      <section class="workspace" aria-label="Folder structure">
+      <section class="workspace" aria-label="Folder structure" data-workspace-view>
         <header class="workspace-header">
           <div>
             <p class="eyebrow">Read-only inspection</p>
@@ -71,6 +76,58 @@
           </div>
           <ol class="folder-tree" data-folder-tree role="tree" aria-label="Scanned folder tree"></ol>
         </section>
+      </section>
+
+      <section class="settings-view" aria-label="Settings" data-settings-view hidden>
+        <header class="workspace-header">
+          <div>
+            <p class="eyebrow">Application settings</p>
+            <h2>Settings</h2>
+          </div>
+          <button type="button" data-close-settings>Back to workspace</button>
+        </header>
+
+        <div class="settings-layout">
+          <nav class="settings-nav" aria-label="Settings sections">
+            <button type="button" class="settings-nav-item" aria-current="page">Integrations</button>
+            <button type="button" class="settings-nav-item" disabled>General</button>
+            <button type="button" class="settings-nav-item" disabled>About</button>
+          </nav>
+
+          <section class="settings-panel" aria-label="Codex settings">
+            <div class="settings-section-header">
+              <p class="section-label">Integrations</p>
+              <h3>Codex</h3>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-copy">
+                <h4>Codex CLI path</h4>
+                <p>Sidekick can discover Codex automatically, or use this executable path.</p>
+                <dl class="settings-details" data-settings-codex-details></dl>
+              </div>
+              <div class="setting-control">
+                <label for="settings-codex-path">Path</label>
+                <input
+                  id="settings-codex-path"
+                  type="text"
+                  data-settings-codex-path
+                  placeholder="Automatic discovery"
+                  autocomplete="off"
+                />
+                <div class="settings-actions">
+                  <button type="button" data-settings-choose-codex>Choose...</button>
+                  <button type="button" data-settings-test-codex>Test</button>
+                  <button type="button" data-settings-save-codex>Save</button>
+                  <button class="button-secondary" type="button" data-settings-reset-codex>
+                    Reset to automatic discovery
+                  </button>
+                </div>
+                <p class="settings-message" data-settings-message></p>
+              </div>
+            </div>
+          </section>
+        </div>
       </section>
 
       <aside class="inspector" aria-label="Project summary">

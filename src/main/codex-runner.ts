@@ -159,7 +159,11 @@ export const resolveCodexExecutable = (
 };
 
 export class CodexRunner extends EventEmitter {
-  private readonly executable: CodexExecutable;
+  private executable: CodexExecutable;
+
+  private readonly executableName: string;
+
+  private readonly platform: NodeJS.Platform;
 
   private activeRun?: ActiveRun;
 
@@ -169,7 +173,17 @@ export class CodexRunner extends EventEmitter {
     platform: NodeJS.Platform = process.platform,
   ) {
     super();
+    this.executableName = executable;
+    this.platform = platform;
     this.executable = resolveCodexExecutable(executable, environment, platform);
+  }
+
+  setEnvironment(environment: CodexEnvironment) {
+    if (this.activeRun) {
+      throw new Error('Codex settings cannot be changed while a Codex run is active.');
+    }
+
+    this.executable = resolveCodexExecutable(this.executableName, environment, this.platform);
   }
 
   override on<EventName extends keyof CodexRunnerEvents>(

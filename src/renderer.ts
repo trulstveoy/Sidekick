@@ -4,12 +4,14 @@ import type {
   ArtifactType,
   CodexCompletionEvent,
   CodexOutputEvent,
+  CodexPathTestResult,
   CodexRunMode,
   CodexStatus,
   ContextPackagePreview,
   ContextPackageResult,
   FolderSignal,
   FolderTreeNode,
+  AppSettingsSnapshot,
   ProjectCreationResult,
   ProjectFolderScan,
   ScanWarning,
@@ -62,12 +64,26 @@ type CodexState =
 
 type DetailRow = [string, string];
 
+type AppView = 'workspace' | 'settings';
+
+type SettingsState =
+  | { status: 'idle'; snapshot?: AppSettingsSnapshot; message: string }
+  | { status: 'loading'; snapshot?: AppSettingsSnapshot; message: string }
+  | { status: 'saving'; snapshot?: AppSettingsSnapshot; message: string }
+  | { status: 'testing'; snapshot?: AppSettingsSnapshot; message: string }
+  | { status: 'error'; snapshot?: AppSettingsSnapshot; message: string };
+
 type ActionTargets = {
   primaryButton: HTMLButtonElement | null;
   secondaryButton: HTMLButtonElement | null;
 };
 
 const appInfoTarget = document.querySelector<HTMLSpanElement>('[data-app-info]');
+const workspaceViewTarget = document.querySelector<HTMLElement>('[data-workspace-view]');
+const settingsViewTarget = document.querySelector<HTMLElement>('[data-settings-view]');
+const openWorkspaceButton = document.querySelector<HTMLButtonElement>('[data-open-workspace]');
+const openSettingsButton = document.querySelector<HTMLButtonElement>('[data-open-settings]');
+const closeSettingsButton = document.querySelector<HTMLButtonElement>('[data-close-settings]');
 const chooseFolderButton = document.querySelector<HTMLButtonElement>('[data-choose-folder]');
 const projectNameInput = document.querySelector<HTMLInputElement>('[data-project-name]');
 const createProjectButton = document.querySelector<HTMLButtonElement>('[data-create-project]');
@@ -119,6 +135,19 @@ const codexEditModeInput = document.querySelector<HTMLInputElement>('[data-codex
 const codexOutputTarget = document.querySelector<HTMLUListElement>('[data-codex-output]');
 const codexPrimaryButton = document.querySelector<HTMLButtonElement>('[data-codex-primary]');
 const codexSecondaryButton = document.querySelector<HTMLButtonElement>('[data-codex-secondary]');
+const settingsCodexPathInput = document.querySelector<HTMLInputElement>('[data-settings-codex-path]');
+const settingsCodexDetailsTarget = document.querySelector<HTMLElement>(
+  '[data-settings-codex-details]',
+);
+const settingsMessageTarget = document.querySelector<HTMLElement>('[data-settings-message]');
+const settingsChooseCodexButton = document.querySelector<HTMLButtonElement>(
+  '[data-settings-choose-codex]',
+);
+const settingsTestCodexButton = document.querySelector<HTMLButtonElement>('[data-settings-test-codex]');
+const settingsSaveCodexButton = document.querySelector<HTMLButtonElement>('[data-settings-save-codex]');
+const settingsResetCodexButton = document.querySelector<HTMLButtonElement>(
+  '[data-settings-reset-codex]',
+);
 
 const artifactLabels: Record<ArtifactType, string> = {
   'markdown-text': 'Markdown/text',
@@ -151,6 +180,8 @@ let contextPackageState: ContextPackageState = { status: 'unavailable' };
 let transcriptionImportState: TranscriptionImportState = { status: 'unavailable' };
 let projectCreationState: ProjectCreationState = { status: 'idle', message: '' };
 let codexState: CodexState = { status: 'unavailable', message: 'Choose a folder first.' };
+let appView: AppView = 'workspace';
+let settingsState: SettingsState = { status: 'idle', message: '' };
 
 const ROOT_PATH = '.';
 
@@ -1077,11 +1108,58 @@ const renderReadyState = (scan: ProjectFolderScan, status: 'ready' | 'partial') 
   renderTree(scan);
 };
 
+const sourceLabel = (snapshot?: AppSettingsSnapshot) => {
+  if (!snapshot) {
+    return 'Unknown';
+  }
+
+  if (snapshot.codexPathSource === 'environment') {
+    return 'Environment variable';
+  }
+
+  if (snapshot.codexPathSource === 'saved') {
+    return 'Saved setting';
+  }
+
+  return 'Automatic discovery';
+};
+
+const renderSettings = () => {
+  workspaceViewTarget?.toggleAttribute('hidden', appView !== 'workspace');
+  settingsViewTarget?.toggleAttribute('hidden', appView !== 'settings');
+  openWorkspaceButton?.setAttribute('aria-current', appView === 'workspace' ? 'page' : 'false');
+  openSettingsButton?.setAttribute('aria-current', appView === 'settings' ? 'page' : 'false');
+
+  const snapshot = settingsState.snapshot;
+
+  const rows: DetailRow[] = [
+    ['Mode', sourceLabel(snapshot)],
+    ['Effective path', snapshot?.effectiveCodexPath ?? 'Automatic discovery'],
+  ];
+
+  if (snapshot?.warning) {
+    rows.push(['Warning', snapshot.warning]);
+  }
+
+  renderDetails(settingsCodexDetailsTarget, rows);
+  setText(settingsMessageTarget, settingsState.message);
+
+  const settingsBusy = settingsState.status === 'loading' || settingsState.status === 'saving' || settingsState.status === 'testing';
+  const settingsAvailable = Boolean(window.sidekick);
+
+  settingsCodexPathInput?.toggleAttribute('disabled', settingsBusy || !settingsAvailable);
+  settingsChooseCodexButton?.toggleAttribute('disabled', settingsBusy || !settingsAvailable);
+  settingsTestCodexButton?.toggleAttribute('disabled', settingsBusy || !settingsAvailable);
+  settingsSaveCodexButton?.toggleAttribute('disabled', settingsBusy || !settingsAvailable);
+  settingsResetCodexButton?.toggleAttribute('disabled', settingsBusy || !settingsAvailable);
+};
+
 const render = () => {
   const isBusy = state.status === 'loading' || projectCreationState.status === 'creating';
 
   chooseFolderButton?.toggleAttribute('disabled', isBusy || !window.sidekick);
   renderProjectCreation();
+  renderSettings();
 
   switch (state.status) {
     case 'empty':
@@ -1098,6 +1176,199 @@ const render = () => {
       renderReadyState(state.scan, state.status);
       break;
   }
+};
+
+const loadSettings = async () => {
+  if (!window.sidekick) {
+    settingsState = {
+      status: 'error',
+      message: 'Settings are available in the Electron app.',
+    };
+    render();
+    return;
+  }
+
+  settingsState = {
+    ...settingsState,
+    status: 'loading',
+    message: 'Loading settings.',
+  };
+  render();
+
+  try {
+    const snapshot = await window.sidekick.getSettings();
+    if (settingsCodexPathInput) {
+      settingsCodexPathInput.value = snapshot.settings.sidekick_codex_path ?? '';
+    }
+    settingsState = {
+      status: 'idle',
+      snapshot,
+      message: snapshot.warning ?? 'Settings loaded.',
+    };
+  } catch (error) {
+    settingsState = {
+      ...settingsState,
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unable to load settings.',
+    };
+  }
+
+  render();
+};
+
+const openSettings = () => {
+  appView = 'settings';
+  render();
+  void loadSettings();
+};
+
+const openWorkspace = () => {
+  appView = 'workspace';
+  render();
+};
+
+const currentSettingsCodexPath = () => settingsCodexPathInput?.value.trim() || null;
+
+const chooseCodexPath = async () => {
+  if (!window.sidekick) {
+    return;
+  }
+
+  settingsState = {
+    ...settingsState,
+    status: 'loading',
+    message: 'Choose the Codex CLI executable.',
+  };
+  render();
+
+  try {
+    const codexPath = await window.sidekick.chooseCodexPath();
+
+    if (codexPath && settingsCodexPathInput) {
+      settingsCodexPathInput.value = codexPath;
+      settingsState = {
+        ...settingsState,
+        status: 'idle',
+        message: 'Path selected. Test or save the setting.',
+      };
+    } else {
+      settingsState = {
+        ...settingsState,
+        status: 'idle',
+        message: 'No path selected.',
+      };
+    }
+  } catch (error) {
+    settingsState = {
+      ...settingsState,
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unable to choose Codex path.',
+    };
+  }
+
+  render();
+};
+
+const applyCodexSettingsResult = (snapshot: AppSettingsSnapshot, message: string) => {
+  if (settingsCodexPathInput) {
+    settingsCodexPathInput.value = snapshot.settings.sidekick_codex_path ?? '';
+  }
+
+  settingsState = {
+    status: 'idle',
+    snapshot,
+    message,
+  };
+
+  const scan = getActiveScan();
+
+  if (scan) {
+    void refreshCodexStatus(scan);
+  }
+};
+
+const saveCodexPath = async () => {
+  if (!window.sidekick) {
+    return;
+  }
+
+  settingsState = {
+    ...settingsState,
+    status: 'saving',
+    message: 'Saving Codex path.',
+  };
+  render();
+
+  try {
+    const snapshot = await window.sidekick.saveCodexPath(currentSettingsCodexPath());
+    applyCodexSettingsResult(snapshot, 'Codex path saved.');
+  } catch (error) {
+    settingsState = {
+      ...settingsState,
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unable to save Codex path.',
+    };
+  }
+
+  render();
+};
+
+const resetCodexPath = async () => {
+  if (!window.sidekick) {
+    return;
+  }
+
+  settingsState = {
+    ...settingsState,
+    status: 'saving',
+    message: 'Resetting Codex path.',
+  };
+  render();
+
+  try {
+    const snapshot = await window.sidekick.resetCodexPath();
+    applyCodexSettingsResult(snapshot, 'Codex path reset to automatic discovery.');
+  } catch (error) {
+    settingsState = {
+      ...settingsState,
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unable to reset Codex path.',
+    };
+  }
+
+  render();
+};
+
+const testCodexPath = async () => {
+  if (!window.sidekick) {
+    return;
+  }
+
+  settingsState = {
+    ...settingsState,
+    status: 'testing',
+    message: 'Testing Codex path.',
+  };
+  render();
+
+  try {
+    const result: CodexPathTestResult = await window.sidekick.testCodexPath(
+      currentSettingsCodexPath(),
+    );
+    settingsState = {
+      ...settingsState,
+      status: result.ok ? 'idle' : 'error',
+      message: result.message,
+    };
+  } catch (error) {
+    settingsState = {
+      ...settingsState,
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unable to test Codex path.',
+    };
+  }
+
+  render();
 };
 
 const openContextPackageConfirmation = async () => {
@@ -1512,6 +1783,22 @@ if (window.sidekick) {
 
 chooseFolderButton?.addEventListener('click', () => {
   void chooseFolder();
+});
+
+openSettingsButton?.addEventListener('click', openSettings);
+openWorkspaceButton?.addEventListener('click', openWorkspace);
+closeSettingsButton?.addEventListener('click', openWorkspace);
+settingsChooseCodexButton?.addEventListener('click', () => {
+  void chooseCodexPath();
+});
+settingsTestCodexButton?.addEventListener('click', () => {
+  void testCodexPath();
+});
+settingsSaveCodexButton?.addEventListener('click', () => {
+  void saveCodexPath();
+});
+settingsResetCodexButton?.addEventListener('click', () => {
+  void resetCodexPath();
 });
 
 createProjectButton?.addEventListener('click', () => {

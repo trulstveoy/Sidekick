@@ -3,6 +3,8 @@ import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import type {
   AppInfo,
+  AppSettingsSnapshot,
+  CodexPathTestResult,
   CodexCompletionEvent,
   CodexRunRequest,
   ProjectCreationRequest,
@@ -16,6 +18,7 @@ import {
   confirmTranscriptionImport,
   createTranscriptionImportPreview,
 } from './main/transcription-importer';
+import { AppSettingsStore, normalizeCodexPath, validateCodexPath } from './main/settings-store';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -40,6 +43,7 @@ const appIconPath = () =>
 
 const selectedProjectRoots = new Set<string>();
 const pendingTranscriptionImports = new Map<string, TranscriptionImportPreview>();
+let settingsStore: AppSettingsStore | undefined;
 const codexRunner = new CodexRunner();
 const codexRuns = new Map<
   string,
@@ -49,6 +53,32 @@ const codexRuns = new Map<
     mode: CodexCompletionEvent['mode'];
   }
 >();
+
+const getSettingsStore = () => {
+  settingsStore ??= new AppSettingsStore(app.getPath('userData'));
+
+  return settingsStore;
+};
+
+const codexEnvironmentFromSettings = (snapshot: AppSettingsSnapshot) => {
+  const environmentPath = normalizeCodexPath(process.env.SIDEKICK_CODEX_PATH);
+
+  if (environmentPath || !snapshot.settings.sidekick_codex_path) {
+    return process.env;
+  }
+
+  return {
+    ...process.env,
+    SIDEKICK_CODEX_PATH: snapshot.settings.sidekick_codex_path,
+  };
+};
+
+const applyCodexSettings = async () => {
+  const snapshot = await getSettingsStore().snapshot();
+  codexRunner.setEnvironment(codexEnvironmentFromSettings(snapshot));
+
+  return snapshot;
+};
 
 ipcMain.handle('project-folder:choose-and-scan', async (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
@@ -273,6 +303,68 @@ ipcMain.handle('codex:cancel', (_event, runId) => {
   codexRunner.cancel(runId);
 });
 
+ipcMain.handle('settings:get', () => getSettingsStore().snapshot());
+
+ipcMain.handle('settings:choose-codex-path', async (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  const dialogOptions: Electron.OpenDialogOptions = {
+    title: 'Choose Codex CLI executable',
+    properties: ['openFile'],
+  };
+  const result = window
+    ? await dialog.showOpenDialog(window, dialogOptions)
+    : await dialog.showOpenDialog(dialogOptions);
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+
+  return result.filePaths[0];
+});
+
+ipcMain.handle('settings:save-codex-path', async (_event, codexPath) => {
+  await getSettingsStore().updateCodexPath(codexPath);
+  return applyCodexSettings();
+});
+
+ipcMain.handle('settings:reset-codex-path', async () => {
+  await getSettingsStore().updateCodexPath(null);
+  return applyCodexSettings();
+});
+
+ipcMain.handle('settings:test-codex-path', async (_event, codexPath): Promise<CodexPathTestResult> => {
+  try {
+    const validatedPath = await validateCodexPath(codexPath);
+    const snapshot = await getSettingsStore().snapshot();
+    const environment =
+      validatedPath && !normalizeCodexPath(process.env.SIDEKICK_CODEX_PATH)
+        ? {
+            ...process.env,
+            SIDEKICK_CODEX_PATH: validatedPath,
+          }
+        : codexEnvironmentFromSettings(snapshot);
+    const testRunner = new CodexRunner('codex', environment);
+    const status = await testRunner.getStatus(app.getPath('home'));
+
+    return {
+      ok: status.state !== 'unavailable',
+      state: status.state,
+      version: status.version,
+      message:
+        status.state === 'unavailable'
+          ? status.message ?? 'Codex CLI is unavailable.'
+          : status.version
+            ? `Codex detected: ${status.version}`
+            : status.message ?? 'Codex detected.',
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'Codex CLI path could not be tested.',
+    };
+  }
+});
+
 const isAllowedNavigation = (targetUrl: string) => {
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     return targetUrl.startsWith(MAIN_WINDOW_VITE_DEV_SERVER_URL);
@@ -328,8 +420,9 @@ const createWindow = () => {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   app.setAppUserModelId('com.sidekick.app');
+  await applyCodexSettings();
   createWindow();
 });
 

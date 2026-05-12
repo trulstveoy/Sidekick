@@ -15,6 +15,11 @@ const sidekickApi: SidekickApi = {
   startCodexLogin: (rootPath) => ipcRenderer.invoke('codex:start-login', rootPath),
   startCodexRun: (request) => ipcRenderer.invoke('codex:start-run', request),
   cancelCodexRun: (runId) => ipcRenderer.invoke('codex:cancel', runId),
+  getSettings: () => ipcRenderer.invoke('settings:get'),
+  saveCodexPath: (codexPath) => ipcRenderer.invoke('settings:save-codex-path', codexPath),
+  resetCodexPath: () => ipcRenderer.invoke('settings:reset-codex-path'),
+  chooseCodexPath: () => ipcRenderer.invoke('settings:choose-codex-path'),
+  testCodexPath: (codexPath) => ipcRenderer.invoke('settings:test-codex-path', codexPath),
   onCodexOutput: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, output: CodexOutputEvent) => {
       listener(output);

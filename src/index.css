@@ -33,7 +33,8 @@ body {
 
 button,
 a,
-input {
+input,
+textarea {
   font: inherit;
 }
 
@@ -60,6 +61,12 @@ button:disabled {
 }
 
 button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+input:focus-visible,
+textarea:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
@@ -94,6 +101,19 @@ button:focus-visible {
   flex-direction: column;
   padding: 28px 34px;
   background: var(--workspace-background);
+}
+
+.settings-view {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 28px 34px;
+  background: var(--workspace-background);
+}
+
+.settings-view[hidden],
+.workspace[hidden] {
+  display: none;
 }
 
 .workspace-header {
@@ -139,6 +159,11 @@ h3 {
   font-size: 15px;
 }
 
+h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
 p,
 li {
   color: var(--muted-text);
@@ -156,6 +181,130 @@ li {
   color: var(--muted-text);
   font-size: 12px;
   line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.app-nav {
+  display: grid;
+  gap: 7px;
+}
+
+.nav-button,
+.settings-nav-item,
+.button-secondary {
+  min-width: 0;
+  border: 1px solid var(--border);
+  color: var(--accent);
+  background: transparent;
+  text-align: left;
+}
+
+.nav-button:hover:not(:disabled),
+.settings-nav-item:hover:not(:disabled),
+.button-secondary:hover:not(:disabled) {
+  border-color: #c7c1b6;
+  background: var(--subtle-surface);
+}
+
+.nav-button[aria-current='page'],
+.settings-nav-item[aria-current='page'] {
+  color: var(--text);
+  background: var(--selected-surface);
+}
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 28px;
+  padding-top: 24px;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-panel {
+  display: grid;
+  gap: 18px;
+  max-width: 760px;
+}
+
+.settings-section-header {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--subtle-border);
+}
+
+.setting-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.75fr) minmax(320px, 1fr);
+  gap: 28px;
+  padding-top: 4px;
+}
+
+.setting-copy p,
+.settings-message {
+  margin-bottom: 0;
+  color: var(--muted-text);
+  font-size: 13px;
+}
+
+.setting-control {
+  display: grid;
+  gap: 10px;
+}
+
+.setting-control label {
+  color: var(--soft-text);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.setting-control input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 9px 10px;
+  color: var(--text);
+  background: var(--workspace-background);
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-actions button {
+  min-width: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.settings-details {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0 0;
+}
+
+.settings-details div {
+  padding-top: 7px;
+  border-top: 1px solid var(--subtle-border);
+}
+
+.settings-details dt {
+  color: var(--soft-text);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.settings-details dd {
+  margin: 3px 0 0;
+  color: var(--text);
+  font-size: 13px;
   overflow-wrap: anywhere;
 }
 

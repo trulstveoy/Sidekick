@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type {
   ArtifactType,
+  AppSettingsSnapshot,
   ContextPackagePreview,
   ContextPackageResult,
   FolderSignal,
@@ -9,6 +10,14 @@ import type {
   TranscriptionImportPreview,
   TranscriptionImportResult,
 } from '../../src/shared/sidekick-api';
+
+const mockSettingsSnapshot: AppSettingsSnapshot = {
+  settings: {
+    sidekick_codex_path: null,
+  },
+  codexPathSource: 'automatic',
+  effectiveCodexPath: null,
+};
 
 const createArtifactCounts = () =>
   ({
@@ -616,4 +625,102 @@ test('runs Codex from the controlled panel with mocked output', async ({ page })
 
   await expect(codexPanel.getByRole('heading', { name: 'Codex completed' })).toBeVisible();
   await expect(codexPanel).toContainText('Project summary complete');
+});
+
+test('opens settings and manages Codex CLI path', async ({ page }) => {
+  await page.addInitScript(({ settings }) => {
+    let currentSettings = settings;
+
+    window.sidekick = {
+      getAppInfo: async () => ({
+        name: 'Sidekick',
+        version: '1.0.0',
+        platform: 'linux',
+        isPackaged: false,
+      }),
+      chooseProjectFolder: async () => null,
+      createProjectFolder: async () => null,
+      previewContextPackage: async () => {
+        throw new Error('No context package preview.');
+      },
+      generateContextPackage: async () => {
+        throw new Error('No context package result.');
+      },
+      previewTranscriptionImport: async () => null,
+      confirmTranscriptionImport: async () => {
+        throw new Error('No transcription import preview.');
+      },
+      getCodexStatus: async () => ({
+        state: 'ready',
+        available: true,
+        loggedIn: true,
+        version: 'codex-cli 0.130.0-test',
+      }),
+      startCodexLogin: async () => ({ runId: 'login-run' }),
+      startCodexRun: async () => ({ runId: 'codex-run' }),
+      cancelCodexRun: async () => undefined,
+      getSettings: async () => currentSettings,
+      chooseCodexPath: async () => '/usr/local/bin/codex',
+      testCodexPath: async (codexPath) => ({
+        ok: codexPath === '/usr/local/bin/codex',
+        state: codexPath === '/usr/local/bin/codex' ? 'ready' : 'unavailable',
+        version: codexPath === '/usr/local/bin/codex' ? 'codex-cli settings-test' : undefined,
+        message:
+          codexPath === '/usr/local/bin/codex'
+            ? 'Codex detected: codex-cli settings-test'
+            : 'Codex CLI path must point to an existing file.',
+      }),
+      saveCodexPath: async (codexPath) => {
+        currentSettings = {
+          settings: {
+            sidekick_codex_path: codexPath,
+          },
+          codexPathSource: codexPath ? 'saved' : 'automatic',
+          effectiveCodexPath: codexPath,
+        };
+
+        return currentSettings;
+      },
+      resetCodexPath: async () => {
+        currentSettings = {
+          settings: {
+            sidekick_codex_path: null,
+          },
+          codexPathSource: 'automatic',
+          effectiveCodexPath: null,
+        };
+
+        return currentSettings;
+      },
+      onCodexOutput: () => () => undefined,
+      onCodexCompletion: () => () => undefined,
+    };
+  }, {
+    settings: mockSettingsSnapshot,
+  });
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Settings' }).click();
+
+  const settingsDetails = page.locator('[data-settings-codex-details]');
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Codex', exact: true })).toBeVisible();
+  await expect(settingsDetails).toContainText('Automatic discovery');
+
+  await page.getByRole('button', { name: 'Choose...' }).click();
+  await expect(page.getByLabel('Path')).toHaveValue('/usr/local/bin/codex');
+
+  await page.getByRole('button', { name: 'Test' }).click();
+  await expect(page.getByText('Codex detected: codex-cli settings-test')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Codex path saved.')).toBeVisible();
+  await expect(settingsDetails).toContainText('Saved setting');
+
+  await page.getByRole('button', { name: 'Reset to automatic discovery' }).click();
+  await expect(page.getByText('Codex path reset to automatic discovery.')).toBeVisible();
+  await expect(page.getByLabel('Path')).toHaveValue('');
+
+  await page.getByRole('button', { name: 'Back to workspace' }).click();
+  await expect(page.getByRole('heading', { name: 'Folder structure' })).toBeVisible();
 });
