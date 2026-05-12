@@ -269,6 +269,65 @@ const mockProjectCreationResult: ProjectCreationResult = {
   },
 };
 
+const mockPartialScan: ProjectFolderScan = {
+  ...mockScan,
+  status: 'partial',
+  warnings: [
+    {
+      path: '06-eksporter',
+      type: 'read-error',
+      severity: 'warning',
+      message: 'Kunne ikke lese mappen.',
+    },
+  ],
+  summary: {
+    ...mockScan.summary,
+    limitsReached: {
+      maxDepth: false,
+      maxFiles: true,
+    },
+  },
+};
+
+const mockEmptyScan: ProjectFolderScan = {
+  ...mockScan,
+  rootPath: '/tmp/empty-sidekick-project',
+  rootName: 'empty-sidekick-project',
+  tree: {
+    name: 'empty-sidekick-project',
+    relativePath: '.',
+    kind: 'folder',
+    children: [],
+    folderSignals: [],
+    contextHints: [],
+    modifiedAt: '2026-05-09T12:00:00.000Z',
+  },
+  summary: {
+    fileCount: 0,
+    folderCount: 0,
+    artifactTypeCounts: {
+      ...createArtifactCounts(),
+      'markdown-text': 0,
+      document: 0,
+      pdf: 0,
+      image: 0,
+    },
+    folderSignalCounts: {
+      background: 0,
+      transcript: 0,
+      'information-model': 0,
+      architecture: 0,
+      thematic: 0,
+    },
+    recentFiles: [],
+    limitsReached: {
+      maxDepth: false,
+      maxFiles: false,
+    },
+  },
+  warnings: [],
+};
+
 test('renders the folder inspection empty state', async ({ page }) => {
   await page.goto('/');
 
@@ -458,6 +517,178 @@ test('shows a project creation error and keeps the dialog usable', async ({ page
   await expect(page.getByRole('dialog', { name: 'Opprett ny prosjektmappe' })).toBeVisible();
   await expect(page.getByText('Project folder already exists.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Opprett mappe' })).toBeEnabled();
+});
+
+test('renders the refreshed project overview at minimum viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 1040, height: 720 });
+  await page.addInitScript(
+    ({ scan, preview }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
+        createProjectFolder: async () => null,
+        previewContextPackage: async () => preview,
+        generateContextPackage: async () => {
+          throw new Error('No context package result.');
+        },
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+        getCodexStatus: async () => ({
+          state: 'ready',
+          available: true,
+          loggedIn: true,
+          version: 'codex-cli 0.130.0-test',
+        }),
+        startCodexLogin: async () => ({ runId: 'login-run' }),
+        startCodexRun: async () => ({ runId: 'codex-run' }),
+        cancelCodexRun: async () => undefined,
+        onCodexOutput: () => () => undefined,
+        onCodexCompletion: () => () => undefined,
+      };
+    },
+    {
+      scan: mockScan,
+      preview: mockContextPackagePreview,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+
+  await expect(page.locator('[data-overview-title]')).toHaveText('Prosjektoversikt');
+  await expect(page.getByLabel('Valgt prosjektmappe')).toContainText('/tmp/sidekick-project');
+
+  const stats = page.locator('[data-overview-stats]');
+  await expect(stats).toContainText('Filer');
+  await expect(stats).toContainText('3');
+  await expect(stats).toContainText('Mapper');
+  await expect(stats).toContainText('2');
+  await expect(stats).toContainText('Siste skanning');
+  await expect(stats).toContainText('Kontekstpakke');
+
+  await expect(page.locator('[data-overview-context-package-status]')).toHaveText('Finnes');
+  await expect(page.locator('[data-overview-scan-status]')).toContainText('Fullført');
+  await expect(page.getByRole('treeitem', { name: /01-bakgrunn/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Generer kontekstpakke' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Importer transkripsjon' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Kjør Codex' })).toBeVisible();
+});
+
+test('shows partial scan status and warnings in the overview', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan, preview }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
+        createProjectFolder: async () => null,
+        previewContextPackage: async () => preview,
+        generateContextPackage: async () => {
+          throw new Error('No context package result.');
+        },
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+        getCodexStatus: async () => ({
+          state: 'ready',
+          available: true,
+          loggedIn: true,
+          version: 'codex-cli 0.130.0-test',
+        }),
+        startCodexLogin: async () => ({ runId: 'login-run' }),
+        startCodexRun: async () => ({ runId: 'codex-run' }),
+        cancelCodexRun: async () => undefined,
+        onCodexOutput: () => () => undefined,
+        onCodexCompletion: () => () => undefined,
+      };
+    },
+    {
+      scan: mockPartialScan,
+      preview: {
+        ...mockContextPackagePreview,
+        willOverwrite: false,
+      },
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Prosjektoversikt (delvis)' })).toBeVisible();
+  await expect(page.locator('[data-overview-scan-status]')).toContainText('Delvis');
+  await expect(page.locator('[data-overview-context-package-status]')).toHaveText('Mangler');
+  await expect(page.locator('[data-warnings]')).toContainText(
+    'Skanningen traff maks antall filer.',
+  );
+  await expect(page.locator('[data-warnings]')).toContainText(
+    '06-eksporter: Kunne ikke lese mappen.',
+  );
+});
+
+test('shows an empty scanned project as an overview state', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan, preview }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
+        createProjectFolder: async () => null,
+        previewContextPackage: async () => preview,
+        generateContextPackage: async () => {
+          throw new Error('No context package result.');
+        },
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+        getCodexStatus: async () => ({
+          state: 'ready',
+          available: true,
+          loggedIn: true,
+          version: 'codex-cli 0.130.0-test',
+        }),
+        startCodexLogin: async () => ({ runId: 'login-run' }),
+        startCodexRun: async () => ({ runId: 'codex-run' }),
+        cancelCodexRun: async () => undefined,
+        onCodexOutput: () => () => undefined,
+        onCodexCompletion: () => () => undefined,
+      };
+    },
+    {
+      scan: mockEmptyScan,
+      preview: {
+        ...mockContextPackagePreview,
+        willOverwrite: false,
+      },
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Prosjektmappen er tom' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Velg en prosjektmappe' })).toHaveCount(0);
+  await expect(page.locator('[data-overview-stats]')).toContainText('0');
+  await expect(page.locator('[data-warnings]')).toContainText('Ingen varsler');
 });
 
 test('expands and collapses scanned folders', async ({ page }) => {

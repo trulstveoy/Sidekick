@@ -38,7 +38,10 @@
           <header class="workspace-header">
             <div>
               <p class="eyebrow">Lesende inspeksjon</p>
-              <h2>Mappestruktur</h2>
+              <h2 data-overview-title>Mappestruktur</h2>
+              <p class="workspace-subtitle" data-overview-subtitle>
+                Velg en mappe for å se prosjektoversikt.
+              </p>
             </div>
             <div class="workspace-header__actions" data-tree-toolbar hidden>
               <button class="btn btn-secondary btn-sm" type="button" data-expand-all aria-label="Utvid alle mapper">
@@ -50,7 +53,7 @@
             </div>
           </header>
 
-          <dl class="stats-strip" data-summary aria-label="Prosjektstatistikk">
+          <dl class="stats-strip" data-summary data-overview-stats aria-label="Prosjektstatistikk">
             <div>
               <dt>Files</dt>
               <dd>0</dd>
@@ -95,6 +98,11 @@
             <p data-state-message>Read-only scan of structure, metadata, and artifact types.</p>
           </section>
 
+          <section class="overview-empty" data-overview-empty hidden>
+            <h3>Prosjektmappen er tom</h3>
+            <p>Sidekick fant ingen filer eller undermapper i denne prosjektmappen.</p>
+          </section>
+
           <section class="tree-panel" aria-label="Folder tree">
             <ol class="folder-tree" data-folder-tree role="tree" aria-label="Scanned folder tree"></ol>
           </section>
@@ -102,7 +110,17 @@
 
         <aside class="context-surface" data-context-surface aria-label="Kontekst og handlinger">
           <section class="surface-section">
-            <p class="section-label">Transcriptions</p>
+            <p class="section-label">Skannet</p>
+            <dl class="detail-list" data-overview-scan-status></dl>
+          </section>
+
+          <section class="surface-section">
+            <p class="section-label">Kontekstpakke</p>
+            <p class="status-chip" data-overview-context-package-status>Ikke sjekket</p>
+          </section>
+
+          <section class="surface-section surface-section--workflow">
+            <p class="section-label">Transkripsjoner</p>
             <div class="transcription-import-panel">
               <h3 data-transcription-import-title>Ingen prosjektmappe valgt</h3>
               <p data-transcription-import-message>Choose a folder first.</p>
@@ -119,8 +137,8 @@
             </div>
           </section>
 
-          <section class="surface-section">
-            <p class="section-label">Context package</p>
+          <section class="surface-section surface-section--workflow">
+            <p class="section-label">Kontekstpakke</p>
             <div class="context-package-panel">
               <h3 data-context-package-title>Ingen prosjektmappe valgt</h3>
               <p data-context-package-message>Choose a folder first.</p>
@@ -137,7 +155,7 @@
             </div>
           </section>
 
-          <section class="surface-section">
+          <section class="surface-section surface-section--workflow">
             <p class="section-label">Codex</p>
             <div class="codex-panel">
               <h3 data-codex-title>Ingen prosjektmappe valgt</h3>
@@ -168,28 +186,28 @@
           </section>
 
           <section class="surface-section">
-            <p class="section-label">Folder signals</p>
+            <p class="section-label">Mappesignaler</p>
             <ul class="signal-list plain-list" data-folder-signals>
               <li>No signals yet</li>
             </ul>
           </section>
 
           <section class="surface-section">
-            <p class="section-label">Artifact counts</p>
+            <p class="section-label">Artefakttyper</p>
             <ul class="metric-list plain-list" data-artifact-counts>
               <li>No artifacts yet</li>
             </ul>
           </section>
 
           <section class="surface-section">
-            <p class="section-label">Recent files</p>
+            <p class="section-label">Nylig endret</p>
             <ul class="file-list plain-list" data-recent-files>
               <li>No recent files yet</li>
             </ul>
           </section>
 
           <section class="surface-section">
-            <p class="section-label">Warnings</p>
+            <p class="section-label">Varsler</p>
             <ul class="warning-list plain-list" data-warnings>
               <li>No warnings</li>
             </ul>
@@ -309,7 +327,16 @@
       </section>
 
       <footer class="action-bar" data-action-bar>
-        <button class="btn btn-primary" type="button" data-choose-folder>Velg mappe</button>
+        <button class="btn btn-primary" type="button" data-overview-action-generate-context>
+          Generer kontekstpakke
+        </button>
+        <button class="btn btn-secondary" type="button" data-overview-action-import-transcription>
+          Importer transkripsjon
+        </button>
+        <button class="btn btn-secondary" type="button" data-overview-action-run-codex>
+          Kjør Codex
+        </button>
+        <button class="btn btn-ghost" type="button" data-choose-folder>Bytt prosjekt</button>
       </footer>
 
       <footer class="status-bar" data-status-bar>

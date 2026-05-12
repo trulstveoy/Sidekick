@@ -15,9 +15,10 @@ The workflow is deliberately tool-neutral. It does not require a specific agent 
 3. Plan
 4. Build
 5. Verify
-6. Review
-7. Document
-8. Close
+6. Ready For Review
+7. Review
+8. Document
+9. Close
 
 ## Purpose
 
@@ -89,6 +90,7 @@ Planned
 Approved
 Building
 Verifying
+Ready For Review
 Reviewing
 Documenting
 Done
@@ -103,6 +105,7 @@ Status rules:
 - Use the repository backlog document for smaller deferred ideas that are not yet Task Records.
 - Use `Blocked` when progress requires human input or unavailable external access.
 - Use `Approved` only when a required human gate has been cleared.
+- Use `Ready For Review` when build and verification are complete and the task is waiting for human review.
 - Use `Done` only after closeout.
 - Move task records with `Done` status into the repository's closed-task archive when one exists.
 - Use `Canceled` when the task is intentionally abandoned.
@@ -1118,9 +1121,40 @@ Notes:
 - [ ] Failures fixed or documented with evidence.
 - [ ] Skipped checks explained.
 - [ ] Verification matches acceptance criteria.
-- [ ] Task status moved to `Verifying` or next appropriate state.
+- [ ] Task status moved to `Ready For Review` when verification is complete and human review is pending.
 
-## Phase 6: Review
+## Phase 6: Ready For Review
+
+### Purpose
+
+Make the handoff point between agent verification and human review explicit.
+
+`Ready For Review` means the agent believes Build and Verify are complete, the Task Record has been updated with evidence, and the task is waiting for the human to inspect or approve the result.
+
+### Agent Behavior
+
+The agent should:
+
+- stop implementation work unless the human asks for changes;
+- keep the working state available for human testing;
+- clearly state what changed and what was verified;
+- avoid closing the task before human review when review is required.
+
+The agent should not:
+
+- treat `Ready For Review` as `Done`;
+- move completed tasks to the closed-task archive before approval;
+- start dependent build work unless the human explicitly allows it.
+
+### Completion Checklist
+
+- [ ] Build Log is current.
+- [ ] Verification Log is current.
+- [ ] Review Notes contain the agent's self-review.
+- [ ] Human has been told how to inspect or test the result.
+- [ ] Task status moved to `Ready For Review`.
+
+## Phase 7: Review
 
 ### Purpose
 
@@ -1190,7 +1224,7 @@ Follow-up items:
 - [ ] Decision record updated if the review uncovered a durable decision.
 - [ ] Task status moved to `Reviewing` or next appropriate state.
 
-## Phase 7: Document
+## Phase 8: Document
 
 ### Purpose
 
@@ -1249,7 +1283,7 @@ Decision record needed:
 - [ ] Intentional doc omissions explained if needed.
 - [ ] Task status moved to `Documenting` or next appropriate state.
 
-## Phase 8: Close
+## Phase 9: Close
 
 ### Purpose
 

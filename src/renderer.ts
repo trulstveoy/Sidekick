@@ -52,6 +52,13 @@ type ProjectCreationState =
   | { status: 'complete'; message: string; parentPath: string | null }
   | { status: 'error'; message: string; parentPath: string | null };
 
+type OverviewContextPackageStatus =
+  | { status: 'unavailable' }
+  | { status: 'checking'; rootPath: string }
+  | { status: 'exists'; rootPath: string; outputFileName: string }
+  | { status: 'missing'; rootPath: string; outputFileName: string }
+  | { status: 'unknown'; rootPath?: string; message: string };
+
 type CodexState =
   | { status: 'unavailable'; message: string }
   | { status: 'checking' }
@@ -118,6 +125,22 @@ const folderSignalsTarget = document.querySelector<HTMLUListElement>('[data-fold
 const stateBannerTarget = document.querySelector<HTMLElement>('[data-state-banner]');
 const stateTitleTarget = document.querySelector<HTMLElement>('[data-state-title]');
 const stateMessageTarget = document.querySelector<HTMLElement>('[data-state-message]');
+const overviewTitleTarget = document.querySelector<HTMLElement>('[data-overview-title]');
+const overviewSubtitleTarget = document.querySelector<HTMLElement>('[data-overview-subtitle]');
+const overviewEmptyTarget = document.querySelector<HTMLElement>('[data-overview-empty]');
+const overviewScanStatusTarget = document.querySelector<HTMLElement>('[data-overview-scan-status]');
+const overviewContextPackageStatusTarget = document.querySelector<HTMLElement>(
+  '[data-overview-context-package-status]',
+);
+const overviewGenerateContextButton = document.querySelector<HTMLButtonElement>(
+  '[data-overview-action-generate-context]',
+);
+const overviewImportTranscriptionButton = document.querySelector<HTMLButtonElement>(
+  '[data-overview-action-import-transcription]',
+);
+const overviewRunCodexButton = document.querySelector<HTMLButtonElement>(
+  '[data-overview-action-run-codex]',
+);
 const treeToolbarTarget = document.querySelector<HTMLElement>('[data-tree-toolbar]');
 const treeTarget = document.querySelector<HTMLOListElement>('[data-folder-tree]');
 const expandAllButton = document.querySelector<HTMLButtonElement>('[data-expand-all]');
@@ -173,33 +196,34 @@ const settingsResetCodexButton = document.querySelector<HTMLButtonElement>(
 );
 
 const artifactLabels: Record<ArtifactType, string> = {
-  'markdown-text': 'Markdown/text',
-  document: 'Documents',
+  'markdown-text': 'Markdown/tekst',
+  document: 'Dokumenter',
   pdf: 'PDFs',
-  image: 'Images',
-  audio: 'Audio',
+  image: 'Bilder',
+  audio: 'Lyd',
   video: 'Video',
-  'spreadsheet-data': 'Spreadsheets/data',
-  presentation: 'Presentations',
+  'spreadsheet-data': 'Regneark/data',
+  presentation: 'Presentasjoner',
   drawio: 'draw.io',
-  transcript: 'Transcripts',
-  note: 'Notes',
-  'information-model': 'Information models',
-  architecture: 'Architecture',
-  unclassified: 'Unclassified',
+  transcript: 'Transkripsjoner',
+  note: 'Notater',
+  'information-model': 'Informasjonsmodeller',
+  architecture: 'Arkitektur',
+  unclassified: 'Uklassifisert',
 };
 
 const signalLabels: Record<FolderSignal, string> = {
-  background: 'Background',
-  transcript: 'Transcripts',
-  'information-model': 'Information models',
-  architecture: 'Architecture',
-  thematic: 'Thematic',
+  background: 'Bakgrunn',
+  transcript: 'Transkripsjonmappe',
+  'information-model': 'Informasjonsmodeller',
+  architecture: 'Arkitektur',
+  thematic: 'Tematisk',
 };
 
 let state: ViewState = { status: 'empty' };
 let expandedPaths = new Set<string>();
 let contextPackageState: ContextPackageState = { status: 'unavailable' };
+let overviewContextPackageStatus: OverviewContextPackageStatus = { status: 'unavailable' };
 let transcriptionImportState: TranscriptionImportState = { status: 'unavailable' };
 let projectCreationState: ProjectCreationState = {
   status: 'closed',
@@ -288,14 +312,110 @@ const formatDate = (value?: string) => {
     return '';
   }
 
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat('nb-NO', {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
 };
 
+const formatShortDate = (value?: string) => {
+  if (!value) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat('nb-NO', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(new Date(value));
+};
+
+const isOverviewContextPackageStatusForScan = (scan: ProjectFolderScan) =>
+  overviewContextPackageStatus.status !== 'unavailable' &&
+  overviewContextPackageStatus.status !== 'unknown' &&
+  overviewContextPackageStatus.rootPath === scan.rootPath;
+
+const contextPackageStatusText = (scan?: ProjectFolderScan) => {
+  if (!scan || !isOverviewContextPackageStatusForScan(scan)) {
+    return overviewContextPackageStatus.status === 'unknown' ? 'Ukjent' : 'Ikke sjekket';
+  }
+
+  if (overviewContextPackageStatus.status === 'checking') {
+    return 'Sjekker';
+  }
+
+  if (overviewContextPackageStatus.status === 'exists') {
+    return 'Finnes';
+  }
+
+  return 'Mangler';
+};
+
+const overviewWarningCount = (scan: ProjectFolderScan) => {
+  let count = scan.warnings.length;
+
+  if (scan.summary.limitsReached.maxDepth) {
+    count += 1;
+  }
+
+  if (scan.summary.limitsReached.maxFiles) {
+    count += 1;
+  }
+
+  return count;
+};
+
+const collectFileArtifactTypes = (node: FolderTreeNode, types = new Set<ArtifactType>()) => {
+  if (!isFolderNode(node) && node.artifactType) {
+    types.add(node.artifactType);
+  }
+
+  getChildren(node).forEach((child) => collectFileArtifactTypes(child, types));
+
+  return types;
+};
+
+const countFilesInNode = (node: FolderTreeNode): number =>
+  getChildren(node).reduce(
+    (count, child) => count + (isFolderNode(child) ? countFilesInNode(child) : 1),
+    0,
+  );
+
+const getFolderSignalLabel = (node: FolderTreeNode) => {
+  const signal = node.folderSignals?.[0] ?? node.contextHints[0];
+
+  return signal ? signalLabels[signal] : 'Ingen tydelig signal';
+};
+
+const overviewWarnings = (scan?: ProjectFolderScan) => {
+  if (!scan) {
+    return [];
+  }
+
+  const warnings = scan.warnings.map((warning) => `${warning.path}: ${warning.message}`);
+
+  if (scan.summary.limitsReached.maxDepth) {
+    warnings.unshift('Skanningen traff maks dybde. Oversikten kan være ufullstendig.');
+  }
+
+  if (scan.summary.limitsReached.maxFiles) {
+    warnings.unshift('Skanningen traff maks antall filer. Oversikten kan være ufullstendig.');
+  }
+
+  if (scan.status === 'partial' && warnings.length === 0) {
+    warnings.unshift('Skanningen er delvis. Se prosjektmappen manuelt ved behov.');
+  }
+
+  return warnings;
+};
+
 const setContextPackageStateForScan = (scan?: ProjectFolderScan) => {
   contextPackageState = scan && window.sidekick ? { status: 'ready' } : { status: 'unavailable' };
+};
+
+const setOverviewContextPackageStatusForScan = (scan?: ProjectFolderScan) => {
+  overviewContextPackageStatus = scan && window.sidekick
+    ? { status: 'checking', rootPath: scan.rootPath }
+    : { status: 'unavailable' };
 };
 
 const setTranscriptionImportStateForScan = (scan?: ProjectFolderScan) => {
@@ -313,6 +433,7 @@ const setCodexStateForScan = (scan?: ProjectFolderScan) => {
 const setActiveScan = (scan: ProjectFolderScan) => {
   resetExpandedPaths();
   setContextPackageStateForScan(scan);
+  setOverviewContextPackageStatusForScan(scan);
   setTranscriptionImportStateForScan(scan);
   setCodexStateForScan(scan);
   state = scan.status === 'partial' ? { status: 'partial', scan } : { status: 'ready', scan };
@@ -334,14 +455,14 @@ const getDirectChildSummary = (node: FolderTreeNode) => {
   const parts = [];
 
   if (folderCount > 0) {
-    parts.push(`${folderCount} ${folderCount === 1 ? 'folder' : 'folders'}`);
+    parts.push(`${folderCount} ${folderCount === 1 ? 'mappe' : 'mapper'}`);
   }
 
   if (fileCount > 0) {
-    parts.push(`${fileCount} ${fileCount === 1 ? 'file' : 'files'}`);
+    parts.push(`${fileCount} ${fileCount === 1 ? 'fil' : 'filer'}`);
   }
 
-  return parts.length > 0 ? parts.join(' / ') : 'Empty';
+  return parts.length > 0 ? parts.join(' / ') : 'Tom';
 };
 
 const collectFolderPaths = (node: FolderTreeNode, paths = new Set<string>()) => {
@@ -398,24 +519,40 @@ const renderSummary = (scan?: ProjectFolderScan) => {
 
   const rows: DetailRow[] = scan
     ? [
-        ['Files', scan.summary.fileCount.toString()],
-        ['Folders', scan.summary.folderCount.toString()],
-        ['Status', scan.status === 'partial' ? 'Partial' : 'Complete'],
+        ['Filer', scan.summary.fileCount.toString()],
+        ['Mapper', scan.summary.folderCount.toString()],
+        ['Siste skanning', formatShortDate(scan.scannedAt)],
+        ['Kontekstpakke', contextPackageStatusText(scan)],
+        ['Transkripsjoner', scan.summary.artifactTypeCounts.transcript.toString()],
+        ['Varsler', overviewWarningCount(scan).toString()],
+        ['Markdown/tekst', scan.summary.artifactTypeCounts['markdown-text'].toString()],
       ]
     : [
-        ['Files', '0'],
-        ['Folders', '0'],
-        ['Status', 'Waiting'],
+        ['Filer', '0'],
+        ['Mapper', '0'],
+        ['Siste skanning', '-'],
+        ['Kontekstpakke', 'Ikke sjekket'],
       ];
 
-  summaryTarget.replaceChildren(...rows.map(createDetailRow));
+  summaryTarget.replaceChildren(
+    ...rows.map((row, index) => {
+      const item = createDetailRow(row);
+      if (index > 3) {
+        item.className = 'stats-strip__optional';
+      }
+      if (row[0] === 'Varsler' && scan && overviewWarningCount(scan) > 0) {
+        item.dataset.status = 'warning';
+      }
+      return item;
+    }),
+  );
 };
 
 const renderArtifactCounts = (scan?: ProjectFolderScan) => {
   clear(artifactCountsTarget);
 
   if (!artifactCountsTarget || !scan) {
-    artifactCountsTarget?.append(createListItem('No artifacts yet'));
+    artifactCountsTarget?.append(createListItem('Ingen artefakter ennå'));
     return;
   }
 
@@ -423,14 +560,14 @@ const renderArtifactCounts = (scan?: ProjectFolderScan) => {
     .filter(([, count]) => count > 0)
     .map(([type, count]) => `${artifactLabels[type as ArtifactType]}: ${count}`);
 
-  artifactCountsTarget.append(...(rows.length ? rows : ['No artifacts found']).map(createListItem));
+  artifactCountsTarget.append(...(rows.length ? rows : ['Ingen artefakter funnet']).map(createListItem));
 };
 
 const renderFolderSignals = (scan?: ProjectFolderScan) => {
   clear(folderSignalsTarget);
 
   if (!folderSignalsTarget || !scan) {
-    folderSignalsTarget?.append(createListItem('No signals yet'));
+    folderSignalsTarget?.append(createListItem('Ingen mappesignaler ennå'));
     return;
   }
 
@@ -438,14 +575,16 @@ const renderFolderSignals = (scan?: ProjectFolderScan) => {
     .filter(([, count]) => count > 0)
     .map(([signal, count]) => `${signalLabels[signal as FolderSignal]}: ${count}`);
 
-  folderSignalsTarget.append(...(rows.length ? rows : ['No folder signals found']).map(createListItem));
+  folderSignalsTarget.append(
+    ...(rows.length ? rows : ['Ingen mappesignaler funnet']).map(createListItem),
+  );
 };
 
 const renderRecentFiles = (scan?: ProjectFolderScan) => {
   clear(recentFilesTarget);
 
   if (!recentFilesTarget || !scan || scan.summary.recentFiles.length === 0) {
-    recentFilesTarget?.append(createListItem('No recent files yet'));
+    recentFilesTarget?.append(createListItem('Ingen nylig endrede filer'));
     return;
   }
 
@@ -467,13 +606,51 @@ const renderWarnings = (warnings: ScanWarning[] = []) => {
   clear(warningsTarget);
 
   if (!warningsTarget || warnings.length === 0) {
-    warningsTarget?.append(createListItem('No warnings'));
+    warningsTarget?.append(createListItem('Ingen varsler'));
     return;
   }
 
   warningsTarget.append(
     ...warnings.map((warning) => createListItem(`${warning.path}: ${warning.message}`)),
   );
+};
+
+const renderOverviewWarnings = (scan?: ProjectFolderScan) => {
+  clear(warningsTarget);
+
+  const warnings = overviewWarnings(scan);
+
+  if (!warningsTarget || warnings.length === 0) {
+    warningsTarget?.append(createListItem('Ingen varsler'));
+    return;
+  }
+
+  warningsTarget.append(...warnings.map(createListItem));
+};
+
+const renderOverviewScanStatus = (scan?: ProjectFolderScan) => {
+  if (!scan) {
+    renderDetails(overviewScanStatusTarget, []);
+    return;
+  }
+
+  renderDetails(overviewScanStatusTarget, [
+    ['Status', scan.status === 'partial' ? 'Delvis' : 'Fullført'],
+    ['Tidspunkt', formatDate(scan.scannedAt)],
+    ['Filer', scan.summary.fileCount.toString()],
+    ['Mapper', scan.summary.folderCount.toString()],
+  ]);
+};
+
+const renderOverviewContextPackageStatus = (scan?: ProjectFolderScan) => {
+  if (!overviewContextPackageStatusTarget) {
+    return;
+  }
+
+  const statusText = contextPackageStatusText(scan);
+  overviewContextPackageStatusTarget.textContent = statusText;
+  overviewContextPackageStatusTarget.dataset.status =
+    statusText === 'Finnes' ? 'success' : statusText === 'Mangler' ? 'warning' : 'neutral';
 };
 
 const normalizeDisplayPath = (pathValue: string) => pathValue.replace(/[\\/]+$/, '');
@@ -1029,7 +1206,10 @@ const appendTreeNodeMeta = (row: HTMLDivElement, node: FolderTreeNode) => {
   if (isFolderNode(node)) {
     const meta = document.createElement('span');
     meta.className = 'tree-meta';
-    meta.textContent = getDirectChildSummary(node);
+    const fileCount = countFilesInNode(node);
+    meta.textContent = `${getDirectChildSummary(node)} · ${fileCount} ${
+      fileCount === 1 ? 'fil totalt' : 'filer totalt'
+    }`;
     row.append(meta);
   } else if (node.artifactType) {
     const meta = document.createElement('span');
@@ -1040,7 +1220,15 @@ const appendTreeNodeMeta = (row: HTMLDivElement, node: FolderTreeNode) => {
 };
 
 const appendTreeNodeHints = (row: HTMLDivElement, node: FolderTreeNode) => {
-  if (node.contextHints.length > 0) {
+  if (isFolderNode(node)) {
+    const hints = document.createElement('span');
+    const artifacts = [...collectFileArtifactTypes(node)]
+      .slice(0, 3)
+      .map((type) => artifactLabels[type]);
+    hints.className = 'tree-hints';
+    hints.textContent = artifacts.length > 0 ? artifacts.join(', ') : getFolderSignalLabel(node);
+    row.append(hints);
+  } else if (node.contextHints.length > 0) {
     const hints = document.createElement('span');
     hints.className = 'tree-hints';
     hints.textContent = node.contextHints.map((hint) => signalLabels[hint]).join(', ');
@@ -1131,7 +1319,49 @@ const renderTree = (scan?: ProjectFolderScan) => {
   treeTarget.append(renderTreeNode(scan.tree));
 };
 
+const refreshOverviewContextPackageStatus = async (scan: ProjectFolderScan) => {
+  if (!window.sidekick) {
+    overviewContextPackageStatus = { status: 'unavailable' };
+    render();
+    return;
+  }
+
+  const rootPath = scan.rootPath;
+  overviewContextPackageStatus = { status: 'checking', rootPath };
+  render();
+
+  try {
+    const preview = await window.sidekick.previewContextPackage(rootPath);
+    const activeScan = getActiveScan();
+
+    if (!activeScan || activeScan.rootPath !== rootPath) {
+      return;
+    }
+
+    overviewContextPackageStatus = preview.willOverwrite
+      ? { status: 'exists', rootPath, outputFileName: preview.outputFileName }
+      : { status: 'missing', rootPath, outputFileName: preview.outputFileName };
+  } catch (error) {
+    const activeScan = getActiveScan();
+
+    if (!activeScan || activeScan.rootPath !== rootPath) {
+      return;
+    }
+
+    overviewContextPackageStatus = {
+      status: 'unknown',
+      rootPath,
+      message: error instanceof Error ? error.message : 'Kunne ikke sjekke kontekstpakke.',
+    };
+  }
+
+  render();
+};
+
 const renderNoScanPanels = () => {
+  overviewEmptyTarget?.toggleAttribute('hidden', true);
+  renderOverviewScanStatus();
+  renderOverviewContextPackageStatus();
   renderContextPackage();
   renderTranscriptionImport();
   renderCodex();
@@ -1149,6 +1379,8 @@ const renderEmptyState = () => {
   projectEntryErrorTarget?.toggleAttribute('hidden', true);
   setText(stateTitleTarget, 'Velg en prosjektmappe');
   setText(stateMessageTarget, 'Sidekick skanner lokale mapper lesebeskyttet.');
+  setText(overviewTitleTarget, 'Mappestruktur');
+  setText(overviewSubtitleTarget, 'Velg en mappe for å se prosjektoversikt.');
   renderSummary();
   renderArtifactCounts();
   renderFolderSignals();
@@ -1161,6 +1393,9 @@ const renderLoadingState = () => {
   setText(statusMessageTarget, 'Leser mappeinnhold...');
   setText(stateTitleTarget, 'Leser mappeinnhold');
   setText(stateMessageTarget, 'Ingen filer endres. Kun lesing.');
+  setText(overviewTitleTarget, 'Leser mappeinnhold');
+  setText(overviewSubtitleTarget, 'Sidekick inspiserer mappen uten å endre filer.');
+  overviewEmptyTarget?.toggleAttribute('hidden', true);
   renderNoScanPanels();
 };
 
@@ -1170,6 +1405,9 @@ const renderErrorState = (message: string) => {
   projectEntryErrorTarget?.toggleAttribute('hidden', false);
   setText(stateTitleTarget, 'Kan ikke åpne mappen');
   setText(stateMessageTarget, message);
+  setText(overviewTitleTarget, 'Kan ikke åpne mappen');
+  setText(overviewSubtitleTarget, 'Velg en annen mappe eller prøv igjen.');
+  overviewEmptyTarget?.toggleAttribute('hidden', true);
   renderContextPackage();
   renderTranscriptionImport();
   renderCodex();
@@ -1185,6 +1423,7 @@ const renderErrorState = (message: string) => {
 
 const renderReadyState = (scan: ProjectFolderScan, status: 'ready' | 'partial') => {
   const newestFile = scan.summary.recentFiles[0];
+  const hasProjectContent = getChildren(scan.tree).length > 0;
 
   setText(selectedNameTarget, scan.rootName);
   setText(selectedPathTarget, scan.rootPath);
@@ -1194,18 +1433,31 @@ const renderReadyState = (scan: ProjectFolderScan, status: 'ready' | 'partial') 
       scan.scannedAt,
     )}`,
   );
-  setText(stateTitleTarget, status === 'partial' ? 'Partial folder overview' : 'Folder overview');
+  setText(stateTitleTarget, status === 'partial' ? 'Delvis prosjektoversikt' : 'Prosjektoversikt');
   setText(
     stateMessageTarget,
     newestFile
-      ? `Last changed: ${formatDate(newestFile.modifiedAt)}. Folder categories are inferred hints.`
-      : 'Folder categories are inferred hints.',
+      ? `Sist endret: ${formatDate(newestFile.modifiedAt)}. Mappesignaler er tolkningshjelp.`
+      : 'Mappesignaler er tolkningshjelp.',
   );
+  setText(
+    overviewTitleTarget,
+    status === 'partial' ? 'Prosjektoversikt (delvis)' : 'Prosjektoversikt',
+  );
+  setText(
+    overviewSubtitleTarget,
+    hasProjectContent
+      ? 'Nøkkeltall, mappesignaler og nylig aktivitet i valgt prosjektmappe.'
+      : 'Sidekick fant ingen filer eller undermapper i prosjektmappen.',
+  );
+  overviewEmptyTarget?.toggleAttribute('hidden', hasProjectContent);
   renderSummary(scan);
   renderArtifactCounts(scan);
   renderFolderSignals(scan);
   renderRecentFiles(scan);
-  renderWarnings(scan.warnings);
+  renderOverviewWarnings(scan);
+  renderOverviewScanStatus(scan);
+  renderOverviewContextPackageStatus(scan);
   renderContextPackage(scan);
   renderTranscriptionImport(scan);
   renderCodex(scan);
@@ -1266,12 +1518,15 @@ const render = () => {
   chooseFolderButtons.forEach((button) => {
     button.toggleAttribute('disabled', isBusy || !window.sidekick);
   });
+  overviewGenerateContextButton?.toggleAttribute('disabled', !hasActiveProject || isBusy);
+  overviewImportTranscriptionButton?.toggleAttribute('disabled', !hasActiveProject || isBusy);
+  overviewRunCodexButton?.toggleAttribute('disabled', !hasActiveProject || isBusy);
   appMainTarget?.classList.toggle('app-main--single', !hasActiveProject);
   contextSurfaceTarget?.toggleAttribute('hidden', !hasActiveProject);
   actionBarTarget?.toggleAttribute('hidden', !hasActiveProject);
   summaryStripTarget?.toggleAttribute('hidden', !hasActiveProject);
   projectEntryTarget?.toggleAttribute('hidden', !isEntryState);
-  stateBannerTarget?.toggleAttribute('hidden', isEntryState);
+  stateBannerTarget?.toggleAttribute('hidden', isEntryState || hasActiveProject);
   renderProjectCreation();
   renderSettings();
 
@@ -1524,6 +1779,11 @@ const generateContextPackage = async () => {
   try {
     const result = await window.sidekick.generateContextPackage(scan.rootPath);
     contextPackageState = { status: 'complete', result };
+    overviewContextPackageStatus = {
+      status: 'exists',
+      rootPath: scan.rootPath,
+      outputFileName: result.outputFileName,
+    };
   } catch (error) {
     contextPackageState = {
       status: 'error',
@@ -1586,7 +1846,9 @@ const importTranscription = async () => {
     state = nextState;
     expandedPaths = new Set([...expandedPaths, ROOT_PATH, result.targetFolderRelativePath]);
     setContextPackageStateForScan(result.scan);
+    setOverviewContextPackageStatusForScan(result.scan);
     transcriptionImportState = { status: 'complete', result };
+    void refreshOverviewContextPackageStatus(result.scan);
   } catch (error) {
     transcriptionImportState = {
       status: 'error',
@@ -1779,7 +2041,9 @@ const completeCodexRun = (completion: CodexCompletionEvent) => {
         ? { status: 'partial', scan: completion.scan }
         : { status: 'ready', scan: completion.scan };
     setContextPackageStateForScan(completion.scan);
+    setOverviewContextPackageStatusForScan(completion.scan);
     setTranscriptionImportStateForScan(completion.scan);
+    void refreshOverviewContextPackageStatus(completion.scan);
   }
 
   const output = codexState.output;
@@ -1815,6 +2079,7 @@ const chooseFolder = async () => {
     if (!scan) {
       expandedPaths = new Set();
       setContextPackageStateForScan();
+      setOverviewContextPackageStatusForScan();
       setTranscriptionImportStateForScan();
       setCodexStateForScan();
       state = { status: 'empty' };
@@ -1824,10 +2089,12 @@ const chooseFolder = async () => {
 
     setActiveScan(scan);
     render();
+    void refreshOverviewContextPackageStatus(scan);
     void refreshCodexStatus(scan);
   } catch (error) {
     expandedPaths = new Set();
     setContextPackageStateForScan();
+    setOverviewContextPackageStatusForScan();
     setTranscriptionImportStateForScan();
     setCodexStateForScan();
     state = {
@@ -1956,6 +2223,7 @@ const createProject = async () => {
     }
 
     setActiveScan(result.scan);
+    void refreshOverviewContextPackageStatus(result.scan);
     void refreshCodexStatus(result.scan);
     projectCreationState = {
       status: 'closed',
@@ -2055,16 +2323,19 @@ createProjectButton?.addEventListener('click', () => {
 expandAllButton?.addEventListener('click', expandAllFolders);
 collapseAllButton?.addEventListener('click', collapseAllFolders);
 contextPackagePrimaryButton?.addEventListener('click', handleContextPackagePrimary);
+overviewGenerateContextButton?.addEventListener('click', handleContextPackagePrimary);
 contextPackageSecondaryButton?.addEventListener('click', () => {
   contextPackageState = getActiveScan() ? { status: 'ready' } : { status: 'unavailable' };
   render();
 });
 transcriptionImportPrimaryButton?.addEventListener('click', handleTranscriptionImportPrimary);
+overviewImportTranscriptionButton?.addEventListener('click', handleTranscriptionImportPrimary);
 transcriptionImportSecondaryButton?.addEventListener('click', () => {
   transcriptionImportState = getActiveScan() ? { status: 'ready' } : { status: 'unavailable' };
   render();
 });
 codexPrimaryButton?.addEventListener('click', handleCodexPrimary);
+overviewRunCodexButton?.addEventListener('click', handleCodexPrimary);
 codexSecondaryButton?.addEventListener('click', () => {
   void cancelCodexRun();
 });
