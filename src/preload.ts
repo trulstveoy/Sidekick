@@ -6,6 +6,10 @@ const sidekickApi: SidekickApi = {
   chooseProjectFolder: () => ipcRenderer.invoke('project-folder:choose-and-scan'),
   chooseProjectParentFolder: () => ipcRenderer.invoke('project-folder:choose-parent'),
   createProjectFolder: (request) => ipcRenderer.invoke('project-folder:create', request),
+  chooseProjectFolderForInitialization: () =>
+    ipcRenderer.invoke('project-folder:choose-for-initialization'),
+  confirmProjectInitialization: (previewId) =>
+    ipcRenderer.invoke('project-folder:confirm-initialization', previewId),
   previewContextPackage: (rootPath) => ipcRenderer.invoke('context-package:preview', rootPath),
   generateContextPackage: (rootPath) => ipcRenderer.invoke('context-package:generate', rootPath),
   previewTranscriptionImport: (rootPath) =>

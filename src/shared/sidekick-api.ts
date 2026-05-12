@@ -117,6 +117,36 @@ export type ProjectCreationResult = {
   scan: ProjectFolderScan;
 };
 
+export type ProjectInitializationFolderStatus = 'existing' | 'missing';
+
+export type ProjectInitializationFolder = {
+  name: RequiredProjectFolderName;
+  path: string;
+  status: ProjectInitializationFolderStatus;
+};
+
+export type ProjectInitializationWarning = {
+  path: string;
+  message: string;
+};
+
+export type ProjectInitializationPreview = {
+  previewId: string;
+  rootPath: string;
+  rootName: string;
+  requiredFolders: ProjectInitializationFolder[];
+  existingEntryCount: number;
+  warnings: ProjectInitializationWarning[];
+};
+
+export type ProjectInitializationResult = {
+  status: 'complete';
+  rootPath: string;
+  rootName: string;
+  requiredFolders: ProjectCreationFolder[];
+  scan: ProjectFolderScan;
+};
+
 export type ContextPackageSkippedFile = {
   path: string;
   reason: string;
@@ -260,6 +290,8 @@ export type SidekickApi = {
   createProjectFolder: (
     request: ProjectCreationRequest,
   ) => Promise<ProjectCreationResult | null>;
+  chooseProjectFolderForInitialization: () => Promise<ProjectInitializationPreview | null>;
+  confirmProjectInitialization: (previewId: string) => Promise<ProjectInitializationResult>;
   previewContextPackage: (rootPath: string) => Promise<ContextPackagePreview>;
   generateContextPackage: (rootPath: string) => Promise<ContextPackageResult>;
   previewTranscriptionImport: (rootPath: string) => Promise<TranscriptionImportPreview | null>;

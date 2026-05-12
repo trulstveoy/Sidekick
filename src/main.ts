@@ -8,12 +8,17 @@ import type {
   CodexCompletionEvent,
   CodexRunRequest,
   ProjectCreationRequest,
+  ProjectInitializationPreview,
   TranscriptionImportPreview,
 } from './shared/sidekick-api';
 import { generateContextPackage, getContextPackagePreview } from './main/context-package';
 import { CodexRunner } from './main/codex-runner';
 import { scanProjectFolder } from './main/folder-scanner';
 import { createProjectFolder } from './main/project-creator';
+import {
+  confirmProjectInitialization,
+  createProjectInitializationPreview,
+} from './main/project-initializer';
 import {
   confirmTranscriptionImport,
   createTranscriptionImportPreview,
@@ -44,6 +49,7 @@ const appIconPath = () =>
 const selectedProjectRoots = new Set<string>();
 const selectedProjectParentFolders = new Set<string>();
 const pendingTranscriptionImports = new Map<string, TranscriptionImportPreview>();
+const pendingProjectInitializations = new Map<string, ProjectInitializationPreview>();
 let settingsStore: AppSettingsStore | undefined;
 const codexRunner = new CodexRunner();
 const codexRuns = new Map<
@@ -136,6 +142,51 @@ ipcMain.handle('project-folder:create', async (event, request: ProjectCreationRe
     ...createdProject,
     scan: await scanProjectFolder(createdProject.rootPath),
   };
+});
+
+ipcMain.handle('project-folder:choose-for-initialization', async (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  const dialogOptions: Electron.OpenDialogOptions = {
+    title: 'Choose existing project folder',
+    properties: ['openDirectory'],
+  };
+  const result = window
+    ? await dialog.showOpenDialog(window, dialogOptions)
+    : await dialog.showOpenDialog(dialogOptions);
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+
+  const preview = await createProjectInitializationPreview(result.filePaths[0]);
+  pendingProjectInitializations.set(preview.previewId, preview);
+
+  return preview;
+});
+
+ipcMain.handle('project-folder:confirm-initialization', async (_event, previewId) => {
+  if (typeof previewId !== 'string' || previewId.trim().length === 0) {
+    throw new Error('A project initialization preview is required.');
+  }
+
+  const preview = pendingProjectInitializations.get(previewId);
+
+  if (!preview) {
+    throw new Error('The project initialization preview has expired.');
+  }
+
+  try {
+    const initializedProject = await confirmProjectInitialization(preview.rootPath);
+    selectedProjectRoots.add(initializedProject.rootPath);
+
+    return {
+      status: 'complete',
+      ...initializedProject,
+      scan: await scanProjectFolder(initializedProject.rootPath),
+    };
+  } finally {
+    pendingProjectInitializations.delete(previewId);
+  }
 });
 
 const assertKnownProjectRoot = (rootPath: unknown) => {
