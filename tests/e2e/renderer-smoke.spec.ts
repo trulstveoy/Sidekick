@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import type {
   ArtifactType,
   AppSettingsSnapshot,
@@ -19,6 +19,20 @@ const mockSettingsSnapshot: AppSettingsSnapshot = {
   },
   codexPathSource: 'automatic',
   effectiveCodexPath: null,
+};
+
+const expectWithinViewport = async (locator: Locator, width: number, height: number) => {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+
+  if (!box) {
+    return;
+  }
+
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(width);
+  expect(box.y + box.height).toBeLessThanOrEqual(height);
 };
 
 const createArtifactCounts = () =>
@@ -749,6 +763,75 @@ test('renders the refreshed project overview at minimum viewport', async ({ page
   await expect(page.getByRole('button', { name: 'Generer kontekstpakke' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Importer transkripsjon' })).toBeVisible();
   await expect(page.locator('[data-overview-action-run-codex]')).toBeVisible();
+  await expectWithinViewport(page.locator('[data-app-topbar]'), 1040, 720);
+  await expectWithinViewport(page.locator('[data-overview-stats]'), 1040, 720);
+  await expectWithinViewport(page.locator('[data-action-bar]'), 1040, 720);
+  await expect(
+    page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+  ).resolves.toBe(true);
+});
+
+test('keeps the refreshed shell balanced at reference viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 820 });
+  await page.addInitScript(
+    ({ scan, preview }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
+        createProjectFolder: async () => null,
+        previewContextPackage: async () => preview,
+        generateContextPackage: async () => {
+          throw new Error('No context package result.');
+        },
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+        getCodexStatus: async () => ({
+          state: 'ready',
+          available: true,
+          loggedIn: true,
+          version: 'codex-cli 0.130.0-test',
+        }),
+        startCodexLogin: async () => ({ runId: 'login-run' }),
+        startCodexRun: async () => ({ runId: 'codex-run' }),
+        cancelCodexRun: async () => undefined,
+        onCodexOutput: () => () => undefined,
+        onCodexCompletion: () => () => undefined,
+      };
+    },
+    {
+      scan: mockScan,
+      preview: mockContextPackagePreview,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+
+  const primary = page.locator('[data-primary-workspace]');
+  const context = page.locator('[data-context-surface]');
+  const primaryBox = await primary.boundingBox();
+  const contextBox = await context.boundingBox();
+
+  expect(primaryBox).not.toBeNull();
+  expect(contextBox).not.toBeNull();
+
+  if (primaryBox && contextBox) {
+    expect(primaryBox.x + primaryBox.width).toBeLessThanOrEqual(contextBox.x + 1);
+    expect(contextBox.x + contextBox.width).toBeLessThanOrEqual(1280);
+  }
+
+  await expectWithinViewport(page.locator('[data-app-topbar]'), 1280, 820);
+  await expectWithinViewport(page.locator('[data-action-bar]'), 1280, 820);
+  await expectWithinViewport(page.locator('[data-status-bar]'), 1280, 820);
+  await expect(page.locator('[data-context-surface]')).toContainText('Kontekstpakke');
 });
 
 test('shows partial scan status and warnings in the overview', async ({ page }) => {
@@ -806,6 +889,14 @@ test('shows partial scan status and warnings in the overview', async ({ page }) 
   await expect(page.locator('[data-warnings]')).toContainText(
     '06-eksporter: Kunne ikke lese mappen.',
   );
+  await expect
+    .poll(() =>
+      page
+        .locator('[data-warnings] li')
+        .first()
+        .evaluate((element) => getComputedStyle(element, '::before').content),
+    )
+    .toBe('"!"');
 });
 
 test('shows an empty scanned project as an overview state', async ({ page }) => {
@@ -891,16 +982,16 @@ test('expands and collapses scanned folders', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
 
-  await expect(page.getByRole('tree', { name: 'Scanned folder tree' })).toBeVisible();
+  await expect(page.getByRole('tree', { name: 'Skannet mappetre' })).toBeVisible();
   await expect(page.getByRole('treeitem', { name: /sidekick-project/ })).toBeVisible();
   await expect(page.getByRole('treeitem', { name: /01-bakgrunn/ })).toBeVisible();
   await expect(page.getByText('brief.pdf')).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Expand 01-bakgrunn' }).click();
+  await page.getByRole('button', { name: 'Utvid 01-bakgrunn' }).click();
   await expect(page.getByText('brief.pdf')).toBeVisible();
   await expect(page.getByText('notes.md')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Collapse 01-bakgrunn' }).click();
+  await page.getByRole('button', { name: 'Lukk 01-bakgrunn' }).click();
   await expect(page.getByText('brief.pdf')).toHaveCount(0);
   await expect(page.getByText('notes.md')).toHaveCount(0);
 });
@@ -1022,20 +1113,30 @@ test('supports keyboard navigation and breadcrumb selection in the folder tree',
 
   const rootRow = page.locator('.tree-row[data-tree-path="."]');
   await rootRow.focus();
-  await rootRow.press('ArrowDown');
-  await page.locator('.tree-row[data-tree-path="01-bakgrunn"]').press('Enter');
+  await expect(rootRow).toBeFocused();
+  await expect
+    .poll(() =>
+      rootRow.evaluate((element) => Number.parseFloat(getComputedStyle(element).outlineWidth)),
+    )
+    .toBeGreaterThanOrEqual(2);
 
-  await expect(page.locator('[role="treeitem"][data-tree-path="01-bakgrunn"]')).toHaveAttribute(
+  await rootRow.press('ArrowDown');
+  const backgroundRow = page.locator('.tree-row[data-tree-path="01-bakgrunn"]');
+  await expect(backgroundRow).toBeFocused();
+  await backgroundRow.press('Enter');
+
+  const backgroundItem = page.locator('[role="treeitem"][data-tree-path="01-bakgrunn"]');
+  await expect(backgroundItem).toHaveAttribute(
     'aria-selected',
     'true',
   );
+  await expect
+    .poll(() => backgroundRow.evaluate((element) => getComputedStyle(element).boxShadow))
+    .not.toBe('none');
   await expect(page.locator('[data-selection-title]')).toHaveText('01-bakgrunn');
 
-  await page.locator('.tree-row[data-tree-path="01-bakgrunn"]').press('ArrowRight');
-  await expect(page.locator('[role="treeitem"][data-tree-path="01-bakgrunn"]')).toHaveAttribute(
-    'aria-expanded',
-    'true',
-  );
+  await backgroundRow.press('ArrowRight');
+  await expect(backgroundItem).toHaveAttribute('aria-expanded', 'true');
 
   await page.locator('.tree-row[data-tree-path="01-bakgrunn/research"]').click();
   await expect(page.locator('[data-selection-title]')).toHaveText('research');
@@ -1205,7 +1306,7 @@ test('confirms and displays an imported transcription', async ({ page }) => {
   await expect(page.getByText('Originalfilen er uendret på kildestedet.')).toBeVisible();
   await expect(transcriptionDetails).toContainText('00. new-transcription.md');
   await expect(
-    page.getByRole('tree', { name: 'Scanned folder tree' }).getByText('00. new-transcription.md'),
+    page.getByRole('tree', { name: 'Skannet mappetre' }).getByText('00. new-transcription.md'),
   ).toBeVisible();
   await expect(
     page.getByRole('treeitem', { name: '00. new-transcription.md' }),
@@ -1283,6 +1384,78 @@ test('shows no-change feedback when transcript import preview fails', async ({ p
   await expect(page.getByText('No transcription folder was detected in this project.')).toBeVisible();
   await expect(page.getByText('Ingen filer ble endret')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Prøv igjen' })).toBeEnabled();
+});
+
+test('operates refreshed workflow controls from keyboard focus', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan, contextPreview, contextResult, importPreview, importResult }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
+        createProjectFolder: async () => null,
+        previewContextPackage: async () => contextPreview,
+        generateContextPackage: async () => contextResult,
+        previewTranscriptionImport: async () => importPreview,
+        confirmTranscriptionImport: async () => importResult,
+        getCodexStatus: async () => ({
+          state: 'ready',
+          available: true,
+          loggedIn: true,
+          version: 'codex-cli 0.130.0-test',
+        }),
+        startCodexLogin: async () => ({ runId: 'login-run' }),
+        startCodexRun: async () => ({ runId: 'codex-run' }),
+        cancelCodexRun: async () => undefined,
+        onCodexOutput: () => () => undefined,
+        onCodexCompletion: () => () => undefined,
+      };
+    },
+    {
+      scan: mockScan,
+      contextPreview: mockContextPackagePreview,
+      contextResult: mockContextPackageResult,
+      importPreview: mockTranscriptionImportPreview,
+      importResult: mockTranscriptionImportResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+
+  const contextAction = page.locator('[data-overview-action-generate-context]');
+  await contextAction.focus();
+  await expect(contextAction).toBeFocused();
+  await contextAction.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Bekreft kontekstpakke' })).toBeVisible();
+  await page.locator('[data-context-package-secondary]').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Lag kontekstpakke' })).toBeVisible();
+
+  const importAction = page.locator('[data-overview-action-import-transcription]');
+  await importAction.focus();
+  await expect(importAction).toBeFocused();
+  await importAction.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Bekreft import' })).toBeVisible();
+  await page.locator('[data-transcription-import-secondary]').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Importer transkripsjon' })).toBeVisible();
+
+  const codexPrompt = page.locator('[data-codex-prompt]');
+  await codexPrompt.focus();
+  await expect(codexPrompt).toBeFocused();
+  await codexPrompt.fill('Inspect the project');
+  await page.locator('[data-codex-edit-mode]').focus();
+  await page.keyboard.press('Space');
+  await expect(page.locator('[data-codex-state]')).toContainText('Skriveoperasjon');
+  await page.locator('[data-codex-primary]').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Codex kjører' })).toBeVisible();
 });
 
 test('runs Codex in read-only mode from the controlled panel', async ({ page }) => {

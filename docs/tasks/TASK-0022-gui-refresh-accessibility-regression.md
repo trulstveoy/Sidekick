@@ -1,7 +1,7 @@
 # Task: GUI Refresh Accessibility And Regression Pass
 
 ID: TASK-0022
-Status: Planned
+Status: Ready For Review
 Class: Major
 Owner: Pair
 Created: 2026-05-12
@@ -36,21 +36,21 @@ This is intentionally a final integration-quality task, not a parallel workflow 
 
 ## Current Phase
 
-Plan
+Ready For Review
 
-Planning is complete. Build requires human approval.
+Build and verification are complete. The task is ready for human review.
 
 ## Progress Checklist
 
 - [x] Explore complete
 - [x] Spec complete
 - [x] Plan complete
-- [ ] Worktree created or reused, if required
-- [ ] Human approval received, if required
-- [ ] Build complete
-- [ ] Verification complete
+- [x] Worktree created or reused, if required
+- [x] Human approval received, if required
+- [x] Build complete
+- [x] Verification complete
 - [ ] Review complete
-- [ ] Documentation complete
+- [x] Documentation complete
 - [ ] Closeout complete
 
 ## Links
@@ -360,25 +360,61 @@ Manual verification for Ready For Review handoff:
 ### Human Gates
 
 - Required.
-- Approval status: Pending.
+- Approval status: Received.
 
 This is a Major final-pass task across the refreshed UI. Human approval is required before Build.
 
 ## Build Log
 
-Not started.
+- Worktree created: `/home/trutve/code/Sidekick-worktrees/TASK-0022-gui-refresh-accessibility-regression`.
+- Base branch: local `main` at task start.
+- `npm install` was required because `node_modules` was missing in the new worktree. It produced package-lock noise only; `package-lock.json` was restored before baseline.
+- Baseline audit found these concrete issues before fixes:
+  - folder tree accessible names and expand/collapse button labels still used English copy;
+  - warning lists used warning color without a persistent non-color marker;
+  - result banners and write warnings did not expose live/status semantics;
+  - UI smoke coverage did not explicitly assert the `1280 x 820` reference layout;
+  - UI smoke coverage did not explicitly assert warning non-color cues or keyboard operation across refreshed workflow controls.
+- Fixes applied:
+  - changed folder tree labels to Norwegian;
+  - changed folder expand/collapse labels to `Utvid` / `Lukk`;
+  - added semantic roles/live attributes to write warnings and result banners;
+  - added `!` marker treatment for warning-style lists;
+  - added UI smoke coverage for reference viewport layout, minimum viewport bounds, focus visibility, selected/focused tree state, warning non-color cue, and keyboard operation of context package, transcript import, and Codex controls.
+- No backend, IPC, persistence, filesystem, or Codex execution behavior was changed.
 
 ## Verification Log
 
-Not started.
+Baseline before fixes:
+
+- `npm run check` passed.
+- `npm test` passed, 62 tests.
+- `npm run test:ui` passed, 23 UI tests.
+
+After fixes:
+
+- `npm run check` passed.
+- `npm test` passed, 62 tests.
+- `npm run test:ui` passed, 25 UI tests.
 
 ## Review Notes
 
-Not started.
+Ready for human review.
+
+Suggested manual verification:
+
+- Start the app from this worktree.
+- Select a project folder at a normal desktop size, around `1280 x 820`.
+- Confirm the shell feels balanced: project context in the topbar, overview/folder tree as the main surface, context/actions on the side, and status/action bars visible.
+- Resize to approximately `1040 x 720`.
+- Confirm project context, core stats, the folder tree, and the action bar remain usable without overlap or clipped primary controls.
+- Use keyboard focus through the folder tree and confirm focus is visible and selection remains visually distinct.
+- Trigger a warning state, such as a partial scan or context package warning list, and confirm warning rows include a visible marker in addition to color.
+- Open context package preview, transcript import preview, and Codex write mode; confirm each write operation shows explicit warning treatment before action.
 
 ## Documentation Notes
 
-Not started.
+No durable design guideline change was needed. The changes stay within `docs/design/desktop-design-guidelines.md`.
 
 ## Closeout
 
