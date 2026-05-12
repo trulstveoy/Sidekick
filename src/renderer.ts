@@ -92,6 +92,7 @@ const createProjectMessageTarget = document.querySelector<HTMLElement>(
 );
 const selectedNameTarget = document.querySelector<HTMLElement>('[data-selected-name]');
 const selectedPathTarget = document.querySelector<HTMLElement>('[data-selected-path]');
+const statusMessageTarget = document.querySelector<HTMLElement>('[data-status-message]');
 const folderSignalsTarget = document.querySelector<HTMLUListElement>('[data-folder-signals]');
 const stateTitleTarget = document.querySelector<HTMLElement>('[data-state-title]');
 const stateMessageTarget = document.querySelector<HTMLElement>('[data-state-message]');
@@ -513,7 +514,7 @@ const renderTranscriptionImportActions = (
 };
 
 const renderContextPackageUnavailable = () => {
-  setText(contextPackageTitleTarget, 'No folder selected');
+  setText(contextPackageTitleTarget, 'Ingen prosjektmappe valgt');
   setText(
     contextPackageMessageTarget,
     window.sidekick ? 'Choose a folder first.' : 'Open in Electron to create context packages.',
@@ -634,7 +635,7 @@ const renderContextPackage = (scan?: ProjectFolderScan) => {
 };
 
 const renderTranscriptionImportUnavailable = () => {
-  setText(transcriptionImportTitleTarget, 'No folder selected');
+  setText(transcriptionImportTitleTarget, 'Ingen prosjektmappe valgt');
   setText(
     transcriptionImportMessageTarget,
     window.sidekick ? 'Choose a folder first.' : 'Open in Electron to import transcriptions.',
@@ -796,7 +797,7 @@ const renderCodexOutput = (output: CodexOutputEvent[] = []) => {
 };
 
 const renderCodexUnavailable = (message = 'Choose a folder first.') => {
-  setText(codexTitleTarget, 'No folder selected');
+  setText(codexTitleTarget, 'Ingen prosjektmappe valgt');
   setText(codexMessageTarget, window.sidekick ? message : 'Open in Electron to use Codex.');
   renderCodexDetails([]);
   renderCodexOutput([]);
@@ -1048,11 +1049,12 @@ const renderNoScanPanels = () => {
 };
 
 const renderEmptyState = () => {
-  setText(selectedNameTarget, 'No folder selected');
+  setText(selectedNameTarget, 'Ingen prosjektmappe valgt');
   setText(
     selectedPathTarget,
-    window.sidekick ? 'Choose a folder to inspect.' : 'Open in Electron to inspect local folders.',
+    window.sidekick ? 'Velg en mappe for å inspisere innholdet.' : 'Åpne i Electron for å inspisere lokale mapper.',
   );
+  setText(statusMessageTarget, 'Ingen prosjektmappe valgt');
   setText(stateTitleTarget, 'Choose a project folder');
   setText(stateMessageTarget, 'Read-only scan of structure, metadata, and artifact types.');
   renderSummary();
@@ -1064,12 +1066,14 @@ const renderEmptyState = () => {
 };
 
 const renderLoadingState = () => {
+  setText(statusMessageTarget, 'Skanner prosjektmappe...');
   setText(stateTitleTarget, 'Scanning folder');
   setText(stateMessageTarget, 'Reading structure and metadata.');
   renderNoScanPanels();
 };
 
 const renderErrorState = (message: string) => {
+  setText(statusMessageTarget, 'Skanning feilet');
   setText(stateTitleTarget, 'Unable to inspect folder');
   setText(stateMessageTarget, message);
   renderContextPackage();
@@ -1090,6 +1094,12 @@ const renderReadyState = (scan: ProjectFolderScan, status: 'ready' | 'partial') 
 
   setText(selectedNameTarget, scan.rootName);
   setText(selectedPathTarget, scan.rootPath);
+  setText(
+    statusMessageTarget,
+    `${scan.status === 'partial' ? 'Delvis skanning' : 'Skanning fullført'} · ${formatDate(
+      scan.scannedAt,
+    )}`,
+  );
   setText(stateTitleTarget, status === 'partial' ? 'Partial folder overview' : 'Folder overview');
   setText(
     stateMessageTarget,

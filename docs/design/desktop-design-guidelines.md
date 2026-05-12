@@ -8,6 +8,8 @@ This document defines the desktop UI direction for Sidekick. It should guide new
 
 Sidekick should feel like a quiet local workspace for understanding project folders. The interface should reduce visual noise, make folder structure easy to scan, and keep potentially destructive or expensive actions explicit.
 
+The current design direction follows the consultant GUI refresh delivery in `docs/design/sidekick-ui design leveranse.zip` and the implementation analysis in `docs/design/gui-refresh-implementation-analysis.md`.
+
 ## Design Thesis
 
 Visual thesis: Sidekick is a minimalist desktop workspace with calm surfaces, strong alignment, restrained color, and dense but readable project information.
@@ -15,6 +17,16 @@ Visual thesis: Sidekick is a minimalist desktop workspace with calm surfaces, st
 Content thesis: The UI should show the selected project, the folder structure, and the most useful metadata without explaining itself in long text.
 
 Interaction thesis: Common actions should be direct and discoverable through the work surface, menus, context menus, and keyboard shortcuts. Motion should be subtle and functional only.
+
+## Product Modes
+
+Use these modes as a mental model for organizing functionality. They do not have to be literal navigation labels in every screen.
+
+- Forstå: inspect the selected project folder, folder hierarchy, artifact types, warnings, recent files, and scan status.
+- Strukturere: perform explicit structure-changing actions such as creating a project, importing a transcript, or opening a scoped folder/file action.
+- Assistere: run controlled assistant operations such as Codex against the selected project folder.
+
+The interface should make the active mode understandable through context, action placement, and state language. Do not make Sidekick feel like a chat product, a terminal, or a generic file manager.
 
 ## Core Principles
 
@@ -43,15 +55,23 @@ Use these rules when reducing noise in the current UI:
 
 ## Application Shell
 
-Sidekick uses a three-area desktop workspace:
+Sidekick uses a calm desktop workspace with persistent project context and compact operational surfaces.
 
-- Left sidebar: project selection, selected root, and stable project-level signals.
-- Center workspace: folder structure and the primary object the user is inspecting.
-- Right inspector: summary, metadata, warnings, and actions for the current selection or project.
+Preferred shell areas:
 
-The center workspace is the main surface. The left and right areas should support it without competing for attention.
+- Topbar: app identity, selected project name, selected project path, and high-level mode/context.
+- Primary workspace: the main object the user is working with, usually project overview, folder hierarchy, a write-operation preview, or a controlled assistant run.
+- Context surface: secondary information about the selected project, folder, file, operation, or assistant state.
+- Action bar: stable area for the primary action and safe secondary actions for the current workflow.
+- Status bar: compact operational status such as scan state, Codex state, context-package state, or latest operation result.
+
+The primary workspace is the main surface. Context surfaces, action bars, and status bars should support it without competing for attention.
+
+The selected project folder must remain visible in the shell whenever a project is active. Long project names and paths must truncate predictably.
 
 The shell should avoid page-like composition. Do not introduce landing-page sections, hero copy, marketing language, or decorative feature cards inside the app.
+
+At `1280 x 820`, the full workspace should feel complete. At `1040 x 720`, the UI must keep the project context, core stats, primary workspace, and primary action usable. Hide lower-priority metadata before hiding core actions.
 
 ## Folder Tree
 
@@ -62,19 +82,23 @@ Expected behavior:
 - Folders can expand and collapse.
 - Collapsed folders show only the folder row and relevant summary signals.
 - Expanded folders reveal direct child folders and files.
+- Deep structures may use drill-down with breadcrumbs instead of expanding every level inline.
 - File rows should be visually quieter than folder rows.
 - Selected rows should be obvious without using heavy color blocks.
+- Focus and selection are different states and must be visually distinguishable.
 - Indentation should be consistent and compact.
 - Counts and artifact hints should be aligned so the tree remains scannable.
 - Long names and paths must truncate or wrap predictably without shifting the layout.
 
-The tree should not show every detail inline. File type, size, modified date, warnings, and generated context-package status can move to the inspector when a row is selected.
+The tree should not show every detail inline. File type, size, modified date, warnings, and generated context-package status can move to the context surface when a row is selected.
 
-## Inspector
+Tree behavior must follow accessible tree-view expectations: arrow-key navigation, visible focus, `aria-expanded` for expandable folders, and assistive-technology state that matches the visual state.
 
-The inspector should answer "what matters about this selection?" rather than duplicate the full folder tree.
+## Context Surface
 
-Good inspector content:
+The context surface should answer "what matters about this selection or operation?" rather than duplicate the full folder tree.
+
+Good context content:
 
 - selected folder or file name;
 - path;
@@ -85,7 +109,7 @@ Good inspector content:
 - context-package preview and result;
 - safe actions that apply to the current selection.
 
-Avoid turning the inspector into a dashboard. If many unrelated sections appear, group them behind tabs, disclosure controls, or selection-specific views.
+Avoid turning the context surface into a dashboard. If many unrelated sections appear, group them behind tabs, disclosure controls, or selection-specific views.
 
 ## Typography
 
@@ -116,6 +140,8 @@ Color roles:
 - error;
 - success.
 
+Use the revised token set from `fase3b-tokens-v2.json` in the consultant package as the source of truth for the GUI refresh. Token names may be adapted to code conventions, but semantic intent should be preserved.
+
 Avoid one-note palettes dominated by a single hue. The current warm neutral direction is acceptable, but it should be quieter: fewer filled surfaces, fewer high-contrast blocks, and fewer competing section treatments.
 
 ## Controls And Actions
@@ -123,12 +149,36 @@ Avoid one-note palettes dominated by a single hue. The current warm neutral dire
 Controls should follow desktop expectations.
 
 - Primary actions should be limited to the current main task.
+- Use at most one visually primary action in a panel or workflow surface.
 - Secondary actions should use quiet buttons, icon buttons, menus, or context menus.
-- Destructive actions require explicit confirmation and should not be presented as routine toolbar actions.
+- Dangerous or broad write actions require explicit confirmation and should not be presented as routine toolbar actions.
 - Long-running actions need disabled states and progress or pending status.
 - Actions that create files, move files, rename files, or overwrite files must clearly show the target path before execution.
+- Write operations must use a consistent write-operation indicator and confirmation pattern before execution.
 
 For Electron menus and shortcuts, prefer native menu roles and cross-platform accelerators where possible.
+
+## Write Operations
+
+Read-only inspection is the default mode. Any action that writes to disk must be visually and verbally explicit.
+
+Write-operation requirements:
+
+- Show that the action writes to disk before the user confirms.
+- Show what will be written, copied, generated, or changed.
+- Show the target folder or file path.
+- Show overwrite status when relevant.
+- Use calm warning treatment, not alarming destructive styling, unless data loss is possible.
+- Show success with the resulting path or changed object.
+- Rescan or refresh affected project information after successful writes when the operation changes the project folder.
+
+Current resolved product constraints:
+
+- Transcript import accepts existing `.txt`, `.md`, and `.markdown` files only. It does not import audio.
+- Transcript import keeps the current filename convention: `NN. original-name.ext`.
+- Context packages keep the current filename behavior based on the project folder name.
+- Codex runs directly against the selected project folder, not through a required context package.
+- Codex model selection is deferred.
 
 ## Menus, Context Menus, And Shortcuts
 
@@ -156,6 +206,8 @@ Feedback should be specific and compact.
 - Errors should include what failed, why if known, and what the user can do next.
 - Success messages should be brief and should not remain prominent after the result is visible.
 - Generated files should show their output path and overwrite status.
+- The status bar should carry compact operational state; large banners should be reserved for states that require attention or action.
+- Loading states should preserve layout stability and avoid shifting key actions.
 
 ## Accessibility
 
@@ -167,6 +219,7 @@ Minimal UI must still be accessible.
 - Text contrast must remain usable in light and dark operating system themes.
 - Hit targets must be large enough for pointer use, even when the visual design is compact.
 - Do not rely on color alone for warnings, errors, or selected state.
+- Minimum functional text should remain readable at the supported minimum window size.
 
 ## Electron Desktop Boundaries
 
@@ -174,6 +227,8 @@ The design should reinforce Sidekick's security model:
 
 - The renderer should never imply arbitrary filesystem access.
 - File writes must be explicit, reviewable, and tied to selected project roots.
+- File opening, if introduced, must go through a typed main/preload API that validates the target is inside the selected project root before using OS integration.
+- Codex must remain a controlled assistant operation, not a generic embedded shell.
 - External links should open through safe Electron handling, not embedded web content.
 - Avoid webview-based UI unless there is a specific reviewed need.
 - Native dialogs should be used for folder selection and other OS-level file choices.
@@ -182,13 +237,16 @@ The design should reinforce Sidekick's security model:
 
 Use this checklist before merging UI changes:
 
-- [ ] The center workspace remains the primary visual focus.
+- [ ] The primary workspace remains the primary visual focus.
+- [ ] The selected project name and path remain visible when a project is active.
 - [ ] The UI uses fewer surfaces, borders, and filled blocks than before.
 - [ ] Repeated information has been removed or moved to selection-specific detail.
 - [ ] Primary and secondary actions are visually distinct.
+- [ ] Write operations use the shared write-operation indicator and show the target path before execution.
 - [ ] Long folder names, filenames, and paths behave correctly.
 - [ ] Empty, loading, success, warning, and error states are covered.
 - [ ] Keyboard navigation and focus states work for new controls.
+- [ ] The UI works at `1280 x 820` and remains usable at `1040 x 720`.
 - [ ] The change does not weaken Electron security boundaries.
 - [ ] UI smoke tests or screenshots cover the changed workflow when relevant.
 
@@ -198,5 +256,7 @@ Use this checklist before merging UI changes:
 - Electron Keyboard Shortcuts: https://www.electronjs.org/docs/latest/tutorial/keyboard-shortcuts
 - Electron Security: https://www.electronjs.org/docs/latest/tutorial/security
 - Windows app design overview: https://learn.microsoft.com/en-us/windows/apps/design/
+- WAI-ARIA Tree View Pattern: https://www.w3.org/WAI/ARIA/apg/patterns/treeview/
+- WCAG 2.2: https://www.w3.org/TR/wcag/
 - Apple Human Interface Guidelines: https://developer.apple.com/design/human-interface-guidelines
 - GNOME Human Interface Guidelines: https://developer.gnome.org/hig/

@@ -272,12 +272,17 @@ const mockProjectCreationResult: ProjectCreationResult = {
 test('renders the folder inspection empty state', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { name: 'Sidekick' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Choose folder' })).toBeVisible();
+  await expect(page.locator('[data-app-topbar]')).toBeVisible();
+  await expect(page.locator('[data-primary-workspace]')).toBeVisible();
+  await expect(page.locator('[data-context-surface]')).toBeVisible();
+  await expect(page.locator('[data-action-bar]')).toBeVisible();
+  await expect(page.locator('[data-status-bar]')).toBeVisible();
+  await expect(page.locator('.app-brand__name')).toHaveText('Sidekick');
+  await expect(page.getByRole('button', { name: 'Velg mappe' })).toBeVisible();
   await expect(page.getByText('Choose a project folder')).toBeVisible();
   await expect(
-    page.getByLabel('Selected project folder').getByRole('heading', {
-      name: 'No folder selected',
+    page.getByLabel('Valgt prosjektmappe').getByRole('heading', {
+      name: 'Ingen prosjektmappe valgt',
     }),
   ).toBeVisible();
   await expect(page.getByText('Browser preview')).toBeVisible();
@@ -332,9 +337,10 @@ test('creates a project and displays the required folders', async ({ page }) => 
   await page.getByLabel('Project name').fill('new-sidekick-project');
   await page.getByRole('button', { name: 'Create project' }).click();
 
-  await expect(page.getByLabel('Selected project folder').getByRole('heading')).toHaveText(
+  await expect(page.getByLabel('Valgt prosjektmappe').getByRole('heading')).toHaveText(
     'new-sidekick-project',
   );
+  await expect(page.getByLabel('Valgt prosjektmappe')).toContainText('/tmp/new-sidekick-project');
   await expect(page.getByText('Created new-sidekick-project.')).toBeVisible();
   await expect(page.getByRole('treeitem', { name: /00. Forutsetninger/ })).toBeVisible();
   await expect(page.getByRole('treeitem', { name: /01. Transkripsjoner/ })).toBeVisible();
@@ -369,7 +375,7 @@ test('expands and collapses scanned folders', async ({ page }) => {
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Choose folder' }).click();
+  await page.getByRole('button', { name: 'Velg mappe' }).click();
 
   await expect(page.getByRole('tree', { name: 'Scanned folder tree' })).toBeVisible();
   await expect(page.getByRole('treeitem', { name: /sidekick-project/ })).toBeVisible();
@@ -413,13 +419,13 @@ test('expands and collapses all scanned folders', async ({ page }) => {
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Choose folder' }).click();
-  await page.getByRole('button', { name: 'Expand all folders' }).click();
+  await page.getByRole('button', { name: 'Velg mappe' }).click();
+  await page.getByRole('button', { name: 'Utvid alle mapper' }).click();
 
   await expect(page.getByText('brief.pdf')).toBeVisible();
   await expect(page.getByText('intervju-01.docx')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Collapse all folders' }).click();
+  await page.getByRole('button', { name: 'Lukk alle mapper' }).click();
   await expect(page.getByRole('treeitem', { name: /01-bakgrunn/ })).toBeVisible();
   await expect(page.getByText('brief.pdf')).toHaveCount(0);
   await expect(page.getByText('intervju-01.docx')).toHaveCount(0);
@@ -453,7 +459,7 @@ test('confirms and displays a generated context package', async ({ page }) => {
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Choose folder' }).click();
+  await page.getByRole('button', { name: 'Velg mappe' }).click();
 
   await expect(page.getByRole('button', { name: 'Create context package' })).toBeEnabled();
   await page.getByRole('button', { name: 'Create context package' }).click();
@@ -508,7 +514,7 @@ test('confirms and displays an imported transcription', async ({ page }) => {
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Choose folder' }).click();
+  await page.getByRole('button', { name: 'Velg mappe' }).click();
 
   await expect(page.getByRole('button', { name: 'Add transcription' })).toBeEnabled();
   await page.getByRole('button', { name: 'Add transcription' }).click();
@@ -614,7 +620,7 @@ test('runs Codex from the controlled panel with mocked output', async ({ page })
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Choose folder' }).click();
+  await page.getByRole('button', { name: 'Velg mappe' }).click();
 
   const codexPanel = page.locator('.codex-panel');
   await expect(codexPanel.getByRole('heading', { name: 'Ready' })).toBeVisible();
@@ -722,5 +728,5 @@ test('opens settings and manages Codex CLI path', async ({ page }) => {
   await expect(page.getByLabel('Path')).toHaveValue('');
 
   await page.getByRole('button', { name: 'Back to workspace' }).click();
-  await expect(page.getByRole('heading', { name: 'Folder structure' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Mappestruktur' })).toBeVisible();
 });

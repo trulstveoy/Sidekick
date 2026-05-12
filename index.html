@@ -10,73 +10,175 @@
     <title>Sidekick</title>
   </head>
   <body>
-    <main class="shell" aria-label="Sidekick folder inspection workspace">
-      <aside class="sidebar" aria-label="Selected project">
-        <div>
-          <p class="eyebrow">Local folders</p>
-          <h1>Sidekick</h1>
+    <main class="app-shell" aria-label="Sidekick prosjektarbeidsflate">
+      <header class="app-topbar" data-app-topbar>
+        <div class="app-brand" aria-label="Sidekick">
+          <span class="app-brand__mark" aria-hidden="true">S</span>
+          <span class="app-brand__name">Sidekick</span>
         </div>
 
-        <nav class="app-nav" aria-label="Application views">
-          <button class="nav-button" type="button" data-open-workspace aria-current="page">Workspace</button>
-          <button class="nav-button" type="button" data-open-settings>Settings</button>
+        <section class="project-context" aria-label="Valgt prosjektmappe">
+          <p class="section-label">Prosjektmappe</p>
+          <h1 data-selected-name>Ingen prosjektmappe valgt</h1>
+          <p class="path" data-selected-path>Velg en mappe for å inspisere innholdet.</p>
+        </section>
+
+        <nav class="mode-strip" aria-label="Arbeidsmodus">
+          <button class="mode-pill mode-pill--active" type="button" data-open-workspace aria-current="page">
+            Forstå
+          </button>
+          <span class="mode-pill">Strukturere</span>
+          <span class="mode-pill">Assistere</span>
+          <button class="mode-pill" type="button" data-open-settings>Settings</button>
         </nav>
+      </header>
 
-        <section class="selected-project" aria-label="Selected project folder">
-          <p class="section-label">Selected project</p>
-          <h2 data-selected-name>No folder selected</h2>
-          <p class="path" data-selected-path>Choose a folder to inspect.</p>
+      <div class="app-main" data-app-main data-workspace-view>
+        <section class="primary-workspace" data-primary-workspace aria-label="Primær arbeidsflate">
+          <header class="workspace-header">
+            <div>
+              <p class="eyebrow">Lesende inspeksjon</p>
+              <h2>Mappestruktur</h2>
+            </div>
+            <div class="workspace-header__actions" data-tree-toolbar hidden>
+              <button class="btn btn-secondary btn-sm" type="button" data-expand-all aria-label="Utvid alle mapper">
+                Utvid alle
+              </button>
+              <button class="btn btn-secondary btn-sm" type="button" data-collapse-all aria-label="Lukk alle mapper">
+                Lukk alle
+              </button>
+            </div>
+          </header>
+
+          <dl class="stats-strip" data-summary aria-label="Prosjektstatistikk">
+            <div>
+              <dt>Files</dt>
+              <dd>0</dd>
+            </div>
+            <div>
+              <dt>Folders</dt>
+              <dd>0</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd>Waiting</dd>
+            </div>
+          </dl>
+
+          <section class="state-banner state-banner--info" data-state-banner>
+            <h3 data-state-title>Choose a project folder</h3>
+            <p data-state-message>Read-only scan of structure, metadata, and artifact types.</p>
+          </section>
+
+          <section class="tree-panel" aria-label="Folder tree">
+            <ol class="folder-tree" data-folder-tree role="tree" aria-label="Scanned folder tree"></ol>
+          </section>
         </section>
 
-        <section class="project-create" aria-label="Create project">
-          <p class="section-label">New project</p>
-          <label for="project-name">Project name</label>
-          <input id="project-name" type="text" data-project-name autocomplete="off" />
-          <button type="button" data-create-project>Create project</button>
-          <p class="project-create-message" data-create-project-message></p>
-        </section>
+        <aside class="context-surface" data-context-surface aria-label="Kontekst og handlinger">
+          <section class="surface-section project-create" aria-label="Create project">
+            <p class="section-label">Nytt prosjekt</p>
+            <label for="project-name">Project name</label>
+            <input id="project-name" type="text" data-project-name autocomplete="off" />
+            <button class="btn btn-secondary" type="button" data-create-project>Create project</button>
+            <p class="project-create-message" data-create-project-message></p>
+          </section>
 
-        <section aria-label="Folder signals">
-          <p class="section-label">Folder signals</p>
-          <ul class="signal-list" data-folder-signals>
-            <li>No signals yet</li>
-          </ul>
-        </section>
+          <section class="surface-section">
+            <p class="section-label">Transcriptions</p>
+            <div class="transcription-import-panel">
+              <h3 data-transcription-import-title>Ingen prosjektmappe valgt</h3>
+              <p data-transcription-import-message>Choose a folder first.</p>
+              <dl class="transcription-import-details detail-list" data-transcription-import-details></dl>
+              <ul class="transcription-import-list plain-list" data-transcription-import-list></ul>
+              <div class="inline-actions">
+                <button class="btn btn-primary transcription-import-primary" type="button" data-transcription-import-primary disabled>
+                  Add transcription
+                </button>
+                <button class="btn btn-secondary transcription-import-secondary" type="button" data-transcription-import-secondary hidden>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </section>
 
-        <div class="runtime">
-          <span>Runtime</span>
-          <strong data-app-info>Loading...</strong>
-        </div>
-      </aside>
+          <section class="surface-section">
+            <p class="section-label">Context package</p>
+            <div class="context-package-panel">
+              <h3 data-context-package-title>Ingen prosjektmappe valgt</h3>
+              <p data-context-package-message>Choose a folder first.</p>
+              <dl class="context-package-details detail-list" data-context-package-details></dl>
+              <ul class="context-package-list plain-list" data-context-package-list></ul>
+              <div class="inline-actions">
+                <button class="btn btn-primary context-package-primary" type="button" data-context-package-primary disabled>
+                  Create context package
+                </button>
+                <button class="btn btn-secondary context-package-secondary" type="button" data-context-package-secondary hidden>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </section>
 
-      <section class="workspace" aria-label="Folder structure" data-workspace-view>
-        <header class="workspace-header">
-          <div>
-            <p class="eyebrow">Read-only inspection</p>
-            <h2>Folder structure</h2>
-          </div>
-          <button type="button" data-choose-folder>Choose folder</button>
-        </header>
+          <section class="surface-section">
+            <p class="section-label">Codex</p>
+            <div class="codex-panel">
+              <h3 data-codex-title>Ingen prosjektmappe valgt</h3>
+              <p data-codex-message>Choose a folder first.</p>
+              <dl class="codex-details detail-list" data-codex-details></dl>
+              <label class="codex-prompt-label" for="codex-prompt">Prompt</label>
+              <textarea
+                id="codex-prompt"
+                data-codex-prompt
+                rows="4"
+                placeholder="Ask Codex to inspect or update this project..."
+                disabled
+              ></textarea>
+              <label class="codex-mode">
+                <input type="checkbox" data-codex-edit-mode disabled />
+                Allow file changes
+              </label>
+              <ul class="codex-output plain-list output-list" data-codex-output></ul>
+              <div class="inline-actions">
+                <button class="btn btn-primary codex-primary" type="button" data-codex-primary disabled>
+                  Run Codex
+                </button>
+                <button class="btn btn-secondary codex-secondary" type="button" data-codex-secondary hidden>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </section>
 
-        <section class="state-banner" data-state-banner>
-          <h3 data-state-title>Choose a project folder</h3>
-          <p data-state-message>
-            Read-only scan of structure, metadata, and artifact types.
-          </p>
-        </section>
+          <section class="surface-section">
+            <p class="section-label">Folder signals</p>
+            <ul class="signal-list plain-list" data-folder-signals>
+              <li>No signals yet</li>
+            </ul>
+          </section>
 
-        <section class="tree-panel" aria-label="Folder tree">
-          <div class="tree-toolbar" data-tree-toolbar hidden>
-            <button class="tree-action" type="button" data-expand-all aria-label="Expand all folders">
-              Expand all
-            </button>
-            <button class="tree-action" type="button" data-collapse-all aria-label="Collapse all folders">
-              Collapse all
-            </button>
-          </div>
-          <ol class="folder-tree" data-folder-tree role="tree" aria-label="Scanned folder tree"></ol>
-        </section>
-      </section>
+          <section class="surface-section">
+            <p class="section-label">Artifact counts</p>
+            <ul class="metric-list plain-list" data-artifact-counts>
+              <li>No artifacts yet</li>
+            </ul>
+          </section>
+
+          <section class="surface-section">
+            <p class="section-label">Recent files</p>
+            <ul class="file-list plain-list" data-recent-files>
+              <li>No recent files yet</li>
+            </ul>
+          </section>
+
+          <section class="surface-section">
+            <p class="section-label">Warnings</p>
+            <ul class="warning-list plain-list" data-warnings>
+              <li>No warnings</li>
+            </ul>
+          </section>
+        </aside>
+      </div>
 
       <section class="settings-view" aria-label="Settings" data-settings-view hidden>
         <header class="workspace-header">
@@ -84,7 +186,7 @@
             <p class="eyebrow">Application settings</p>
             <h2>Settings</h2>
           </div>
-          <button type="button" data-close-settings>Back to workspace</button>
+          <button class="btn btn-secondary" type="button" data-close-settings>Back to workspace</button>
         </header>
 
         <div class="settings-layout">
@@ -104,7 +206,7 @@
               <div class="setting-copy">
                 <h4>Codex CLI path</h4>
                 <p>Sidekick can discover Codex automatically, or use this executable path.</p>
-                <dl class="settings-details" data-settings-codex-details></dl>
+                <dl class="settings-details detail-list" data-settings-codex-details></dl>
               </div>
               <div class="setting-control">
                 <label for="settings-codex-path">Path</label>
@@ -116,10 +218,10 @@
                   autocomplete="off"
                 />
                 <div class="settings-actions">
-                  <button type="button" data-settings-choose-codex>Choose...</button>
-                  <button type="button" data-settings-test-codex>Test</button>
-                  <button type="button" data-settings-save-codex>Save</button>
-                  <button class="button-secondary" type="button" data-settings-reset-codex>
+                  <button class="btn btn-secondary" type="button" data-settings-choose-codex>Choose...</button>
+                  <button class="btn btn-secondary" type="button" data-settings-test-codex>Test</button>
+                  <button class="btn btn-primary" type="button" data-settings-save-codex>Save</button>
+                  <button class="btn btn-secondary" type="button" data-settings-reset-codex>
                     Reset to automatic discovery
                   </button>
                 </div>
@@ -130,112 +232,14 @@
         </div>
       </section>
 
-      <aside class="inspector" aria-label="Project summary">
-        <section>
-          <p class="eyebrow">Project summary</p>
-          <dl class="summary-grid" data-summary>
-            <div>
-              <dt>Files</dt>
-              <dd>0</dd>
-            </div>
-            <div>
-              <dt>Folders</dt>
-              <dd>0</dd>
-            </div>
-            <div>
-              <dt>Status</dt>
-              <dd>Waiting</dd>
-            </div>
-          </dl>
-        </section>
+      <footer class="action-bar" data-action-bar>
+        <button class="btn btn-primary" type="button" data-choose-folder>Velg mappe</button>
+      </footer>
 
-        <section>
-          <p class="section-label">Transcriptions</p>
-          <div class="transcription-import-panel">
-            <h3 data-transcription-import-title>No folder selected</h3>
-            <p data-transcription-import-message>Choose a folder first.</p>
-            <dl class="transcription-import-details" data-transcription-import-details></dl>
-            <ul class="transcription-import-list" data-transcription-import-list></ul>
-            <div class="transcription-import-actions">
-              <button class="transcription-import-primary" type="button" data-transcription-import-primary disabled>
-                Add transcription
-              </button>
-              <button class="transcription-import-secondary" type="button" data-transcription-import-secondary hidden>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <p class="section-label">Context package</p>
-          <div class="context-package-panel">
-            <h3 data-context-package-title>No folder selected</h3>
-            <p data-context-package-message>Choose a folder first.</p>
-            <dl class="context-package-details" data-context-package-details></dl>
-            <ul class="context-package-list" data-context-package-list></ul>
-            <div class="context-package-actions">
-              <button class="context-package-primary" type="button" data-context-package-primary disabled>
-                Create context package
-              </button>
-              <button class="context-package-secondary" type="button" data-context-package-secondary hidden>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <p class="section-label">Codex</p>
-          <div class="codex-panel">
-            <h3 data-codex-title>No folder selected</h3>
-            <p data-codex-message>Choose a folder first.</p>
-            <dl class="codex-details" data-codex-details></dl>
-            <label class="codex-prompt-label" for="codex-prompt">Prompt</label>
-            <textarea
-              id="codex-prompt"
-              data-codex-prompt
-              rows="4"
-              placeholder="Ask Codex to inspect or update this project..."
-              disabled
-            ></textarea>
-            <label class="codex-mode">
-              <input type="checkbox" data-codex-edit-mode disabled />
-              Allow file changes
-            </label>
-            <ul class="codex-output" data-codex-output></ul>
-            <div class="codex-actions">
-              <button class="codex-primary" type="button" data-codex-primary disabled>
-                Run Codex
-              </button>
-              <button class="codex-secondary" type="button" data-codex-secondary hidden>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <p class="section-label">Artifact counts</p>
-          <ul class="metric-list" data-artifact-counts>
-            <li>No artifacts yet</li>
-          </ul>
-        </section>
-
-        <section>
-          <p class="section-label">Recent files</p>
-          <ul class="file-list" data-recent-files>
-            <li>No recent files yet</li>
-          </ul>
-        </section>
-
-        <section>
-          <p class="section-label">Warnings</p>
-          <ul class="warning-list" data-warnings>
-            <li>No warnings</li>
-          </ul>
-        </section>
-      </aside>
+      <footer class="status-bar" data-status-bar>
+        <span data-app-info>Loading...</span>
+        <span data-status-message>Ingen prosjektmappe valgt</span>
+      </footer>
     </main>
     <script type="module" src="/src/renderer.ts"></script>
   </body>
