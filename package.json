@@ -1,7 +1,7 @@
 {
   "name": "sidekick",
   "productName": "Sidekick",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Local project folder intelligence workspace built with Electron.",
   "main": ".vite/build/main.js",
   "private": true,
