@@ -1,7 +1,7 @@
 # Task: Controlled Codex Assistant Refresh
 
 ID: TASK-0021
-Status: Ready For Review
+Status: Closed
 Class: Major
 Owner: Pair
 Created: 2026-05-12
@@ -33,9 +33,9 @@ This task should reuse the shell, state library, output surface, and write-opera
 
 ## Current Phase
 
-Ready For Review
+Closed
 
-Build is complete. The task is ready for human review.
+Build is complete, reviewed, and accepted.
 
 ## Progress Checklist
 
@@ -46,9 +46,9 @@ Build is complete. The task is ready for human review.
 - [x] Human approval received, if required
 - [x] Build complete
 - [x] Verification complete
-- [ ] Review complete
+- [x] Review complete
 - [x] Documentation complete
-- [ ] Closeout complete
+- [x] Closeout complete
 
 ## Links
 
@@ -430,7 +430,7 @@ This task is Major and affects a security-sensitive assistant workflow. Human ap
 
 ## Review Notes
 
-Ready for human review.
+Reviewed and accepted by the human.
 
 Suggested manual verification:
 
@@ -449,4 +449,9 @@ Task record updated with Build Log, Verification Log, and Ready For Review instr
 
 ## Closeout
 
-Pending human review.
+- Merged to `main`.
+- Human tested from `main` and confirmed that the refreshed Codex workflow works.
+- Final verification before review:
+  - `npm run check` passed.
+  - `npm test` passed, 57 tests.
+  - `npm run test:ui` passed, 22 UI tests.
