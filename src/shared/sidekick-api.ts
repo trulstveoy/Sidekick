@@ -157,8 +157,18 @@ export type ContextPackageWarning = {
   message: string;
 };
 
-export type ContextPackagePreview = {
+export type ContextPackageScope = 'project' | 'folder';
+
+export type FolderContextPackageRequest = {
   rootPath: string;
+  folderRelativePath: string;
+};
+
+export type ContextPackagePreview = {
+  scope: ContextPackageScope;
+  rootPath: string;
+  targetPath: string;
+  targetRelativePath: string;
   outputPath: string;
   outputFileName: string;
   willOverwrite: boolean;
@@ -168,7 +178,10 @@ export type ContextPackagePreview = {
 
 export type ContextPackageResult = {
   status: 'complete';
+  scope: ContextPackageScope;
   rootPath: string;
+  targetPath: string;
+  targetRelativePath: string;
   outputPath: string;
   outputFileName: string;
   overwritten: boolean;
@@ -297,6 +310,12 @@ export type SidekickApi = {
   confirmProjectInitialization: (previewId: string) => Promise<ProjectInitializationResult>;
   previewContextPackage: (rootPath: string) => Promise<ContextPackagePreview>;
   generateContextPackage: (rootPath: string) => Promise<ContextPackageResult>;
+  previewFolderContextPackage: (
+    request: FolderContextPackageRequest,
+  ) => Promise<ContextPackagePreview>;
+  generateFolderContextPackage: (
+    request: FolderContextPackageRequest,
+  ) => Promise<ContextPackageResult>;
   previewTranscriptionImport: (rootPath: string) => Promise<TranscriptionImportPreview | null>;
   confirmTranscriptionImport: (previewId: string) => Promise<TranscriptionImportResult>;
   getCodexStatus: (rootPath: string) => Promise<CodexStatus>;
