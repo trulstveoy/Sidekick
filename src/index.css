@@ -183,25 +183,36 @@ li {
   line-height: 1.2;
 }
 
-.mode-strip {
+.topbar-actions {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.mode-pill {
+.topbar-button,
+.project-switch {
   border: 1px solid transparent;
   border-radius: 6px;
   padding: 4px 9px;
   color: var(--text-2);
+  background: transparent;
   font-size: 12px;
   font-weight: 600;
 }
 
-.mode-pill--active {
+.topbar-button:hover:not(:disabled),
+.project-switch:hover:not(:disabled),
+.topbar-button[aria-current='page'] {
   border-color: var(--accent-border);
   color: var(--accent);
   background: var(--accent-subtle);
+}
+
+.project-switch {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-main {
@@ -231,6 +242,67 @@ li {
   min-width: 0;
   flex-direction: column;
   background: var(--surface);
+}
+
+.workspace-default {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.workflow-host {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.workflow-surface {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.workflow-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 76px;
+  border-bottom: 1px solid var(--border-1);
+  padding: 16px 20px;
+  background: var(--surface);
+}
+
+.workflow-header h2 {
+  margin-bottom: 4px;
+}
+
+.workflow-header p:not(.section-label) {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.workflow-body {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 18px 20px;
+}
+
+.workflow-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--border-1);
+  padding: 10px 20px;
+  background: var(--surface-2);
 }
 
 .context-surface {
@@ -264,15 +336,11 @@ li {
 .action-bar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 10px;
   border-top: 1px solid var(--border-1);
   padding: 0 20px;
   background: var(--surface);
-}
-
-.action-bar .btn-primary {
-  margin-right: auto;
 }
 
 .status-bar {

@@ -527,7 +527,7 @@ test('creates a project and displays the required folders', async ({ page }) => 
   await expect(page.getByLabel('Valgt prosjektmappe')).toContainText('/tmp/new-sidekick-project');
   await expect(page.getByRole('treeitem', { name: /00. Forutsetninger/ })).toBeVisible();
   await expect(page.getByRole('treeitem', { name: /01. Transkripsjoner/ })).toBeVisible();
-  await expect(page.locator('.codex-panel')).toContainText('codex-cli 0.130.0-test');
+  await expect(page.locator('[data-workflow-panel="codex"]')).toContainText('codex-cli 0.130.0-test');
 });
 
 test('initializes an existing folder after preview confirmation', async ({ page }) => {
@@ -760,8 +760,9 @@ test('renders the refreshed project overview at minimum viewport', async ({ page
   await expect(stats).toContainText('Siste skanning');
   await expect(stats).toContainText('Kontekstpakke');
 
-  await expect(page.locator('[data-overview-context-package-status]')).toHaveText('Finnes');
-  await expect(page.locator('[data-overview-scan-status]')).toContainText('Fullført');
+  await expect(page.locator('[data-selection-details]')).toContainText('Kontekstpakke');
+  await expect(page.locator('[data-selection-details]')).toContainText('Finnes');
+  await expect(page.locator('[data-selection-details]')).toContainText('Fullført');
   await expect(page.getByRole('treeitem', { name: /01-bakgrunn/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Generer kontekstpakke' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Importer transkripsjon' })).toBeVisible();
@@ -884,18 +885,18 @@ test('shows partial scan status and warnings in the overview', async ({ page }) 
   await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
 
   await expect(page.getByRole('heading', { name: 'Prosjektoversikt (delvis)' })).toBeVisible();
-  await expect(page.locator('[data-overview-scan-status]')).toContainText('Delvis');
-  await expect(page.locator('[data-overview-context-package-status]')).toHaveText('Mangler');
-  await expect(page.locator('[data-warnings]')).toContainText(
+  await expect(page.locator('[data-selection-details]')).toContainText('Delvis');
+  await expect(page.locator('[data-selection-details]')).toContainText('Mangler');
+  await expect(page.locator('[data-selection-warnings]')).toContainText(
     'Skanningen traff maks antall filer.',
   );
-  await expect(page.locator('[data-warnings]')).toContainText(
+  await expect(page.locator('[data-selection-warnings]')).toContainText(
     '06-eksporter: Kunne ikke lese mappen.',
   );
   await expect
     .poll(() =>
       page
-        .locator('[data-warnings] li')
+        .locator('[data-selection-warnings] li')
         .first()
         .evaluate((element) => getComputedStyle(element, '::before').content),
     )
@@ -951,7 +952,7 @@ test('shows an empty scanned project as an overview state', async ({ page }) => 
   await expect(page.getByRole('heading', { name: 'Prosjektmappen er tom' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Velg en prosjektmappe' })).toHaveCount(0);
   await expect(page.locator('[data-overview-stats]')).toContainText('0');
-  await expect(page.locator('[data-warnings]')).toContainText('Ingen varsler');
+  await expect(page.locator('[data-selection-details]')).toContainText('Ingen');
 });
 
 test('expands and collapses scanned folders', async ({ page }) => {
@@ -1075,9 +1076,7 @@ test('selects folders and shows selected folder detail', async ({ page }) => {
   const selectedItem = page.locator('[role="treeitem"][data-tree-path="01-bakgrunn"]');
   await expect(selectedItem).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('[data-selection-title]')).toHaveText('01-bakgrunn');
-  await expect(page.locator('[data-selection-details]')).toContainText(
-    '/tmp/sidekick-project/01-bakgrunn',
-  );
+  await expect(page.locator('[data-selection-details]')).toContainText('01-bakgrunn');
   await expect(page.locator('[data-selection-details]')).toContainText('2 filer');
   await expect(page.locator('[data-selection-contents]')).toContainText('brief.pdf');
   await expect(page.locator('[data-selection-contents]')).toContainText('notes.md');
@@ -1180,6 +1179,7 @@ test('confirms and displays a generated context package', async ({ page }) => {
 
   await page.goto('/');
   await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Generer kontekstpakke' }).click();
 
   await expect(page.getByRole('button', { name: 'Forhåndsvis' })).toBeEnabled();
   await page.getByRole('button', { name: 'Forhåndsvis' }).click();
@@ -1199,8 +1199,9 @@ test('confirms and displays a generated context package', async ({ page }) => {
   await expect(page.getByText(/Generated context-package files are ignored/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Tilbake' }).click();
-  await expect(page.getByRole('heading', { name: 'Lag kontekstpakke' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Prosjektoversikt' })).toBeVisible();
 
+  await page.getByRole('button', { name: 'Generer kontekstpakke' }).click();
   await page.getByRole('button', { name: 'Forhåndsvis' }).click();
   await expect(page.getByRole('heading', { name: 'Bekreft kontekstpakke' })).toBeVisible();
   await page.getByRole('button', { name: 'Generer pakke' }).click();
@@ -1214,7 +1215,7 @@ test('confirms and displays a generated context package', async ({ page }) => {
   await expect(contextPackageDetails).toContainText('523');
   await expect(page.getByText('01-bakgrunn/brief.pdf: binary-extension')).toBeVisible();
   await expect(page.getByText('03-modeller/model.md: Suspicious file content detected.')).toBeVisible();
-  await expect(page.locator('[data-overview-context-package-status]')).toHaveText('Finnes');
+  await expect(page.locator('[data-selection-details]')).toContainText('Finnes');
 });
 
 test('shows no-write feedback when context package preview fails', async ({ page }) => {
@@ -1244,6 +1245,7 @@ test('shows no-write feedback when context package preview fails', async ({ page
 
   await page.goto('/');
   await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Generer kontekstpakke' }).click();
   await page.getByRole('button', { name: 'Forhåndsvis' }).click();
 
   await expect(
@@ -1284,6 +1286,7 @@ test('confirms and displays an imported transcription', async ({ page }) => {
 
   await page.goto('/');
   await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Importer transkripsjon' }).click();
 
   await expect(page.getByRole('button', { name: 'Velg fil...' })).toBeEnabled();
   await page.getByRole('button', { name: 'Velg fil...' }).click();
@@ -1299,8 +1302,9 @@ test('confirms and displays an imported transcription', async ({ page }) => {
   await expect(page.getByText(/Ingen andre filer endres/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Tilbake' }).click();
-  await expect(page.getByRole('heading', { name: 'Importer transkripsjon' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Prosjektoversikt' })).toBeVisible();
 
+  await page.getByRole('button', { name: 'Importer transkripsjon' }).click();
   await page.getByRole('button', { name: 'Velg fil...' }).click();
   await expect(page.getByRole('heading', { name: 'Bekreft import' })).toBeVisible();
   await page.getByRole('button', { name: 'Importer fil' }).click();
@@ -1308,6 +1312,7 @@ test('confirms and displays an imported transcription', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Transkripsjon importert' })).toBeVisible();
   await expect(page.getByText('Originalfilen er uendret på kildestedet.')).toBeVisible();
   await expect(transcriptionDetails).toContainText('00. new-transcription.md');
+  await page.getByRole('button', { name: 'Tilbake' }).click();
   await expect(
     page.getByRole('tree', { name: 'Skannet mappetre' }).getByText('00. new-transcription.md'),
   ).toBeVisible();
@@ -1343,6 +1348,7 @@ test('keeps the transcript import ready state when file selection is cancelled',
 
   await page.goto('/');
   await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Importer transkripsjon' }).click();
   await page.getByRole('button', { name: 'Velg fil...' }).click();
 
   await expect(page.getByRole('heading', { name: 'Importer transkripsjon' })).toBeVisible();
@@ -1381,6 +1387,7 @@ test('shows no-change feedback when transcript import preview fails', async ({ p
 
   await page.goto('/');
   await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Importer transkripsjon' }).click();
   await page.getByRole('button', { name: 'Velg fil...' }).click();
 
   await expect(page.getByRole('heading', { name: 'Importen kan ikke fullføres' })).toBeVisible();
@@ -1435,20 +1442,28 @@ test('operates refreshed workflow controls from keyboard focus', async ({ page }
   await contextAction.focus();
   await expect(contextAction).toBeFocused();
   await contextAction.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Lag kontekstpakke' })).toBeVisible();
+  await page.locator('[data-context-package-primary]').focus();
+  await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Bekreft kontekstpakke' })).toBeVisible();
   await page.locator('[data-context-package-secondary]').focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('heading', { name: 'Lag kontekstpakke' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Prosjektoversikt' })).toBeVisible();
 
   const importAction = page.locator('[data-overview-action-import-transcription]');
   await importAction.focus();
   await expect(importAction).toBeFocused();
   await importAction.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Importer transkripsjon' })).toBeVisible();
+  await page.locator('[data-transcription-import-primary]').focus();
+  await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Bekreft import' })).toBeVisible();
   await page.locator('[data-transcription-import-secondary]').focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('heading', { name: 'Importer transkripsjon' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Prosjektoversikt' })).toBeVisible();
 
+  await page.locator('[data-overview-action-run-codex]').focus();
+  await page.keyboard.press('Enter');
   const codexPrompt = page.locator('[data-codex-prompt]');
   await codexPrompt.focus();
   await expect(codexPrompt).toBeFocused();
@@ -1552,8 +1567,9 @@ test('runs Codex in read-only mode from the controlled panel', async ({ page }) 
 
   await page.goto('/');
   await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Kjør Codex' }).click();
 
-  const codexPanel = page.locator('.codex-panel');
+  const codexPanel = page.locator('[data-workflow-panel="codex"]');
   await expect(codexPanel.getByRole('heading', { name: 'Codex er klar' })).toBeVisible();
   await expect(codexPanel).toContainText('codex-cli 0.130.0-test');
   await expect(codexPanel).toContainText('Lesetilgang');
@@ -1620,8 +1636,9 @@ test('shows Codex write-mode warning before running', async ({ page }) => {
 
   await page.goto('/');
   await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Kjør Codex' }).click();
 
-  const codexPanel = page.locator('.codex-panel');
+  const codexPanel = page.locator('[data-workflow-panel="codex"]');
   await codexPanel.getByLabel('Instruksjon').fill('Update the project notes');
   await codexPanel.locator('[data-codex-edit-mode]').check();
 
@@ -1743,8 +1760,9 @@ test('shows Codex login state and returns to ready after device login', async ({
 
   await page.goto('/');
   await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Kjør Codex' }).click();
 
-  const codexPanel = page.locator('.codex-panel');
+  const codexPanel = page.locator('[data-workflow-panel="codex"]');
   await expect(codexPanel.getByRole('heading', { name: 'Innlogging kreves' })).toBeVisible();
   await expect(codexPanel).toContainText('Codex er ikke logget inn');
   await codexPanel.getByRole('button', { name: 'Logg inn' }).click();
@@ -1822,8 +1840,9 @@ test('cancels a running Codex operation from the controlled panel', async ({ pag
 
   await page.goto('/');
   await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Kjør Codex' }).click();
 
-  const codexPanel = page.locator('.codex-panel');
+  const codexPanel = page.locator('[data-workflow-panel="codex"]');
   await codexPanel.getByLabel('Instruksjon').fill('Inspect the project');
   await codexPanel.getByRole('button', { name: 'Kjør Codex' }).click();
   await expect(codexPanel.getByRole('heading', { name: 'Codex kjører' })).toBeVisible();
@@ -1920,8 +1939,9 @@ test('shows Codex failure state and refreshes scan after write completion', asyn
 
   await page.goto('/');
   await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Kjør Codex' }).click();
 
-  const codexPanel = page.locator('.codex-panel');
+  const codexPanel = page.locator('[data-workflow-panel="codex"]');
   await codexPanel.getByLabel('Instruksjon').fill('Fail this read-only run');
   await codexPanel.getByRole('button', { name: 'Kjør Codex' }).click();
   await expect(codexPanel.getByRole('heading', { name: 'Codex feilet' })).toBeVisible();
@@ -2010,27 +2030,27 @@ test('opens settings and manages Codex CLI path', async ({ page }) => {
   });
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: 'Innstillinger' }).click();
 
   const settingsDetails = page.locator('[data-settings-codex-details]');
-  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Innstillinger' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Codex', exact: true })).toBeVisible();
-  await expect(settingsDetails).toContainText('Automatic discovery');
+  await expect(settingsDetails).toContainText('Automatisk søk');
 
-  await page.getByRole('button', { name: 'Choose...' }).click();
-  await expect(page.getByLabel('Path')).toHaveValue('/usr/local/bin/codex');
+  await page.getByRole('button', { name: 'Velg...' }).click();
+  await expect(page.getByRole('textbox', { name: 'Sti' })).toHaveValue('/usr/local/bin/codex');
 
   await page.getByRole('button', { name: 'Test' }).click();
   await expect(page.getByText('Codex detected: codex-cli settings-test')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByText('Codex path saved.')).toBeVisible();
-  await expect(settingsDetails).toContainText('Saved setting');
+  await page.getByRole('button', { name: 'Lagre' }).click();
+  await expect(page.getByText('Codex-sti lagret.')).toBeVisible();
+  await expect(settingsDetails).toContainText('Lagret innstilling');
 
-  await page.getByRole('button', { name: 'Reset to automatic discovery' }).click();
-  await expect(page.getByText('Codex path reset to automatic discovery.')).toBeVisible();
-  await expect(page.getByLabel('Path')).toHaveValue('');
+  await page.getByRole('button', { name: 'Tilbakestill til automatisk søk' }).click();
+  await expect(page.getByText('Codex-sti tilbakestilt til automatisk søk.')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Sti' })).toHaveValue('');
 
-  await page.getByRole('button', { name: 'Back to workspace' }).click();
+  await page.getByRole('button', { name: 'Tilbake til arbeidsflate' }).click();
   await expect(page.getByRole('heading', { name: 'Mappestruktur' })).toBeVisible();
 });

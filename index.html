@@ -23,119 +23,196 @@
           <p class="path" data-selected-path>Velg en mappe for å inspisere innholdet.</p>
         </section>
 
-        <nav class="mode-strip" aria-label="Arbeidsmodus">
-          <button class="mode-pill mode-pill--active" type="button" data-open-workspace aria-current="page">
-            Forstå
+        <nav class="topbar-actions" aria-label="Appnavigasjon">
+          <button class="project-switch" type="button" data-choose-folder disabled>
+            Velg annen mappe...
           </button>
-          <span class="mode-pill">Strukturere</span>
-          <span class="mode-pill">Assistere</span>
-          <button class="mode-pill" type="button" data-open-settings>Settings</button>
+          <button class="topbar-button" type="button" data-open-settings>Innstillinger</button>
         </nav>
       </header>
 
       <div class="app-main" data-app-main data-workspace-view>
         <section class="primary-workspace" data-primary-workspace aria-label="Primær arbeidsflate">
-          <header class="workspace-header">
-            <div>
-              <p class="eyebrow">Lesende inspeksjon</p>
-              <h2 data-overview-title>Mappestruktur</h2>
-              <p class="workspace-subtitle" data-overview-subtitle>
-                Velg en mappe for å se prosjektoversikt.
-              </p>
-            </div>
-            <div class="workspace-header__actions" data-tree-toolbar hidden>
-              <button class="btn btn-secondary btn-sm" type="button" data-expand-all aria-label="Utvid alle mapper">
-                Utvid alle
-              </button>
-              <button class="btn btn-secondary btn-sm" type="button" data-collapse-all aria-label="Lukk alle mapper">
-                Lukk alle
-              </button>
-            </div>
-          </header>
-
-          <dl class="stats-strip" data-summary data-overview-stats aria-label="Prosjektstatistikk">
-            <div>
-              <dt>Files</dt>
-              <dd>0</dd>
-            </div>
-            <div>
-              <dt>Folders</dt>
-              <dd>0</dd>
-            </div>
-            <div>
-              <dt>Status</dt>
-              <dd>Waiting</dd>
-            </div>
-          </dl>
-
-          <section class="project-entry" data-project-entry>
-            <div class="project-entry-card">
-              <div class="project-entry-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false">
-                  <path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
-                </svg>
+          <div class="workspace-default" data-workspace-default>
+            <header class="workspace-header">
+              <div>
+                <p class="eyebrow">Lesende inspeksjon</p>
+                <h2 data-overview-title>Mappestruktur</h2>
+                <p class="workspace-subtitle" data-overview-subtitle>
+                  Velg en mappe for å se prosjektoversikt.
+                </p>
               </div>
-              <h3>Velg en prosjektmappe</h3>
-              <p>
-                Sidekick hjelper deg forstå og jobbe med innholdet i en lokal prosjektmappe.
-                Velg en eksisterende mappe, eller opprett en ny.
-              </p>
-              <div class="entry-error" data-project-entry-error hidden></div>
-              <div class="project-entry-actions">
-                <button class="btn btn-primary btn-lg" type="button" data-choose-folder>
-                  Velg eksisterende mappe...
+              <div class="workspace-header__actions" data-tree-toolbar hidden>
+                <button class="btn btn-secondary btn-sm" type="button" data-expand-all aria-label="Utvid alle mapper">
+                  Utvid alle
                 </button>
-                <button class="btn btn-secondary btn-lg" type="button" data-initialize-project>
-                  Initialiser eksisterende mappe...
+                <button class="btn btn-secondary btn-sm" type="button" data-collapse-all aria-label="Lukk alle mapper">
+                  Lukk alle
                 </button>
-                <div class="project-initialization-panel" data-project-initialization-panel hidden>
-                  <h4 data-project-initialization-title>Initialiser eksisterende mappe</h4>
-                  <p data-project-initialization-message>Velg en mappe for å se hva Sidekick vil gjøre.</p>
-                  <dl class="detail-list" data-project-initialization-details></dl>
-                  <ul class="plain-list" data-project-initialization-warnings></ul>
-                  <div class="inline-actions">
-                    <button class="btn btn-primary" type="button" data-project-initialization-confirm hidden>
-                      Bruk som prosjekt
-                    </button>
-                    <button class="btn btn-secondary" type="button" data-project-initialization-cancel hidden>
-                      Avbryt
-                    </button>
-                  </div>
+              </div>
+            </header>
+
+            <dl class="stats-strip" data-summary data-overview-stats aria-label="Prosjektstatistikk">
+              <div>
+                <dt>Files</dt>
+                <dd>0</dd>
+              </div>
+              <div>
+                <dt>Folders</dt>
+                <dd>0</dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd>Waiting</dd>
+              </div>
+            </dl>
+
+            <section class="project-entry" data-project-entry>
+              <div class="project-entry-card">
+                <div class="project-entry-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+                  </svg>
                 </div>
-                <div class="entry-divider"><span>eller</span></div>
-                <button class="btn btn-secondary btn-lg" type="button" data-open-create-project>
-                  Opprett ny prosjektmappe...
-                </button>
+                <h3>Velg en prosjektmappe</h3>
+                <p>
+                  Sidekick hjelper deg forstå og jobbe med innholdet i en lokal prosjektmappe.
+                  Velg en eksisterende mappe, eller opprett en ny.
+                </p>
+                <div class="entry-error" data-project-entry-error hidden></div>
+                <div class="project-entry-actions">
+                  <button class="btn btn-primary btn-lg" type="button" data-choose-folder>
+                    Velg eksisterende mappe...
+                  </button>
+                  <button class="btn btn-secondary btn-lg" type="button" data-initialize-project>
+                    Initialiser eksisterende mappe...
+                  </button>
+                  <div class="project-initialization-panel" data-project-initialization-panel hidden>
+                    <h4 data-project-initialization-title>Initialiser eksisterende mappe</h4>
+                    <p data-project-initialization-message>Velg en mappe for å se hva Sidekick vil gjøre.</p>
+                    <dl class="detail-list" data-project-initialization-details></dl>
+                    <ul class="plain-list" data-project-initialization-warnings></ul>
+                    <div class="inline-actions">
+                      <button class="btn btn-primary" type="button" data-project-initialization-confirm hidden>
+                        Bruk som prosjekt
+                      </button>
+                      <button class="btn btn-secondary" type="button" data-project-initialization-cancel hidden>
+                        Avbryt
+                      </button>
+                    </div>
+                  </div>
+                  <div class="entry-divider"><span>eller</span></div>
+                  <button class="btn btn-secondary btn-lg" type="button" data-open-create-project>
+                    Opprett ny prosjektmappe...
+                  </button>
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
 
-          <section class="state-banner state-banner--info" data-state-banner>
-            <h3 data-state-title>Choose a project folder</h3>
-            <p data-state-message>Read-only scan of structure, metadata, and artifact types.</p>
-          </section>
+            <section class="state-banner state-banner--info" data-state-banner>
+              <h3 data-state-title>Velg en prosjektmappe</h3>
+              <p data-state-message>Sidekick skanner struktur, metadata og artefakttyper uten å endre filer.</p>
+            </section>
 
-          <section class="overview-empty" data-overview-empty hidden>
-            <h3>Prosjektmappen er tom</h3>
-            <p>Sidekick fant ingen filer eller undermapper i denne prosjektmappen.</p>
-          </section>
+            <section class="overview-empty" data-overview-empty hidden>
+              <h3>Prosjektmappen er tom</h3>
+              <p>Sidekick fant ingen filer eller undermapper i denne prosjektmappen.</p>
+            </section>
 
-          <section class="tree-panel" aria-label="Mappestruktur">
-            <ol class="folder-tree" data-folder-tree role="tree" aria-label="Skannet mappetre"></ol>
-          </section>
+            <section class="tree-panel" aria-label="Mappestruktur">
+              <ol class="folder-tree" data-folder-tree role="tree" aria-label="Skannet mappetre"></ol>
+            </section>
+          </div>
+
+          <div class="workflow-host" data-workflow-host hidden>
+            <section class="workflow-surface" data-workflow-panel="transcription-import" hidden>
+              <header class="workflow-header">
+                <div>
+                  <p class="section-label">Transkripsjoner</p>
+                  <h2 data-transcription-import-title>Ingen prosjektmappe valgt</h2>
+                  <p data-transcription-import-message>Velg en prosjektmappe først.</p>
+                </div>
+              </header>
+              <div class="workflow-body transcription-import-panel">
+                <div class="operation-state" data-transcription-import-state></div>
+                <dl class="transcription-import-details detail-list" data-transcription-import-details></dl>
+                <ul class="transcription-import-list plain-list" data-transcription-import-list></ul>
+              </div>
+              <footer class="workflow-footer">
+                <button class="btn btn-secondary transcription-import-secondary" type="button" data-transcription-import-secondary hidden>
+                  Tilbake
+                </button>
+                <button class="btn btn-primary transcription-import-primary" type="button" data-transcription-import-primary disabled>
+                  Velg fil...
+                </button>
+              </footer>
+            </section>
+
+            <section class="workflow-surface" data-workflow-panel="context-package" hidden>
+              <header class="workflow-header">
+                <div>
+                  <p class="section-label">Kontekstpakke</p>
+                  <h2 data-context-package-title>Ingen prosjektmappe valgt</h2>
+                  <p data-context-package-message>Velg en prosjektmappe først.</p>
+                </div>
+              </header>
+              <div class="workflow-body context-package-panel">
+                <div class="operation-state" data-context-package-state></div>
+                <dl class="context-package-details detail-list" data-context-package-details></dl>
+                <ul class="context-package-list plain-list" data-context-package-list></ul>
+              </div>
+              <footer class="workflow-footer">
+                <button class="btn btn-secondary context-package-secondary" type="button" data-context-package-secondary hidden>
+                  Tilbake
+                </button>
+                <button class="btn btn-primary context-package-primary" type="button" data-context-package-primary disabled>
+                  Forhåndsvis
+                </button>
+              </footer>
+            </section>
+
+            <section class="workflow-surface" data-workflow-panel="codex" hidden>
+              <header class="workflow-header">
+                <div>
+                  <p class="section-label">Codex</p>
+                  <h2 data-codex-title>Ingen prosjektmappe valgt</h2>
+                  <p data-codex-message>Velg en prosjektmappe først.</p>
+                </div>
+              </header>
+              <div class="workflow-body codex-panel">
+                <div class="operation-state" data-codex-state></div>
+                <dl class="codex-details detail-list" data-codex-details></dl>
+                <label class="codex-prompt-label" for="codex-prompt">Instruksjon</label>
+                <textarea
+                  id="codex-prompt"
+                  data-codex-prompt
+                  rows="4"
+                  placeholder="Be Codex undersøke eller arbeide med prosjektmappen..."
+                  disabled
+                ></textarea>
+                <label class="codex-mode">
+                  <input type="checkbox" data-codex-edit-mode disabled />
+                  <span class="codex-mode-copy">
+                    <strong data-codex-mode-title>Lesetilgang</strong>
+                    <span data-codex-mode-description>Codex kan lese prosjektmappen, men ikke endre filer.</span>
+                  </span>
+                </label>
+                <p class="codex-output-label">Kjørelogg</p>
+                <ul class="codex-output plain-list output-list" data-codex-output></ul>
+              </div>
+              <footer class="workflow-footer">
+                <button class="btn btn-secondary codex-secondary" type="button" data-codex-secondary hidden>
+                  Tilbake
+                </button>
+                <button class="btn btn-primary codex-primary" type="button" data-codex-primary disabled>
+                  Kjør Codex
+                </button>
+              </footer>
+            </section>
+          </div>
         </section>
 
         <aside class="context-surface" data-context-surface aria-label="Kontekst og handlinger">
-          <section class="surface-section">
-            <p class="section-label">Skannet</p>
-            <dl class="detail-list" data-overview-scan-status></dl>
-          </section>
-
-          <section class="surface-section">
-            <p class="section-label">Kontekstpakke</p>
-            <p class="status-chip" data-overview-context-package-status>Ikke sjekket</p>
-          </section>
-
           <section class="surface-section surface-section--selection" data-selection-panel>
             <p class="section-label" data-selection-label>Valgt mappe</p>
             <h3 data-selection-title>Ingen mappe valgt</h3>
@@ -143,153 +220,52 @@
             <dl class="selection-details detail-list" data-selection-details></dl>
             <div class="selection-contents" data-selection-contents></div>
           </section>
-
-          <section class="surface-section surface-section--workflow">
-            <p class="section-label">Transkripsjoner</p>
-            <div class="transcription-import-panel">
-              <h3 data-transcription-import-title>Ingen prosjektmappe valgt</h3>
-              <p data-transcription-import-message>Choose a folder first.</p>
-              <div class="operation-state" data-transcription-import-state></div>
-              <dl class="transcription-import-details detail-list" data-transcription-import-details></dl>
-              <ul class="transcription-import-list plain-list" data-transcription-import-list></ul>
-              <div class="inline-actions">
-                <button class="btn btn-primary transcription-import-primary" type="button" data-transcription-import-primary disabled>
-                  Add transcription
-                </button>
-                <button class="btn btn-secondary transcription-import-secondary" type="button" data-transcription-import-secondary hidden>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <section class="surface-section surface-section--workflow">
-            <p class="section-label">Kontekstpakke</p>
-            <div class="context-package-panel">
-              <h3 data-context-package-title>Ingen prosjektmappe valgt</h3>
-              <p data-context-package-message>Choose a folder first.</p>
-              <div class="operation-state" data-context-package-state></div>
-              <dl class="context-package-details detail-list" data-context-package-details></dl>
-              <ul class="context-package-list plain-list" data-context-package-list></ul>
-              <div class="inline-actions">
-                <button class="btn btn-primary context-package-primary" type="button" data-context-package-primary disabled>
-                  Create context package
-                </button>
-                <button class="btn btn-secondary context-package-secondary" type="button" data-context-package-secondary hidden>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <section class="surface-section surface-section--workflow">
-            <p class="section-label">Codex</p>
-            <div class="codex-panel">
-              <h3 data-codex-title>Ingen prosjektmappe valgt</h3>
-              <p data-codex-message>Velg en prosjektmappe først.</p>
-              <div class="operation-state" data-codex-state></div>
-              <dl class="codex-details detail-list" data-codex-details></dl>
-              <label class="codex-prompt-label" for="codex-prompt">Instruksjon</label>
-              <textarea
-                id="codex-prompt"
-                data-codex-prompt
-                rows="4"
-                placeholder="Be Codex undersøke eller arbeide med prosjektmappen..."
-                disabled
-              ></textarea>
-              <label class="codex-mode">
-                <input type="checkbox" data-codex-edit-mode disabled />
-                <span class="codex-mode-copy">
-                  <strong data-codex-mode-title>Lesetilgang</strong>
-                  <span data-codex-mode-description>Codex kan lese prosjektmappen, men ikke endre filer.</span>
-                </span>
-              </label>
-              <p class="codex-output-label">Kjørelogg</p>
-              <ul class="codex-output plain-list output-list" data-codex-output></ul>
-              <div class="inline-actions">
-                <button class="btn btn-primary codex-primary" type="button" data-codex-primary disabled>
-                  Kjør Codex
-                </button>
-                <button class="btn btn-secondary codex-secondary" type="button" data-codex-secondary hidden>
-                  Avbryt
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <section class="surface-section">
-            <p class="section-label">Mappesignaler</p>
-            <ul class="signal-list plain-list" data-folder-signals>
-              <li>No signals yet</li>
-            </ul>
-          </section>
-
-          <section class="surface-section">
-            <p class="section-label">Artefakttyper</p>
-            <ul class="metric-list plain-list" data-artifact-counts>
-              <li>No artifacts yet</li>
-            </ul>
-          </section>
-
-          <section class="surface-section">
-            <p class="section-label">Nylig endret</p>
-            <ul class="file-list plain-list" data-recent-files>
-              <li>No recent files yet</li>
-            </ul>
-          </section>
-
-          <section class="surface-section">
-            <p class="section-label">Varsler</p>
-            <ul class="warning-list plain-list" data-warnings>
-              <li>No warnings</li>
-            </ul>
-          </section>
         </aside>
       </div>
 
-      <section class="settings-view" aria-label="Settings" data-settings-view hidden>
+      <section class="settings-view" aria-label="Innstillinger" data-settings-view hidden>
         <header class="workspace-header">
           <div>
-            <p class="eyebrow">Application settings</p>
-            <h2>Settings</h2>
+            <p class="eyebrow">Appinnstillinger</p>
+            <h2>Innstillinger</h2>
           </div>
-          <button class="btn btn-secondary" type="button" data-close-settings>Back to workspace</button>
+          <button class="btn btn-secondary" type="button" data-close-settings>Tilbake til arbeidsflate</button>
         </header>
 
         <div class="settings-layout">
-          <nav class="settings-nav" aria-label="Settings sections">
-            <button type="button" class="settings-nav-item" aria-current="page">Integrations</button>
-            <button type="button" class="settings-nav-item" disabled>General</button>
-            <button type="button" class="settings-nav-item" disabled>About</button>
+          <nav class="settings-nav" aria-label="Innstillingsseksjoner">
+            <button type="button" class="settings-nav-item" aria-current="page">Integrasjoner</button>
+            <button type="button" class="settings-nav-item" disabled>Generelt</button>
+            <button type="button" class="settings-nav-item" disabled>Om</button>
           </nav>
 
-          <section class="settings-panel" aria-label="Codex settings">
+          <section class="settings-panel" aria-label="Codex-innstillinger">
             <div class="settings-section-header">
-              <p class="section-label">Integrations</p>
+              <p class="section-label">Integrasjoner</p>
               <h3>Codex</h3>
             </div>
 
             <div class="setting-row">
               <div class="setting-copy">
-                <h4>Codex CLI path</h4>
-                <p>Sidekick can discover Codex automatically, or use this executable path.</p>
+                <h4>Codex CLI-sti</h4>
+                <p>Sidekick kan finne Codex automatisk eller bruke denne kjørbare filen.</p>
                 <dl class="settings-details detail-list" data-settings-codex-details></dl>
               </div>
               <div class="setting-control">
-                <label for="settings-codex-path">Path</label>
+                <label for="settings-codex-path">Sti</label>
                 <input
                   id="settings-codex-path"
                   type="text"
                   data-settings-codex-path
-                  placeholder="Automatic discovery"
+                  placeholder="Automatisk søk"
                   autocomplete="off"
                 />
                 <div class="settings-actions">
-                  <button class="btn btn-secondary" type="button" data-settings-choose-codex>Choose...</button>
+                  <button class="btn btn-secondary" type="button" data-settings-choose-codex>Velg...</button>
                   <button class="btn btn-secondary" type="button" data-settings-test-codex>Test</button>
-                  <button class="btn btn-primary" type="button" data-settings-save-codex>Save</button>
+                  <button class="btn btn-primary" type="button" data-settings-save-codex>Lagre</button>
                   <button class="btn btn-secondary" type="button" data-settings-reset-codex>
-                    Reset to automatic discovery
+                    Tilbakestill til automatisk søk
                   </button>
                 </div>
                 <p class="settings-message" data-settings-message></p>
@@ -359,7 +335,7 @@
       </section>
 
       <footer class="action-bar" data-action-bar>
-        <button class="btn btn-primary" type="button" data-overview-action-generate-context>
+        <button class="btn btn-secondary" type="button" data-overview-action-generate-context>
           Generer kontekstpakke
         </button>
         <button class="btn btn-secondary" type="button" data-overview-action-import-transcription>
@@ -368,7 +344,6 @@
         <button class="btn btn-secondary" type="button" data-overview-action-run-codex>
           Kjør Codex
         </button>
-        <button class="btn btn-ghost" type="button" data-choose-folder>Bytt prosjekt</button>
       </footer>
 
       <footer class="status-bar" data-status-bar>

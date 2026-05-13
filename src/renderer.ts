@@ -93,6 +93,7 @@ type VisibleTreeEntry = {
 };
 
 type AppView = 'workspace' | 'settings';
+type ActiveWorkflow = 'context-package' | 'transcription-import' | 'codex' | null;
 
 type SettingsState =
   | { status: 'idle'; snapshot?: AppSettingsSnapshot; message: string }
@@ -115,6 +116,9 @@ const openSettingsButton = document.querySelector<HTMLButtonElement>('[data-open
 const closeSettingsButton = document.querySelector<HTMLButtonElement>('[data-close-settings]');
 const actionBarTarget = document.querySelector<HTMLElement>('[data-action-bar]');
 const contextSurfaceTarget = document.querySelector<HTMLElement>('[data-context-surface]');
+const workspaceDefaultTarget = document.querySelector<HTMLElement>('[data-workspace-default]');
+const workflowHostTarget = document.querySelector<HTMLElement>('[data-workflow-host]');
+const workflowPanels = document.querySelectorAll<HTMLElement>('[data-workflow-panel]');
 const summaryStripTarget = document.querySelector<HTMLElement>('[data-summary]');
 const projectEntryTarget = document.querySelector<HTMLElement>('[data-project-entry]');
 const projectEntryErrorTarget = document.querySelector<HTMLElement>('[data-project-entry-error]');
@@ -297,6 +301,7 @@ let projectInitializationState: ProjectInitializationState = {
 let projectNameTouched = false;
 let codexState: CodexState = { status: 'unavailable', message: 'Choose a folder first.' };
 let appView: AppView = 'workspace';
+let activeWorkflow: ActiveWorkflow = null;
 let settingsState: SettingsState = { status: 'idle', message: '' };
 
 const setText = (target: Element | null, value: string) => {
@@ -344,10 +349,15 @@ const renderActions = (
   primaryLabel: string,
   primaryDisabled: boolean,
   secondaryVisible = false,
+  secondaryLabel?: string,
 ) => {
   if (primaryButton) {
     primaryButton.textContent = primaryLabel;
     primaryButton.disabled = primaryDisabled;
+  }
+
+  if (secondaryButton && secondaryLabel) {
+    secondaryButton.textContent = secondaryLabel;
   }
 
   secondaryButton?.toggleAttribute('hidden', !secondaryVisible);
@@ -527,6 +537,8 @@ const setActiveScan = (scan: ProjectFolderScan) => {
   resetExpandedPaths();
   selectedTreePath = scan.tree.relativePath;
   focusedTreePath = scan.tree.relativePath;
+  activeWorkflow = null;
+  appView = 'workspace';
   setContextPackageStateForScan(scan);
   setOverviewContextPackageStatusForScan(scan);
   setTranscriptionImportStateForScan(scan);
@@ -538,6 +550,74 @@ const getActiveScan = () =>
   state.status === 'ready' || state.status === 'partial' ? state.scan : undefined;
 
 const isFolderNode = (node: FolderTreeNode) => node.kind === 'folder';
+
+const focusActiveWorkflow = () => {
+  window.requestAnimationFrame(() => {
+    const activePanel = document.querySelector<HTMLElement>(
+      `[data-workflow-panel="${activeWorkflow ?? ''}"]`,
+    );
+    const focusTarget = activePanel?.querySelector<HTMLElement>(
+      'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    focusTarget?.focus();
+  });
+};
+
+const focusSelectedTreeRow = () => {
+  window.requestAnimationFrame(() => {
+    const row = treeTarget?.querySelector<HTMLElement>(
+      `.tree-row[data-tree-path="${CSS.escape(focusedTreePath)}"]`,
+    );
+    row?.focus();
+  });
+};
+
+const openWorkflow = (workflow: Exclude<ActiveWorkflow, null>) => {
+  if (!getActiveScan()) {
+    return;
+  }
+
+  appView = 'workspace';
+  activeWorkflow = workflow;
+  render();
+  focusActiveWorkflow();
+};
+
+const closeActiveWorkflow = () => {
+  if (activeWorkflow === 'context-package' && contextPackageState.status !== 'generating') {
+    contextPackageState = getActiveScan() ? { status: 'ready' } : { status: 'unavailable' };
+  }
+
+  if (activeWorkflow === 'transcription-import' && transcriptionImportState.status !== 'importing') {
+    transcriptionImportState = getActiveScan() ? { status: 'ready' } : { status: 'unavailable' };
+  }
+
+  if (
+    activeWorkflow === 'codex' &&
+    codexState.status !== 'running' &&
+    codexState.status !== 'checking'
+  ) {
+    const scan = getActiveScan();
+    if (scan) {
+      void refreshCodexStatus(scan);
+    }
+  }
+
+  activeWorkflow = null;
+  render();
+  focusSelectedTreeRow();
+};
+
+const isExclusiveWorkflowActive = () =>
+  activeWorkflow !== null &&
+  (contextPackageState.status === 'previewing' ||
+    contextPackageState.status === 'confirming' ||
+    contextPackageState.status === 'generating' ||
+    transcriptionImportState.status === 'previewing' ||
+    transcriptionImportState.status === 'confirming' ||
+    transcriptionImportState.status === 'importing' ||
+    codexState.status === 'checking' ||
+    codexState.status === 'running');
 
 const getChildren = (node: FolderTreeNode) => node.children ?? [];
 
@@ -868,9 +948,6 @@ const getFileExtension = (fileName: string) => {
   return extension && extension !== fileName ? `.${extension}` : 'fil';
 };
 
-const getDisplayPath = (scan: ProjectFolderScan, node: FolderTreeNode) =>
-  node.relativePath === ROOT_PATH ? scan.rootPath : `${scan.rootPath}/${node.relativePath}`;
-
 const getNodeWarnings = (scan: ProjectFolderScan, node: FolderTreeNode) =>
   scan.warnings.filter((warning) => {
     if (node.relativePath === ROOT_PATH) {
@@ -958,7 +1035,11 @@ const renderSelectionContents = (node: FolderTreeNode) => {
 
   const title = document.createElement('p');
   title.className = 'selection-contents-title';
-  title.textContent = isFolderNode(node) ? 'Direkte innhold' : 'Artefakt';
+  title.textContent = node.relativePath === ROOT_PATH
+    ? 'Prosjektinnhold'
+    : isFolderNode(node)
+      ? 'Direkte innhold'
+      : 'Artefakt';
   selectionContentsTarget.append(title);
 
   if (!isFolderNode(node)) {
@@ -984,6 +1065,28 @@ const renderSelectionContents = (node: FolderTreeNode) => {
   selectionContentsTarget.append(list);
 };
 
+const appendSelectionWarnings = (warnings: string[]) => {
+  if (!selectionContentsTarget || warnings.length === 0) {
+    return;
+  }
+
+  const title = document.createElement('p');
+  title.className = 'selection-contents-title';
+  title.textContent = 'Varsler';
+
+  const list = document.createElement('ul');
+  list.className = 'warning-list';
+  list.dataset.selectionWarnings = '';
+
+  warnings.forEach((warning) => {
+    const item = document.createElement('li');
+    item.textContent = warning;
+    list.append(item);
+  });
+
+  selectionContentsTarget.append(title, list);
+};
+
 const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
   if (!scan) {
     selectionPanelTarget?.toggleAttribute('hidden', true);
@@ -998,21 +1101,42 @@ const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
   const childFolders = getChildren(node).filter(isFolderNode).length;
   const childFiles = getChildren(node).length - childFolders;
 
-  setText(selectionLabelTarget, isFolderNode(node) ? 'Valgt mappe' : 'Valgt fil');
+  if (node.relativePath === ROOT_PATH) {
+    setText(selectionLabelTarget, 'Prosjekt');
+    setText(selectionTitleTarget, scan.rootName);
+    renderSelectionBreadcrumb(scan, node);
+    renderDetails(selectionDetailsTarget, [
+      ['Prosjektmappe', scan.rootPath],
+      ['Filer', scan.summary.fileCount.toString()],
+      ['Mapper', scan.summary.folderCount.toString()],
+      ['Skannet', formatDate(scan.scannedAt)],
+      ['Status', scan.status === 'partial' ? 'Delvis' : 'Fullført'],
+      ['Kontekstpakke', contextPackageStatusText(scan)],
+      ['Varsler', overviewWarningCount(scan) > 0 ? overviewWarningCount(scan).toString() : 'Ingen'],
+      ['Markdown/tekst', scan.summary.artifactTypeCounts['markdown-text'].toString()],
+      ['Transkripsjoner', scan.summary.artifactTypeCounts.transcript.toString()],
+    ]);
+    renderSelectionContents(node);
+    appendSelectionWarnings(overviewWarnings(scan));
+    return;
+  }
+
+  setText(selectionLabelTarget, isFolderNode(node) ? 'Mappe' : 'Fil');
   setText(selectionTitleTarget, node.relativePath === ROOT_PATH ? scan.rootName : node.name);
   renderSelectionBreadcrumb(scan, node);
 
   if (isFolderNode(node)) {
     renderDetails(selectionDetailsTarget, [
-      ['Sti', getDisplayPath(scan, node)],
+      ['Relativ sti', node.relativePath],
       ['Direkte innhold', `${childFolders} mapper / ${childFiles} filer`],
       ['Filer totalt', countFilesInNode(node).toString()],
       ['Signal', getFolderSignalLabel(node)],
+      ['Sist endret', formatDate(node.modifiedAt) || 'Ukjent'],
       ['Varsler', warnings.length > 0 ? warnings.length.toString() : 'Ingen'],
     ]);
   } else {
     renderDetails(selectionDetailsTarget, [
-      ['Sti', getDisplayPath(scan, node)],
+      ['Relativ sti', node.relativePath],
       ['Type', node.artifactType ? artifactLabels[node.artifactType] : 'Fil'],
       ['Størrelse', formatBytes(node.size) || 'Ukjent'],
       ['Sist endret', formatDate(node.modifiedAt) || 'Ukjent'],
@@ -1021,6 +1145,11 @@ const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
   }
 
   renderSelectionContents(node);
+  appendSelectionWarnings(
+    warnings.map((warning) =>
+      warning.path === ROOT_PATH ? warning.message : `${warning.path}: ${warning.message}`,
+    ),
+  );
 };
 
 const normalizeDisplayPath = (pathValue: string) => pathValue.replace(/[\\/]+$/, '');
@@ -1327,7 +1456,7 @@ const renderContextPackageReady = (scan: ProjectFolderScan) => {
     ['Plassering', 'Prosjektroten'],
   ]);
   renderContextPackageList([]);
-  renderContextPackageActions('Forhåndsvis', false);
+  renderContextPackageActions('Forhåndsvis', false, true);
 };
 
 const renderContextPackagePreviewing = () => {
@@ -1415,7 +1544,7 @@ const renderContextPackageComplete = (result: ContextPackageResult) => {
       ? [`${result.skippedFiles.length - skippedPreview.length} flere filer ble hoppet over`]
       : []),
   ]);
-  renderContextPackageActions('Lag ny', false);
+  renderContextPackageActions('Lag ny', false, true);
 };
 
 const renderContextPackageError = (
@@ -1439,7 +1568,7 @@ const renderContextPackageError = (
   );
   renderContextPackageDetails([]);
   renderContextPackageList([]);
-  renderContextPackageActions('Prøv igjen', false);
+  renderContextPackageActions('Prøv igjen', false, true);
 };
 
 const renderContextPackage = (scan?: ProjectFolderScan) => {
@@ -1497,7 +1626,7 @@ const renderTranscriptionImportReady = (scan: ProjectFolderScan) => {
     ['Handling', 'Kopierer filen. Originalen blir liggende der den er.'],
   ]);
   renderTranscriptionImportList([]);
-  renderTranscriptionImportActions('Velg fil...', false);
+  renderTranscriptionImportActions('Velg fil...', false, true);
 };
 
 const renderTranscriptionImportPreviewing = () => {
@@ -1577,7 +1706,7 @@ const renderTranscriptionImportComplete = (result: TranscriptionImportResult) =>
     ['Original', 'Uendret'],
   ]);
   renderTranscriptionImportList([]);
-  renderTranscriptionImportActions('Importer ny', false);
+  renderTranscriptionImportActions('Importer ny', false, true);
 };
 
 const renderTranscriptionImportError = (message: string) => {
@@ -1589,7 +1718,7 @@ const renderTranscriptionImportError = (message: string) => {
   );
   renderTranscriptionImportDetails([]);
   renderTranscriptionImportList([]);
-  renderTranscriptionImportActions('Prøv igjen', false);
+  renderTranscriptionImportActions('Prøv igjen', false, true);
 };
 
 const renderTranscriptionImport = (scan?: ProjectFolderScan) => {
@@ -1624,11 +1753,8 @@ const renderCodexActions = (
   primaryLabel: string,
   primaryDisabled: boolean,
   secondaryVisible = false,
+  secondaryLabel = 'Tilbake',
 ) => {
-  if (codexSecondaryButton) {
-    codexSecondaryButton.textContent = 'Avbryt';
-  }
-
   renderActions(
     {
       primaryButton: codexPrimaryButton,
@@ -1637,6 +1763,7 @@ const renderCodexActions = (
     primaryLabel,
     primaryDisabled,
     secondaryVisible,
+    secondaryLabel,
   );
 };
 
@@ -1741,7 +1868,7 @@ const renderCodexLoggedOut = (codexStatus: CodexStatus) => {
   renderCodexOutput([]);
   setCodexInputsDisabled(true);
   renderCodexModeCopy();
-  renderCodexActions('Logg inn', false);
+  renderCodexActions('Logg inn', false, true);
 };
 
 const renderCodexReady = (codexStatus: CodexStatus, scan: ProjectFolderScan) => {
@@ -1765,7 +1892,7 @@ const renderCodexReady = (codexStatus: CodexStatus, scan: ProjectFolderScan) => 
   renderCodexOutput([]);
   setCodexInputsDisabled(false);
   renderCodexModeCopy();
-  renderCodexActions('Kjør Codex', false);
+  renderCodexActions('Kjør Codex', false, true);
 };
 
 const renderCodexRunning = (
@@ -1795,7 +1922,7 @@ const renderCodexRunning = (
   renderCodexOutput(run.output);
   setCodexInputsDisabled(true);
   renderCodexModeCopy();
-  renderCodexActions(run.mode === 'login' ? 'Logger inn...' : 'Kjører...', true, true);
+  renderCodexActions(run.mode === 'login' ? 'Logger inn...' : 'Kjører...', true, true, 'Avbryt');
 };
 
 const renderCodexFinished = (
@@ -1832,7 +1959,7 @@ const renderCodexFinished = (
   renderCodexOutput(finished.output);
   setCodexInputsDisabled(false);
   renderCodexModeCopy();
-  renderCodexActions('Kjør igjen', false);
+  renderCodexActions('Kjør igjen', false, true);
 };
 
 const renderCodex = (scan?: ProjectFolderScan) => {
@@ -2279,18 +2406,18 @@ const renderReadyState = (scan: ProjectFolderScan, status: 'ready' | 'partial') 
 
 const sourceLabel = (snapshot?: AppSettingsSnapshot) => {
   if (!snapshot) {
-    return 'Unknown';
+    return 'Ukjent';
   }
 
   if (snapshot.codexPathSource === 'environment') {
-    return 'Environment variable';
+    return 'Miljøvariabel';
   }
 
   if (snapshot.codexPathSource === 'saved') {
-    return 'Saved setting';
+    return 'Lagret innstilling';
   }
 
-  return 'Automatic discovery';
+  return 'Automatisk søk';
 };
 
 const renderSettings = () => {
@@ -2302,12 +2429,12 @@ const renderSettings = () => {
   const snapshot = settingsState.snapshot;
 
   const rows: DetailRow[] = [
-    ['Mode', sourceLabel(snapshot)],
-    ['Effective path', snapshot?.effectiveCodexPath ?? 'Automatic discovery'],
+    ['Modus', sourceLabel(snapshot)],
+    ['Effektiv sti', snapshot?.effectiveCodexPath ?? 'Automatisk søk'],
   ];
 
   if (snapshot?.warning) {
-    rows.push(['Warning', snapshot.warning]);
+    rows.push(['Varsel', snapshot.warning]);
   }
 
   renderDetails(settingsCodexDetailsTarget, rows);
@@ -2324,23 +2451,35 @@ const renderSettings = () => {
 };
 
 const render = () => {
+  const hasActiveProject = state.status === 'ready' || state.status === 'partial';
+  if (!hasActiveProject) {
+    activeWorkflow = null;
+  }
+
   const isBusy =
     state.status === 'loading' ||
     projectCreationState.status === 'creating' ||
     projectInitializationState.status === 'choosing' ||
     projectInitializationState.status === 'initializing';
-  const hasActiveProject = state.status === 'ready' || state.status === 'partial';
   const isEntryState = state.status === 'empty' || state.status === 'error';
+  const hasActiveWorkflow = activeWorkflow !== null;
+  const isNavigationBlocked = isBusy || hasActiveWorkflow || isExclusiveWorkflowActive();
 
   chooseFolderButtons.forEach((button) => {
-    button.toggleAttribute('disabled', isBusy || !window.sidekick);
+    button.toggleAttribute('disabled', isNavigationBlocked || !window.sidekick);
   });
-  overviewGenerateContextButton?.toggleAttribute('disabled', !hasActiveProject || isBusy);
-  overviewImportTranscriptionButton?.toggleAttribute('disabled', !hasActiveProject || isBusy);
-  overviewRunCodexButton?.toggleAttribute('disabled', !hasActiveProject || isBusy);
+  openSettingsButton?.toggleAttribute('disabled', isNavigationBlocked);
+  overviewGenerateContextButton?.toggleAttribute('disabled', !hasActiveProject || isBusy || hasActiveWorkflow);
+  overviewImportTranscriptionButton?.toggleAttribute('disabled', !hasActiveProject || isBusy || hasActiveWorkflow);
+  overviewRunCodexButton?.toggleAttribute('disabled', !hasActiveProject || isBusy || hasActiveWorkflow);
   appMainTarget?.classList.toggle('app-main--single', !hasActiveProject);
   contextSurfaceTarget?.toggleAttribute('hidden', !hasActiveProject);
-  actionBarTarget?.toggleAttribute('hidden', !hasActiveProject);
+  actionBarTarget?.toggleAttribute('hidden', !hasActiveProject || appView === 'settings');
+  workspaceDefaultTarget?.toggleAttribute('hidden', hasActiveWorkflow);
+  workflowHostTarget?.toggleAttribute('hidden', !hasActiveWorkflow);
+  workflowPanels.forEach((panel) => {
+    panel.toggleAttribute('hidden', panel.dataset.workflowPanel !== activeWorkflow);
+  });
   summaryStripTarget?.toggleAttribute('hidden', !hasActiveProject);
   projectEntryTarget?.toggleAttribute('hidden', !isEntryState);
   stateBannerTarget?.toggleAttribute('hidden', isEntryState || hasActiveProject);
@@ -2369,7 +2508,7 @@ const loadSettings = async () => {
   if (!window.sidekick) {
     settingsState = {
       status: 'error',
-      message: 'Settings are available in the Electron app.',
+      message: 'Innstillinger er tilgjengelige i Electron-appen.',
     };
     render();
     return;
@@ -2378,7 +2517,7 @@ const loadSettings = async () => {
   settingsState = {
     ...settingsState,
     status: 'loading',
-    message: 'Loading settings.',
+    message: 'Laster innstillinger.',
   };
   render();
 
@@ -2390,13 +2529,13 @@ const loadSettings = async () => {
     settingsState = {
       status: 'idle',
       snapshot,
-      message: snapshot.warning ?? 'Settings loaded.',
+      message: snapshot.warning ?? 'Innstillinger lastet.',
     };
   } catch (error) {
     settingsState = {
       ...settingsState,
       status: 'error',
-      message: error instanceof Error ? error.message : 'Unable to load settings.',
+      message: error instanceof Error ? error.message : 'Kunne ikke laste innstillinger.',
     };
   }
 
@@ -2404,6 +2543,10 @@ const loadSettings = async () => {
 };
 
 const openSettings = () => {
+  if (activeWorkflow) {
+    return;
+  }
+
   appView = 'settings';
   render();
   void loadSettings();
@@ -2424,7 +2567,7 @@ const chooseCodexPath = async () => {
   settingsState = {
     ...settingsState,
     status: 'loading',
-    message: 'Choose the Codex CLI executable.',
+    message: 'Velg Codex CLI-programfil.',
   };
   render();
 
@@ -2436,20 +2579,20 @@ const chooseCodexPath = async () => {
       settingsState = {
         ...settingsState,
         status: 'idle',
-        message: 'Path selected. Test or save the setting.',
+        message: 'Sti valgt. Test eller lagre innstillingen.',
       };
     } else {
       settingsState = {
         ...settingsState,
         status: 'idle',
-        message: 'No path selected.',
+        message: 'Ingen sti valgt.',
       };
     }
   } catch (error) {
     settingsState = {
       ...settingsState,
       status: 'error',
-      message: error instanceof Error ? error.message : 'Unable to choose Codex path.',
+      message: error instanceof Error ? error.message : 'Kunne ikke velge Codex-sti.',
     };
   }
 
@@ -2482,18 +2625,18 @@ const saveCodexPath = async () => {
   settingsState = {
     ...settingsState,
     status: 'saving',
-    message: 'Saving Codex path.',
+    message: 'Lagrer Codex-sti.',
   };
   render();
 
   try {
     const snapshot = await window.sidekick.saveCodexPath(currentSettingsCodexPath());
-    applyCodexSettingsResult(snapshot, 'Codex path saved.');
+    applyCodexSettingsResult(snapshot, 'Codex-sti lagret.');
   } catch (error) {
     settingsState = {
       ...settingsState,
       status: 'error',
-      message: error instanceof Error ? error.message : 'Unable to save Codex path.',
+      message: error instanceof Error ? error.message : 'Kunne ikke lagre Codex-sti.',
     };
   }
 
@@ -2508,18 +2651,18 @@ const resetCodexPath = async () => {
   settingsState = {
     ...settingsState,
     status: 'saving',
-    message: 'Resetting Codex path.',
+    message: 'Tilbakestiller Codex-sti.',
   };
   render();
 
   try {
     const snapshot = await window.sidekick.resetCodexPath();
-    applyCodexSettingsResult(snapshot, 'Codex path reset to automatic discovery.');
+    applyCodexSettingsResult(snapshot, 'Codex-sti tilbakestilt til automatisk søk.');
   } catch (error) {
     settingsState = {
       ...settingsState,
       status: 'error',
-      message: error instanceof Error ? error.message : 'Unable to reset Codex path.',
+      message: error instanceof Error ? error.message : 'Kunne ikke tilbakestille Codex-sti.',
     };
   }
 
@@ -2534,7 +2677,7 @@ const testCodexPath = async () => {
   settingsState = {
     ...settingsState,
     status: 'testing',
-    message: 'Testing Codex path.',
+    message: 'Tester Codex-sti.',
   };
   render();
 
@@ -2551,7 +2694,7 @@ const testCodexPath = async () => {
     settingsState = {
       ...settingsState,
       status: 'error',
-      message: error instanceof Error ? error.message : 'Unable to test Codex path.',
+      message: error instanceof Error ? error.message : 'Kunne ikke teste Codex-sti.',
     };
   }
 
@@ -2885,6 +3028,10 @@ const completeCodexRun = (completion: CodexCompletionEvent) => {
 };
 
 const chooseFolder = async () => {
+  if (activeWorkflow) {
+    return;
+  }
+
   if (!window.sidekick) {
     state = { status: 'error', message: 'Local folder inspection is available in the Electron app.' };
     render();
@@ -3254,24 +3401,33 @@ createProjectButton?.addEventListener('click', () => {
 expandAllButton?.addEventListener('click', expandAllFolders);
 collapseAllButton?.addEventListener('click', collapseAllFolders);
 contextPackagePrimaryButton?.addEventListener('click', handleContextPackagePrimary);
-overviewGenerateContextButton?.addEventListener('click', handleContextPackagePrimary);
+overviewGenerateContextButton?.addEventListener('click', () => {
+  openWorkflow('context-package');
+});
 contextPackageSecondaryButton?.addEventListener('click', () => {
-  contextPackageState = getActiveScan() ? { status: 'ready' } : { status: 'unavailable' };
-  render();
+  closeActiveWorkflow();
 });
 transcriptionImportPrimaryButton?.addEventListener('click', handleTranscriptionImportPrimary);
-overviewImportTranscriptionButton?.addEventListener('click', handleTranscriptionImportPrimary);
+overviewImportTranscriptionButton?.addEventListener('click', () => {
+  openWorkflow('transcription-import');
+});
 transcriptionImportSecondaryButton?.addEventListener('click', () => {
-  transcriptionImportState = getActiveScan() ? { status: 'ready' } : { status: 'unavailable' };
-  render();
+  closeActiveWorkflow();
 });
 codexEditModeInput?.addEventListener('change', () => {
   render();
 });
 codexPrimaryButton?.addEventListener('click', handleCodexPrimary);
-overviewRunCodexButton?.addEventListener('click', handleCodexPrimary);
+overviewRunCodexButton?.addEventListener('click', () => {
+  openWorkflow('codex');
+});
 codexSecondaryButton?.addEventListener('click', () => {
-  void cancelCodexRun();
+  if (codexState.status === 'running') {
+    void cancelCodexRun();
+    return;
+  }
+
+  closeActiveWorkflow();
 });
 
 window.sidekick?.onCodexOutput?.(appendCodexOutput);
