@@ -1,17 +1,17 @@
 # Task: Generate Summaries For Existing Transcriptions
 
 ID: TASK-0028
-Status: Specified
+Status: Ready For Review
 Class: Major
 Owner: Pair
 Created: 2026-05-12
 Updated: 2026-05-13
 Branch: task/TASK-0028-generate-summaries-for-existing-transcriptions
 Worktree: ../Sidekick-worktrees/TASK-0028-generate-summaries-for-existing-transcriptions
-Base branch: origin/main
+Base branch: local main at `931c22b`
 Write scope:
 - `src/main/transcription-summary.ts`
-- `src/main/transcription-importer.ts`
+- `src/main/transcription-summary-batch.ts`
 - `src/main.ts`
 - `src/preload.ts`
 - `src/shared/sidekick-api.ts`
@@ -24,7 +24,7 @@ Write scope:
 - `docs/tasks/TASK-0028-generate-summaries-for-existing-transcriptions.md`
 Parallel safety: Coordinate
 Depends on:
-- `TASK-0026-transcription-summary-on-import.md`
+- `closed/TASK-0026-transcription-summary-on-import.md`
 - `closed/TASK-0018-folder-hierarchy-artifact-detail.md`
 - `closed/TASK-0019-write-pattern-transcript-import.md`
 - `closed/TASK-0021-controlled-codex-assistant-refresh.md`
@@ -41,21 +41,21 @@ This extends the imported-transcription summary contract from `TASK-0026` so old
 
 ## Current Phase
 
-Specify
+Ready For Review
 
-Specification is complete. Planning has not started.
+Build and automated verification are complete. Human review is next.
 
 ## Progress Checklist
 
 - [x] Explore complete
 - [x] Spec complete
-- [ ] Plan complete
-- [ ] Worktree created or reused, if required
-- [ ] Human approval received, if required
-- [ ] Build complete
-- [ ] Verification complete
+- [x] Plan complete
+- [x] Worktree created or reused, if required
+- [x] Human approval received, if required
+- [x] Build complete
+- [x] Verification complete
 - [ ] Review complete
-- [ ] Documentation complete
+- [x] Documentation complete
 - [ ] Closeout complete
 
 ## Backlog Source
@@ -178,22 +178,22 @@ Allow Sidekick to find existing project-local transcription files without summar
 
 ### Acceptance Criteria
 
-- [ ] Sidekick can detect existing transcription files without summaries.
-- [ ] User sees a preview before summary generation starts.
-- [ ] Missing summaries can be generated through Codex in read-only mode.
-- [ ] Invalid summary metadata can be replaced after batch confirmation.
-- [ ] Existing valid summaries are not overwritten by default.
-- [ ] Stale summaries can be detected using transcription hash.
-- [ ] Stale summaries are not regenerated in this first version.
-- [ ] Partial failures do not discard successful summaries.
-- [ ] Codex failure for one file does not stop remaining files.
-- [ ] Summary files use the same contract as `TASK-0026`.
-- [ ] UI shows generation progress and per-file failures in the primary workspace.
-- [ ] The action appears only for selected transcription-folder context.
-- [ ] Selected-transcription display remains read-only in the file context surface.
-- [ ] Tests cover missing, present, stale, invalid, and failed summary cases.
-- [ ] Tests cover continue-after-failure behavior.
-- [ ] UI smoke coverage covers selected transcription-folder action, preview, confirmation, partial failure, and selected-file summary display.
+- [x] Sidekick can detect existing transcription files without summaries.
+- [x] User sees a preview before summary generation starts.
+- [x] Missing summaries can be generated through Codex in read-only mode.
+- [x] Invalid summary metadata can be replaced after batch confirmation.
+- [x] Existing valid summaries are not overwritten by default.
+- [x] Stale summaries can be detected using transcription hash.
+- [x] Stale summaries are not regenerated in this first version.
+- [x] Partial failures do not discard successful summaries.
+- [x] Codex failure for one file does not stop remaining files.
+- [x] Summary files use the same contract as `TASK-0026`.
+- [x] UI shows generation progress and per-file failures in the primary workspace.
+- [x] The action appears only for selected transcription-folder context.
+- [x] Selected-transcription display remains read-only in the file context surface.
+- [x] Tests cover missing, present, stale, invalid, and failed summary cases.
+- [x] Tests cover continue-after-failure behavior.
+- [x] UI smoke coverage covers selected transcription-folder action, preview, confirmation, partial failure, and selected-file summary display.
 
 ## Deferred Questions
 
@@ -205,23 +205,146 @@ Allow Sidekick to find existing project-local transcription files without summar
 
 ## Implementation Plan
 
-Not started. Stop after Specify until this task is explicitly approved for planning.
+### Plan Status
+
+Approved for build.
+
+### Base And Worktree
+
+- Worktree: `../Sidekick-worktrees/TASK-0028-generate-summaries-for-existing-transcriptions`
+- Branch: `task/TASK-0028-generate-summaries-for-existing-transcriptions`
+- Base: local `main` at `931c22b`, because local `main` contains the closed `TASK-0026` implementation and related local commits not yet present on `origin/main`.
+- Baseline: `npm run check` passed after installing dependencies in the worktree. The mechanical `package-lock.json` change from `npm install` was restored and is not part of this task.
+
+### Implementation Steps
+
+1. Extend shared contracts
+   - Add typed preview, result, item, and count types for batch transcription summary generation.
+   - Keep the renderer contract narrow:
+     - `previewTranscriptionSummaryBatch(rootPath)`
+     - `confirmTranscriptionSummaryBatch(previewId)`
+   - Use a main-process-owned `previewId`; the renderer must not submit file lists or arbitrary paths.
+
+2. Add main-process batch workflow
+   - Create `src/main/transcription-summary-batch.ts`.
+   - Reuse `findTranscriptionFolders` from `transcription-importer.ts` so the batch follows the same “exactly one transcription folder” rule as import.
+   - Detect candidate files only inside the detected transcription folder.
+   - Include only `.txt`, `.md`, and `.markdown`.
+   - For each candidate, call `readTranscriptionSummary`.
+   - Classify each file as:
+     - `missing`: generate;
+     - `invalid`: generate replacement;
+     - `complete`: skip;
+     - `stale`: skip in this version.
+   - Store preview data in a pending map in `main.ts`.
+
+3. Generate summaries sequentially
+   - Confirm by `previewId`.
+   - Revalidate the selected project root and rebuild the candidate list before generating.
+   - Generate only files that are currently `missing` or `invalid`.
+   - Use the same `generateTranscriptionSummary` function and storage contract as `TASK-0026`.
+   - Continue after per-file failures.
+   - Return counts and per-file result details.
+   - Refresh the project scan after completion.
+
+4. Add UI workflow
+   - Add a new primary-workspace workflow panel for transcription summary maintenance.
+   - Show the action only when the selected node is the detected transcription folder.
+   - Keep the right context surface tied to the selected folder.
+   - Preview state shows counts before any writes:
+     - missing;
+     - invalid;
+     - complete;
+     - stale;
+     - total transcription files.
+   - Confirm state explains that Sidekick will write `.sidekick/transcription-summaries/`.
+   - Generating state shows that the batch is running and cannot be canceled in this version.
+   - Result state shows generated, failed, skipped, stale, invalid, and total counts plus per-file failures.
+   - Do not add stale regeneration or per-file selection.
+
+5. Preserve existing flows
+   - Do not change import behavior from `TASK-0026`.
+   - Do not change selected-file read-only summary display.
+   - Do not change context-package generation, document relationship analysis, project summary generation, or Codex panel behavior.
+   - Avoid broad renderer refactors; add the new workflow beside existing workflow patterns.
+
+6. Verification and tests
+   - Unit tests:
+     - batch candidate classification;
+     - missing/complete/stale/invalid count calculation;
+     - continue-after-failure result handling where practical.
+   - Integration tests:
+     - preview detects missing, complete, stale, and invalid summaries;
+     - confirm generates missing and invalid summaries;
+     - confirm skips complete and stale summaries;
+     - Codex failure for one file does not stop the rest;
+     - preview id is required for confirmation.
+   - UI smoke tests:
+     - action appears only on selected transcription folder;
+     - preview and confirmation show counts;
+     - result shows partial failure and completed counts;
+     - selecting a summarized transcription still shows the read-only summary.
+
+### Manual Verification Instructions For Ready For Review
+
+After build, verify from `main` or the task worktree with `npm start`:
+
+1. Select a project folder with one detected transcription folder.
+2. Put at least two `.md` or `.txt` transcriptions in that folder.
+3. Select the transcription folder in the tree.
+4. Confirm the right context surface shows an action for generating missing summaries.
+5. Start the workflow and check the preview counts.
+6. Confirm generation.
+7. Confirm the result reports generated/skipped/failed counts.
+8. Select one generated transcription and confirm `Samtalesammendrag` appears in the context surface.
+9. Confirm the workflow does not appear for ordinary folders, files, or the project root.
+
+### Risks And Guardrails
+
+- Long-running batch jobs are intentionally not cancelable in this version; the UI must say this clearly.
+- Existing valid summaries must not be overwritten.
+- Stale summaries must be detected but not regenerated.
+- Codex must run read-only; Sidekick writes summary files after validating output.
+- Renderer must never send file lists or summary paths.
+- Main process must validate every generated path against the selected project root.
+- `.sidekick/` must remain hidden from scans and context-package input.
 
 ## Build Log
 
-Not started.
+- Added shared preview/result contracts for batch transcription summary generation.
+- Added `src/main/transcription-summary-batch.ts` for main-process preview and sequential generation.
+- Added IPC/preload methods:
+  - `previewTranscriptionSummaryBatch(rootPath)`
+  - `confirmTranscriptionSummaryBatch(previewId)`
+- Added a primary-workspace workflow for generating missing transcription summaries.
+- Added the selected-folder action only for the detected transcription folder.
+- Kept existing valid summaries untouched and stale summaries skipped in this version.
+- Preserved existing import, context package, document relationship, and Codex workflows.
 
 ## Verification Log
 
-Not started.
+- `npm run check` passed.
+- `npm test` passed: 100 tests.
+- `npm run test:ui` passed: 30 UI tests.
 
 ## Review Notes
 
-Not started.
+Ready for human review.
+
+Manual check:
+
+1. Start the app with `npm start`.
+2. Select a project with exactly one transcriptions folder.
+3. Select the transcriptions folder in the tree.
+4. Confirm the right panel shows `Generer manglende sammendrag`.
+5. Click it, run the preview, and confirm the counts look right.
+6. Generate summaries and check the result counts.
+7. Select a transcript afterwards and confirm the read-only `Samtalesammendrag` still appears when a summary exists.
+8. Confirm the action is not shown on project root, ordinary folders, or files.
 
 ## Documentation Notes
 
-Not started.
+Task record updated with build and verification status.
 
 ## Closeout
 

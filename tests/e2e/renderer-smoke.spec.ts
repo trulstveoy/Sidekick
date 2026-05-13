@@ -12,6 +12,8 @@ import type {
   ProjectInfoSnapshot,
   ProjectInitializationPreview,
   ProjectInitializationResult,
+  TranscriptionSummaryBatchPreview,
+  TranscriptionSummaryBatchResult,
   TranscriptionImportPreview,
   TranscriptionImportResult,
 } from '../../src/shared/sidekick-api';
@@ -142,6 +144,58 @@ const mockScan: ProjectFolderScan = {
     },
   },
   warnings: [],
+};
+
+const mockScanWithTextTranscriptions: ProjectFolderScan = {
+  ...mockScan,
+  tree: {
+    ...mockScan.tree,
+    children: mockScan.tree.children?.map((child) =>
+      child.relativePath === '02-transkripsjoner'
+        ? {
+            ...child,
+            children: [
+              ...(child.children ?? []),
+              {
+                name: '00. interview.md',
+                relativePath: '02-transkripsjoner/00. interview.md',
+                kind: 'file',
+                artifactType: 'transcript',
+                contextHints: ['transcript'],
+                size: 2048,
+                modifiedAt: '2026-05-09T12:01:00.000Z',
+              },
+              {
+                name: '01. workshop.txt',
+                relativePath: '02-transkripsjoner/01. workshop.txt',
+                kind: 'file',
+                artifactType: 'transcript',
+                contextHints: ['transcript'],
+                size: 1024,
+                modifiedAt: '2026-05-09T12:02:00.000Z',
+              },
+              {
+                name: '02. broken.md',
+                relativePath: '02-transkripsjoner/02. broken.md',
+                kind: 'file',
+                artifactType: 'transcript',
+                contextHints: ['transcript'],
+                size: 768,
+                modifiedAt: '2026-05-09T12:03:00.000Z',
+              },
+            ],
+          }
+        : child,
+    ),
+  },
+  summary: {
+    ...mockScan.summary,
+    fileCount: 6,
+    artifactTypeCounts: {
+      ...mockScan.summary.artifactTypeCounts,
+      transcript: 3,
+    },
+  },
 };
 
 const mockContextPackagePreview: ContextPackagePreview = {
@@ -345,6 +399,89 @@ const mockTranscriptionImportResult: TranscriptionImportResult = {
     },
   },
   scan: mockScanAfterTranscriptionImport,
+};
+
+const mockTranscriptionSummaryBatchPreview: TranscriptionSummaryBatchPreview = {
+  previewId: 'summary-batch-1',
+  rootPath: '/tmp/sidekick-project',
+  targetFolderPath: '/tmp/sidekick-project/02-transkripsjoner',
+  targetFolderRelativePath: '02-transkripsjoner',
+  counts: {
+    total: 3,
+    missing: 1,
+    complete: 1,
+    stale: 0,
+    invalid: 1,
+    toGenerate: 2,
+  },
+  items: [
+    {
+      transcriptionRelativePath: '02-transkripsjoner/00. interview.md',
+      transcriptionFileName: '00. interview.md',
+      status: 'missing',
+      summaryRelativePath: '.sidekick/transcription-summaries/interview.summary.md',
+    },
+    {
+      transcriptionRelativePath: '02-transkripsjoner/01. workshop.txt',
+      transcriptionFileName: '01. workshop.txt',
+      status: 'complete',
+      summaryRelativePath: '.sidekick/transcription-summaries/workshop.summary.md',
+    },
+    {
+      transcriptionRelativePath: '02-transkripsjoner/02. broken.md',
+      transcriptionFileName: '02. broken.md',
+      status: 'invalid',
+      summaryRelativePath: '.sidekick/transcription-summaries/broken.summary.md',
+      message: 'Sammendraget kunne ikke leses.',
+    },
+  ],
+  warnings: [],
+};
+
+const mockTranscriptionSummaryBatchResult: TranscriptionSummaryBatchResult = {
+  status: 'complete',
+  rootPath: '/tmp/sidekick-project',
+  targetFolderPath: '/tmp/sidekick-project/02-transkripsjoner',
+  targetFolderRelativePath: '02-transkripsjoner',
+  counts: {
+    total: 3,
+    generated: 1,
+    failed: 1,
+    skippedComplete: 1,
+    skippedStale: 0,
+  },
+  items: [
+    {
+      transcriptionRelativePath: '02-transkripsjoner/00. interview.md',
+      transcriptionFileName: '00. interview.md',
+      status: 'generated',
+      summary: {
+        status: 'complete',
+        rootPath: '/tmp/sidekick-project',
+        transcriptionRelativePath: '02-transkripsjoner/00. interview.md',
+        summaryRelativePath: '.sidekick/transcription-summaries/interview.summary.md',
+        summaryPath: '/tmp/sidekick-project/.sidekick/transcription-summaries/interview.summary.md',
+        generatedAt: '2026-05-09T12:15:00.000Z',
+        transcriptionSha256: 'new',
+        currentTranscriptionSha256: 'new',
+        summaryLanguage: 'nb',
+        conversationSummary: '## Conversation Summary\n\nIntervjuet handler om Sidekick.',
+      },
+    },
+    {
+      transcriptionRelativePath: '02-transkripsjoner/01. workshop.txt',
+      transcriptionFileName: '01. workshop.txt',
+      status: 'skipped-complete',
+      message: 'Eksisterende sammendrag ble beholdt.',
+    },
+    {
+      transcriptionRelativePath: '02-transkripsjoner/02. broken.md',
+      transcriptionFileName: '02. broken.md',
+      status: 'failed',
+      message: 'Codex failed.',
+    },
+  ],
+  scan: mockScanWithTextTranscriptions,
 };
 
 const mockProjectCreationResult: ProjectCreationResult = {
@@ -1633,6 +1770,68 @@ test('shows folder-scoped context package action only for non-root folders', asy
   await expect(
     page.getByRole('button', { name: 'Generer kontekstpakke for denne mappen' }),
   ).toBeHidden();
+});
+
+test('generates missing transcription summaries from the transcription folder action', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan, summaryPreview, summaryResult }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
+        createProjectFolder: async () => null,
+        previewContextPackage: async () => {
+          throw new Error('No context package preview.');
+        },
+        generateContextPackage: async () => {
+          throw new Error('No context package result.');
+        },
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+        previewTranscriptionSummaryBatch: async () => summaryPreview,
+        confirmTranscriptionSummaryBatch: async () => summaryResult,
+      };
+    },
+    {
+      scan: mockScanWithTextTranscriptions,
+      summaryPreview: mockTranscriptionSummaryBatchPreview,
+      summaryResult: mockTranscriptionSummaryBatchResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.locator('.tree-row[data-tree-path="02-transkripsjoner"]').click();
+
+  await expect(page.getByRole('button', { name: 'Generer manglende sammendrag' })).toBeVisible();
+  await page.getByRole('button', { name: 'Generer manglende sammendrag' }).click();
+  await expect(page.getByRole('heading', { name: 'Lag manglende sammendrag' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Forhåndsvis' }).click();
+  const summaryDetails = page.locator('[data-transcription-summary-batch-details]');
+  await expect(page.getByRole('heading', { name: 'Bekreft sammendrag' })).toBeVisible();
+  await expect(summaryDetails).toContainText('02-transkripsjoner');
+  await expect(summaryDetails).toContainText('Skal genereres');
+  await expect(summaryDetails).toContainText('2');
+  await expect(page.getByText('00. interview.md: Mangler')).toBeVisible();
+  await expect(page.getByText(/02. broken.md: Ugyldig/)).toBeVisible();
+  await expect(page.getByText(/Sidekick skriver samtalesammendrag/)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Generer sammendrag' }).click();
+  await expect(page.getByRole('heading', { name: 'Sammendrag ferdig' })).toBeVisible();
+  await expect(page.getByText('Delvis fullført')).toBeVisible();
+  await expect(summaryDetails).toContainText('Generert');
+  await expect(summaryDetails).toContainText('Feilet');
+  await expect(summaryDetails).toContainText('Hoppet over, finnes');
+  await expect(page.getByText('02. broken.md: Codex failed.')).toBeVisible();
+  await expect(page.getByText('00. interview.md: Generert')).toBeVisible();
 });
 
 test('shows no-write feedback when context package preview fails', async ({ page }) => {
