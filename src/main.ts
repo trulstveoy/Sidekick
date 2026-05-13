@@ -11,7 +11,12 @@ import type {
   ProjectInitializationPreview,
   TranscriptionImportPreview,
 } from './shared/sidekick-api';
-import { generateContextPackage, getContextPackagePreview } from './main/context-package';
+import {
+  generateContextPackage,
+  generateFolderContextPackage,
+  getContextPackagePreview,
+  getFolderContextPackagePreview,
+} from './main/context-package';
 import { CodexRunner } from './main/codex-runner';
 import { scanProjectFolder } from './main/folder-scanner';
 import { readProjectInfo } from './main/project-info';
@@ -216,6 +221,34 @@ ipcMain.handle('context-package:generate', (_event, rootPath) =>
 
 ipcMain.handle('project-info:read', (_event, rootPath) =>
   readProjectInfo(assertKnownProjectRoot(rootPath)),
+);
+
+const assertFolderContextPackageRequest = (request: unknown) => {
+  if (!request || typeof request !== 'object') {
+    throw new Error('A selected folder is required.');
+  }
+
+  const { rootPath, folderRelativePath } = request as {
+    rootPath?: unknown;
+    folderRelativePath?: unknown;
+  };
+
+  if (typeof folderRelativePath !== 'string') {
+    throw new Error('A selected folder path is required.');
+  }
+
+  return {
+    rootPath: assertKnownProjectRoot(rootPath),
+    folderRelativePath,
+  };
+};
+
+ipcMain.handle('context-package:preview-folder', (_event, request) =>
+  getFolderContextPackagePreview(assertFolderContextPackageRequest(request)),
+);
+
+ipcMain.handle('context-package:generate-folder', (_event, request) =>
+  generateFolderContextPackage(assertFolderContextPackageRequest(request)),
 );
 
 ipcMain.handle('transcription:preview-import', async (event, rootPath) => {

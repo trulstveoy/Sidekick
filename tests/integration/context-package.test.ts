@@ -5,6 +5,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { CodexRunner } from '../../src/main/codex-runner';
 import {
   generateContextPackage,
+  generateFolderContextPackage,
+  getFolderContextPackageOutputPath,
+  getFolderContextPackagePreview,
   getContextPackageOutputPath,
   getContextPackagePreview,
 } from '../../src/main/context-package';
@@ -111,5 +114,73 @@ describe('context package generation', () => {
     expect(output).toContain('intervju-01.txt');
     expect(output).not.toContain('SHOULD_NOT_BE_INCLUDED');
     expect(output).not.toContain('SIDEKICK_METADATA_SECRET');
+  });
+
+  it('previews folder-scoped output path and overwrite status', async () => {
+    const rootPath = await copyFixtureToTemp();
+    const folderRelativePath = '02-transkripsjoner';
+    const folderPath = path.join(rootPath, folderRelativePath);
+    const outputPath = getFolderContextPackageOutputPath(folderPath);
+
+    let preview = await getFolderContextPackagePreview({ rootPath, folderRelativePath });
+    expect(preview.scope).toBe('folder');
+    expect(preview.rootPath).toBe(rootPath);
+    expect(preview.targetPath).toBe(folderPath);
+    expect(preview.targetRelativePath).toBe(folderRelativePath);
+    expect(preview.outputPath).toBe(outputPath);
+    expect(preview.outputFileName).toBe('02-transkripsjoner.context-package.md');
+    expect(preview.willOverwrite).toBe(false);
+
+    await writeFile(outputPath, 'old generated folder package');
+    preview = await getFolderContextPackagePreview({ rootPath, folderRelativePath });
+    expect(preview.willOverwrite).toBe(true);
+  });
+
+  it('generates folder-scoped markdown and excludes sibling folders', async () => {
+    const rootPath = await copyFixtureToTemp();
+    const folderRelativePath = '02-transkripsjoner';
+    const outputPath = getFolderContextPackageOutputPath(path.join(rootPath, folderRelativePath));
+
+    const result = await generateFolderContextPackage({ rootPath, folderRelativePath });
+    const output = await readFile(outputPath, 'utf8');
+
+    expect(result.scope).toBe('folder');
+    expect(result.outputPath).toBe(outputPath);
+    expect(result.targetRelativePath).toBe(folderRelativePath);
+    expect(result.processedFiles).toEqual(expect.arrayContaining(['intervju-01.txt']));
+    expect(result.processedFiles).not.toEqual(expect.arrayContaining(['01-bakgrunn/marked-notes.md']));
+    expect(output).toContain('intervju-01.txt');
+    expect(output).not.toContain('marked-notes.md');
+  });
+
+  it('excludes nested generated context packages from folder-scoped output', async () => {
+    const rootPath = await copyFixtureToTemp();
+    const folderRelativePath = '02-transkripsjoner';
+    const nestedFolder = path.join(rootPath, folderRelativePath, 'nested');
+    await cp(path.join(rootPath, '01-bakgrunn'), nestedFolder, { recursive: true });
+    await writeFile(
+      path.join(nestedFolder, 'nested.context-package.md'),
+      'SHOULD_NOT_BE_INCLUDED_FROM_NESTED_PACKAGE',
+    );
+
+    const result = await generateFolderContextPackage({ rootPath, folderRelativePath });
+    const output = await readFile(result.outputPath, 'utf8');
+
+    expect(output).not.toContain('SHOULD_NOT_BE_INCLUDED_FROM_NESTED_PACKAGE');
+    expect(result.processedFiles).not.toContain('nested/nested.context-package.md');
+  });
+
+  it('rejects unsafe folder-scoped paths', async () => {
+    const rootPath = await copyFixtureToTemp();
+
+    await expect(
+      getFolderContextPackagePreview({ rootPath, folderRelativePath: '../outside' }),
+    ).rejects.toThrow('Selected folder path must stay inside the project root.');
+    await expect(
+      getFolderContextPackagePreview({ rootPath, folderRelativePath: path.join(rootPath, '02-transkripsjoner') }),
+    ).rejects.toThrow('Selected folder path must be relative to the project root.');
+    await expect(
+      getFolderContextPackagePreview({ rootPath, folderRelativePath: '.' }),
+    ).rejects.toThrow('Use the full-project context package action for the project root.');
   });
 });
