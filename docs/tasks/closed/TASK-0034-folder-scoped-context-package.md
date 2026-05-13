@@ -1,7 +1,7 @@
 # Task: Folder-Scoped Context Package
 
 ID: TASK-0034
-Status: Ready For Review
+Status: Done
 Class: Major
 Owner: Pair
 Created: 2026-05-13
@@ -38,9 +38,9 @@ The generated Markdown file should be stored in the selected folder and should i
 
 ## Current Phase
 
-Ready For Review
+Close
 
-Build and automated verification are complete. Waiting for human review.
+Build, verification, human review, and closeout are complete.
 
 ## Progress Checklist
 
@@ -51,9 +51,9 @@ Build and automated verification are complete. Waiting for human review.
 - [x] Human approval received, if required
 - [x] Build complete
 - [x] Verification complete
-- [ ] Review complete
+- [x] Review complete
 - [x] Documentation complete
-- [ ] Closeout complete
+- [x] Closeout complete
 
 ## Links
 
@@ -360,7 +360,7 @@ Human gates:
 
 ## Review Notes
 
-Ready for human review.
+Human review completed. The folder-scoped context-package action was tested manually and accepted after the runtime visibility fix.
 
 Suggested manual verification:
 
@@ -391,4 +391,25 @@ Suggested manual verification:
 
 ## Closeout
 
-Not started. Close after human review and integration.
+TASK-0034 added folder-scoped context packages without replacing the existing full-project workflow.
+
+Final behavior:
+
+- A non-root folder selection exposes `Generer kontekstpakke for denne mappen`.
+- The workflow runs in the primary workspace.
+- The right context panel remains tied to the selected folder.
+- Folder-scoped packages are written into the selected folder.
+- Full-project packages still write to the project root.
+- Generated context packages are ignored by both full-project and folder-scoped generation, including generated packages in nested subfolders.
+- The project tree refreshes after success so the generated file appears.
+
+Final verification:
+
+- `npm run check` passed.
+- `npm test` passed: 16 test files, 69 tests.
+- `npm run test:ui` passed: 27 UI tests.
+- Follow-up visibility fix: `npm run test:ui -- --grep "folder-scoped context package"` passed: 2 UI tests.
+
+Integration:
+
+- Ready to merge from `task/TASK-0034-folder-scoped-context-package` into `main`.
