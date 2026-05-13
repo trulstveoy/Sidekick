@@ -240,6 +240,7 @@ const toWarnings = (
 
 type GenerateContextPackageOptions = {
   codexRunner?: CodexRunner;
+  generateProjectSummary?: boolean;
 };
 
 const generateProjectSummary = async (
@@ -286,11 +287,14 @@ export const generateContextPackage = async (
   });
 
   const outputStats = await stat(preview.outputPath);
-  const projectSummary = await generateProjectSummary(
-    rootPath,
-    preview.outputPath,
-    options.codexRunner ?? new CodexRunner(),
-  );
+  const shouldGenerateProjectSummary = options.generateProjectSummary ?? true;
+  const projectSummary = shouldGenerateProjectSummary
+    ? await generateProjectSummary(
+        rootPath,
+        preview.outputPath,
+        options.codexRunner ?? new CodexRunner(),
+      )
+    : undefined;
   const scan = await scanProjectFolder(rootPath);
 
   return {
@@ -325,10 +329,6 @@ export const generateFolderContextPackage = async (
   });
 
   const outputStats = await stat(preview.outputPath);
-  const projectSummary = await createFailedProjectSummaryResult(
-    preview.rootPath,
-    'Project summary is only generated for full-project context packages.',
-  );
   const scan = await scanProjectFolder(preview.rootPath);
 
   return {
@@ -347,7 +347,6 @@ export const generateFolderContextPackage = async (
     processedFiles: packResult.processedFiles.map((file) => file.path).sort(),
     skippedFiles: toSkippedFiles(packResult.skippedFiles),
     warnings: toWarnings(packResult.suspiciousFilesResults),
-    projectSummary,
     scan,
   };
 };

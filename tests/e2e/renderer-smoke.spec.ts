@@ -4,6 +4,8 @@ import type {
   AppSettingsSnapshot,
   ContextPackagePreview,
   ContextPackageResult,
+  DocumentRelationshipsGenerationResult,
+  DocumentRelationshipsSnapshot,
   FolderSignal,
   ProjectCreationResult,
   ProjectFolderScan,
@@ -218,6 +220,47 @@ const mockContextPackageResult: ContextPackageResult = {
         'markdown-text': mockScan.summary.artifactTypeCounts['markdown-text'] + 1,
       },
     },
+  },
+};
+
+const mockDocumentRelationships: DocumentRelationshipsSnapshot = {
+  status: 'complete',
+  path: '/tmp/sidekick-project/.sidekick/document-relationships.md',
+  generatedAt: '2026-05-09T12:20:00.000Z',
+  sourceScope: 'full-project',
+  sourceModel: 'physical-project-folder',
+  contextPackagePath: './sidekick-project.context-package.md',
+  contextPackageSha256: 'def456',
+  summaryLanguage: 'nb',
+  overview: 'Prosjektet har tydelige koblinger mellom strategiintervjuer og operasjonsmodell.',
+  relationshipMap:
+    '- Type: tematisk overlapp\n  Dokumenter: intervju-01.txt, operasjonsmodell.md\n  Belegg: Begge omtaler styringsmodell.',
+  thematicClusters: '- Styring og ansvar: intervju-01.txt, operasjonsmodell.md',
+  notableOverlaps: '- Strategi og operasjon deler begrepet porteføljestyring.',
+  possibleContradictions: '- Ingen tydelige motsetninger funnet.',
+  lowConfidenceOrMissingEvidence: '- Rollen til ekstern partner bør undersøkes videre.',
+  markdown: [
+    '## Overview',
+    'Prosjektet har tydelige koblinger mellom strategiintervjuer og operasjonsmodell.',
+    '## Relationship Map',
+    '- Type: tematisk overlapp',
+    '## Thematic Clusters',
+    '- Styring og ansvar',
+    '## Notable Overlaps',
+    '- Strategi og operasjon deler begrepet porteføljestyring.',
+    '## Possible Contradictions',
+    '- Ingen tydelige motsetninger funnet.',
+    '## Low Confidence Or Missing Evidence',
+    '- Rollen til ekstern partner bør undersøkes videre.',
+  ].join('\n\n'),
+};
+
+const mockDocumentRelationshipsResult: DocumentRelationshipsGenerationResult = {
+  status: 'complete',
+  report: mockDocumentRelationships,
+  contextPackage: {
+    ...mockContextPackageResult,
+    projectSummary: undefined,
   },
 };
 
@@ -1306,6 +1349,136 @@ test('confirms and displays a generated context package', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Prosjektsammendrag' })).toBeVisible();
   await expect(page.getByText('Prosjektet handler om lokal prosjektforståelse')).toBeVisible();
   await expect(page.locator('[data-overview-stats]')).toContainText('4');
+});
+
+test('generates and displays document relationship reports', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan, contextPreview, contextResult, relationshipResult }) => {
+      let relationshipSnapshot: DocumentRelationshipsSnapshot = {
+        status: 'missing',
+        path: '/tmp/sidekick-project/.sidekick/document-relationships.md',
+      };
+
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
+        createProjectFolder: async () => null,
+        previewContextPackage: async () => contextPreview,
+        generateContextPackage: async () => contextResult,
+        readDocumentRelationships: async () => relationshipSnapshot,
+        generateDocumentRelationships: async () => {
+          relationshipSnapshot = relationshipResult.report;
+
+          return relationshipResult;
+        },
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+        getCodexStatus: async () => ({
+          state: 'ready',
+          available: true,
+          loggedIn: true,
+          version: 'codex-cli 0.130.0-test',
+        }),
+        startCodexLogin: async () => ({ runId: 'login-run' }),
+        startCodexRun: async () => ({ runId: 'codex-run' }),
+        cancelCodexRun: async () => undefined,
+        onCodexOutput: () => () => undefined,
+        onCodexCompletion: () => () => undefined,
+      };
+    },
+    {
+      scan: mockScan,
+      contextPreview: mockContextPackagePreview,
+      contextResult: mockContextPackageResult,
+      relationshipResult: mockDocumentRelationshipsResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+
+  await expect(page.locator('[data-selection-details]')).toContainText('Sammenhenger');
+  await expect(page.locator('[data-selection-details]')).toContainText('Mangler');
+  await page.locator('[data-overview-action-document-relationships]').click();
+
+  const relationshipPanel = page.locator('[data-workflow-panel="document-relationships"]');
+  await expect(relationshipPanel.getByRole('heading', { name: 'Finn sammenhenger' })).toBeVisible();
+  await expect(relationshipPanel).toContainText('Hele valgt prosjektmappe');
+  await relationshipPanel.locator('[data-document-relationships-primary]').click();
+
+  await expect(
+    relationshipPanel.getByRole('heading', { name: 'Dokumentsammenhenger oppdatert' }),
+  ).toBeVisible();
+  await expect(relationshipPanel).toContainText('Rapporten er klar');
+  await expect(relationshipPanel).toContainText('.sidekick/document-relationships.md');
+  await expect(relationshipPanel).toContainText('Strategi og operasjon deler begrepet porteføljestyring');
+  await expect(relationshipPanel).toContainText('Rollen til ekstern partner bør undersøkes videre');
+
+  await relationshipPanel.locator('[data-document-relationships-secondary]').click();
+  await expect(page.getByRole('heading', { name: 'Sammenhenger' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Vis rapport' })).toBeVisible();
+  await page.getByRole('button', { name: 'Vis rapport' }).click();
+
+  await expect(relationshipPanel.getByRole('heading', { name: 'Dokumentsammenhenger' })).toBeVisible();
+  await expect(relationshipPanel).toContainText('Relasjonskart');
+  await expect(relationshipPanel).toContainText('styringsmodell');
+});
+
+test('shows no-write feedback when document relationship analysis fails', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan, contextPreview, contextResult }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
+        createProjectFolder: async () => null,
+        previewContextPackage: async () => contextPreview,
+        generateContextPackage: async () => contextResult,
+        readDocumentRelationships: async () => ({
+          status: 'missing',
+          path: '/tmp/sidekick-project/.sidekick/document-relationships.md',
+        }),
+        generateDocumentRelationships: async () => ({
+          status: 'failed',
+          message: 'Kontekstpakken er for stor til sikker analyse.',
+        }),
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+      };
+    },
+    {
+      scan: mockScan,
+      contextPreview: mockContextPackagePreview,
+      contextResult: mockContextPackageResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.locator('[data-overview-action-document-relationships]').click();
+
+  const relationshipPanel = page.locator('[data-workflow-panel="document-relationships"]');
+  await relationshipPanel.locator('[data-document-relationships-primary]').click();
+
+  await expect(relationshipPanel.getByRole('heading', { name: 'Analyse feilet' })).toBeVisible();
+  await expect(relationshipPanel).toContainText('Kontekstpakken er for stor til sikker analyse.');
+  await expect(relationshipPanel).toContainText('Ingen ny rapport ble skrevet');
+  await expect(relationshipPanel.getByRole('button', { name: 'Prøv igjen' })).toBeEnabled();
 });
 
 test('generates a folder-scoped context package from selected folder context', async ({ page }) => {

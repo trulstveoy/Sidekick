@@ -171,6 +171,29 @@
               </footer>
             </section>
 
+            <section class="workflow-surface" data-workflow-panel="document-relationships" hidden>
+              <header class="workflow-header">
+                <div>
+                  <p class="section-label">Sammenhenger</p>
+                  <h2 data-document-relationships-title>Ingen prosjektmappe valgt</h2>
+                  <p data-document-relationships-message>Velg en prosjektmappe først.</p>
+                </div>
+              </header>
+              <div class="workflow-body document-relationships-panel">
+                <div class="operation-state" data-document-relationships-state></div>
+                <dl class="document-relationships-details detail-list" data-document-relationships-details></dl>
+                <div class="document-relationships-report" data-document-relationships-report></div>
+              </div>
+              <footer class="workflow-footer">
+                <button class="btn btn-secondary document-relationships-secondary" type="button" data-document-relationships-secondary hidden>
+                  Tilbake
+                </button>
+                <button class="btn btn-primary document-relationships-primary" type="button" data-document-relationships-primary disabled>
+                  Finn sammenhenger
+                </button>
+              </footer>
+            </section>
+
             <section class="workflow-surface" data-workflow-panel="codex" hidden>
               <header class="workflow-header">
                 <div>
@@ -341,6 +364,9 @@
         </button>
         <button class="btn btn-secondary" type="button" data-overview-action-import-transcription>
           Importer transkripsjon
+        </button>
+        <button class="btn btn-secondary" type="button" data-overview-action-document-relationships>
+          Finn sammenhenger
         </button>
         <button class="btn btn-secondary" type="button" data-overview-action-run-codex>
           Kjør Codex

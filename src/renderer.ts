@@ -9,6 +9,8 @@ import type {
   CodexStatus,
   ContextPackagePreview,
   ContextPackageResult,
+  DocumentRelationshipsGenerationResult,
+  DocumentRelationshipsSnapshot,
   FolderSignal,
   FolderTreeNode,
   AppSettingsSnapshot,
@@ -86,6 +88,14 @@ type CodexState =
       output: CodexOutputEvent[];
     };
 
+type DocumentRelationshipsState =
+  | { status: 'unavailable' }
+  | { status: 'checking'; rootPath: string }
+  | { status: 'ready'; rootPath: string; snapshot: DocumentRelationshipsSnapshot }
+  | { status: 'generating'; rootPath: string; previousReport?: DocumentRelationshipsSnapshot }
+  | { status: 'complete'; rootPath: string; result: DocumentRelationshipsGenerationResult }
+  | { status: 'failed'; rootPath: string; message: string; previousReport?: DocumentRelationshipsSnapshot };
+
 type DetailRow = [string, string];
 
 type VisibleTreeEntry = {
@@ -99,7 +109,12 @@ type ContextPackageTarget =
   | { scope: 'folder'; folderRelativePath: string };
 
 type AppView = 'workspace' | 'settings';
-type ActiveWorkflow = 'context-package' | 'transcription-import' | 'codex' | null;
+type ActiveWorkflow =
+  | 'context-package'
+  | 'transcription-import'
+  | 'document-relationships'
+  | 'codex'
+  | null;
 
 type SettingsState =
   | { status: 'idle'; snapshot?: AppSettingsSnapshot; message: string }
@@ -208,6 +223,9 @@ const overviewGenerateContextButton = document.querySelector<HTMLButtonElement>(
 const overviewImportTranscriptionButton = document.querySelector<HTMLButtonElement>(
   '[data-overview-action-import-transcription]',
 );
+const overviewDocumentRelationshipsButton = document.querySelector<HTMLButtonElement>(
+  '[data-overview-action-document-relationships]',
+);
 const overviewRunCodexButton = document.querySelector<HTMLButtonElement>(
   '[data-overview-action-run-codex]',
 );
@@ -246,6 +264,27 @@ const transcriptionImportPrimaryButton = document.querySelector<HTMLButtonElemen
 );
 const transcriptionImportSecondaryButton = document.querySelector<HTMLButtonElement>(
   '[data-transcription-import-secondary]',
+);
+const documentRelationshipsTitleTarget = document.querySelector<HTMLElement>(
+  '[data-document-relationships-title]',
+);
+const documentRelationshipsMessageTarget = document.querySelector<HTMLElement>(
+  '[data-document-relationships-message]',
+);
+const documentRelationshipsStateTarget = document.querySelector<HTMLElement>(
+  '[data-document-relationships-state]',
+);
+const documentRelationshipsDetailsTarget = document.querySelector<HTMLElement>(
+  '[data-document-relationships-details]',
+);
+const documentRelationshipsReportTarget = document.querySelector<HTMLElement>(
+  '[data-document-relationships-report]',
+);
+const documentRelationshipsPrimaryButton = document.querySelector<HTMLButtonElement>(
+  '[data-document-relationships-primary]',
+);
+const documentRelationshipsSecondaryButton = document.querySelector<HTMLButtonElement>(
+  '[data-document-relationships-secondary]',
 );
 const codexTitleTarget = document.querySelector<HTMLElement>('[data-codex-title]');
 const codexMessageTarget = document.querySelector<HTMLElement>('[data-codex-message]');
@@ -309,6 +348,7 @@ let contextPackageState: ContextPackageState = { status: 'unavailable' };
 let contextPackageTarget: ContextPackageTarget = { scope: 'project' };
 let overviewContextPackageStatus: OverviewContextPackageStatus = { status: 'unavailable' };
 let transcriptionImportState: TranscriptionImportState = { status: 'unavailable' };
+let documentRelationshipsState: DocumentRelationshipsState = { status: 'unavailable' };
 let projectCreationState: ProjectCreationState = {
   status: 'closed',
   message: '',
@@ -557,6 +597,11 @@ const setTranscriptionImportStateForScan = (scan?: ProjectFolderScan) => {
     scan && window.sidekick ? { status: 'ready' } : { status: 'unavailable' };
 };
 
+const setDocumentRelationshipsStateForScan = (scan?: ProjectFolderScan) => {
+  documentRelationshipsState =
+    scan && window.sidekick ? { status: 'checking', rootPath: scan.rootPath } : { status: 'unavailable' };
+};
+
 const setCodexStateForScan = (scan?: ProjectFolderScan) => {
   codexState =
     scan && window.sidekick
@@ -575,10 +620,12 @@ const setActiveScan = (scan: ProjectFolderScan) => {
   setContextPackageStateForScan(scan);
   setOverviewContextPackageStatusForScan(scan);
   setTranscriptionImportStateForScan(scan);
+  setDocumentRelationshipsStateForScan(scan);
   setCodexStateForScan(scan);
   state = scan.status === 'partial' ? { status: 'partial', scan } : { status: 'ready', scan };
   projectInfoState = null;
   void refreshProjectInfo(scan);
+  void refreshDocumentRelationships(scan);
 };
 
 const getActiveScan = () =>
@@ -641,6 +688,16 @@ const closeActiveWorkflow = () => {
     transcriptionImportState = getActiveScan() ? { status: 'ready' } : { status: 'unavailable' };
   }
 
+  if (activeWorkflow === 'document-relationships' && documentRelationshipsState.status !== 'generating') {
+    const scan = getActiveScan();
+
+    if (scan) {
+      void refreshDocumentRelationships(scan);
+    } else {
+      documentRelationshipsState = { status: 'unavailable' };
+    }
+  }
+
   if (
     activeWorkflow === 'codex' &&
     codexState.status !== 'running' &&
@@ -665,6 +722,8 @@ const isExclusiveWorkflowActive = () =>
     transcriptionImportState.status === 'previewing' ||
     transcriptionImportState.status === 'confirming' ||
     transcriptionImportState.status === 'importing' ||
+    documentRelationshipsState.status === 'checking' ||
+    documentRelationshipsState.status === 'generating' ||
     codexState.status === 'checking' ||
     codexState.status === 'running');
 
@@ -1304,9 +1363,9 @@ const appendProjectSummary = (scan: ProjectFolderScan) => {
   const details = document.createElement('dl');
   details.className = 'detail-list selection-summary-details';
   const rows: DetailRow[] = [
-      ['Oppdatert', snapshot.generatedAt ? formatDate(snapshot.generatedAt) : 'Ukjent'],
-      ['Kilde', snapshot.contextPackagePath ?? 'Ukjent'],
-    ];
+    ['Oppdatert', snapshot.generatedAt ? formatDate(snapshot.generatedAt) : 'Ukjent'],
+    ['Kilde', snapshot.contextPackagePath ?? 'Ukjent'],
+  ];
   details.append(...rows.map(createDetailRow));
 
   const fragments: HTMLElement[] = [title, summary, details];
@@ -1343,6 +1402,121 @@ const appendProjectSummary = (scan: ProjectFolderScan) => {
   }
 
   selectionContentsTarget.append(...fragments);
+};
+
+const getCurrentDocumentRelationshipsSnapshot = (scan: ProjectFolderScan) => {
+  if (documentRelationshipsState.status === 'ready' && documentRelationshipsState.rootPath === scan.rootPath) {
+    return documentRelationshipsState.snapshot;
+  }
+
+  if (
+    documentRelationshipsState.status === 'complete' &&
+    documentRelationshipsState.rootPath === scan.rootPath
+  ) {
+    return documentRelationshipsState.result.report;
+  }
+
+  if (
+    documentRelationshipsState.status === 'failed' &&
+    documentRelationshipsState.rootPath === scan.rootPath
+  ) {
+    return documentRelationshipsState.previousReport;
+  }
+
+  if (
+    documentRelationshipsState.status === 'generating' &&
+    documentRelationshipsState.rootPath === scan.rootPath
+  ) {
+    return documentRelationshipsState.previousReport;
+  }
+
+  return undefined;
+};
+
+const documentRelationshipsStatusText = (scan: ProjectFolderScan) => {
+  if (documentRelationshipsState.status === 'unavailable') {
+    return 'Ikke tilgjengelig';
+  }
+
+  if (
+    'rootPath' in documentRelationshipsState &&
+    documentRelationshipsState.rootPath !== scan.rootPath
+  ) {
+    return 'Sjekker';
+  }
+
+  switch (documentRelationshipsState.status) {
+    case 'checking':
+      return 'Sjekker';
+    case 'generating':
+      return 'Oppdaterer';
+    case 'complete':
+      return documentRelationshipsState.result.report?.generatedAt
+        ? `Oppdatert ${formatDate(documentRelationshipsState.result.report.generatedAt)}`
+        : 'Oppdatert';
+    case 'failed':
+      return documentRelationshipsState.previousReport ? 'Feilet, tidligere rapport finnes' : 'Feilet';
+    case 'ready':
+      switch (documentRelationshipsState.snapshot.status) {
+        case 'complete':
+          return documentRelationshipsState.snapshot.generatedAt
+            ? `Oppdatert ${formatDate(documentRelationshipsState.snapshot.generatedAt)}`
+            : 'Tilgjengelig';
+        case 'invalid':
+          return 'Ugyldig';
+        case 'missing':
+          return 'Mangler';
+      }
+      break;
+  }
+
+  return 'Sjekker';
+};
+
+const appendDocumentRelationshipsSummary = (scan: ProjectFolderScan) => {
+  if (!selectionContentsTarget) {
+    return;
+  }
+
+  const snapshot = getCurrentDocumentRelationshipsSnapshot(scan);
+  const title = document.createElement('h3');
+  title.className = 'selection-contents-title';
+  title.textContent = 'Sammenhenger';
+
+  if (!snapshot || snapshot.status !== 'complete') {
+    const empty = document.createElement('p');
+    empty.className = 'selection-empty';
+    empty.textContent =
+      snapshot?.status === 'invalid'
+        ? snapshot.message ?? 'Rapporten for sammenhenger kan ikke leses.'
+        : 'Ingen rapport for sammenhenger er generert ennå.';
+    selectionContentsTarget.append(title, empty);
+    return;
+  }
+
+  const summary = document.createElement('p');
+  summary.className = 'selection-summary';
+  summary.textContent = snapshot.overview ?? 'Rapporten er tilgjengelig.';
+
+  const details = document.createElement('dl');
+  details.className = 'detail-list selection-summary-details';
+  details.append(
+    ...([
+      ['Oppdatert', snapshot.generatedAt ? formatDate(snapshot.generatedAt) : 'Ukjent'],
+      ['Kilde', snapshot.contextPackagePath ?? 'Ukjent'],
+    ] satisfies DetailRow[]).map(createDetailRow),
+  );
+
+  const button = document.createElement('button');
+  button.className = 'btn btn-secondary btn-sm selection-action-button';
+  button.type = 'button';
+  button.textContent = 'Vis rapport';
+  button.toggleAttribute('disabled', isExclusiveWorkflowActive());
+  button.addEventListener('click', () => {
+    openWorkflow('document-relationships');
+  });
+
+  selectionContentsTarget.append(title, summary, details, button);
 };
 
 const clearSelectionActions = () => {
@@ -1407,6 +1581,7 @@ const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
       ['Status', scan.status === 'partial' ? 'Delvis' : 'Fullført'],
       ['Kontekstpakke', contextPackageStatusText(scan)],
       ['Prosjektsammendrag', projectInfoStatusText(scan)],
+      ['Sammenhenger', documentRelationshipsStatusText(scan)],
       ['Varsler', overviewWarningCount(scan) > 0 ? overviewWarningCount(scan).toString() : 'Ingen'],
       ['Markdown/tekst', scan.summary.artifactTypeCounts['markdown-text'].toString()],
       ['Transkripsjoner', scan.summary.artifactTypeCounts.transcript.toString()],
@@ -1414,6 +1589,7 @@ const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
     clearSelectionActions();
     renderSelectionContents(node);
     appendProjectSummary(scan);
+    appendDocumentRelationshipsSummary(scan);
     appendSelectionWarnings(overviewWarnings(scan));
     return;
   }
@@ -1652,6 +1828,9 @@ const createImportSteps = (activeStep: 1 | 2 | 3) =>
 const createContextPackageSteps = (activeStep: 1 | 2 | 3) =>
   createOperationSteps(['Forhåndsvis', 'Bekreft', 'Ferdig'], activeStep);
 
+const createDocumentRelationshipsSteps = (activeStep: 1 | 2 | 3) =>
+  createOperationSteps(['Kontekstpakke', 'Analyse', 'Rapport'], activeStep);
+
 const createWriteOperationBadge = () => {
   const badge = document.createElement('span');
   badge.className = 'write-operation-badge';
@@ -1837,9 +2016,11 @@ const renderContextPackageComplete = (result: ContextPackageResult) => {
     warning.path ? `${warning.path}: ${warning.message}` : warning.message,
   );
   const summaryStatus =
-    result.projectSummary.status === 'complete'
-      ? 'Prosjektsammendrag oppdatert'
-      : `Prosjektsammendrag feilet: ${result.projectSummary.message ?? 'Ukjent feil'}`;
+    result.scope === 'project' && result.projectSummary
+      ? result.projectSummary.status === 'complete'
+        ? 'Prosjektsammendrag oppdatert'
+        : `Prosjektsammendrag feilet: ${result.projectSummary.message ?? 'Ukjent feil'}`
+      : null;
 
   setText(contextPackageTitleTarget, 'Kontekstpakke generert');
   setText(
@@ -1866,7 +2047,7 @@ const renderContextPackageComplete = (result: ContextPackageResult) => {
     ['Tokens', result.totalTokens.toString()],
     ['Tegn', result.totalCharacters.toString()],
     ['Størrelse', formatBytes(result.outputBytes)],
-    ['Prosjektsammendrag', summaryStatus],
+    ...(summaryStatus ? ([['Prosjektsammendrag', summaryStatus]] satisfies DetailRow[]) : []),
   ]);
   renderContextPackageList([
     ...warningPreview,
@@ -2089,6 +2270,233 @@ const renderTranscriptionImport = (scan?: ProjectFolderScan) => {
       break;
     case 'error':
       renderTranscriptionImportError(transcriptionImportState.message);
+      break;
+  }
+};
+
+const renderDocumentRelationshipsDetails = (rows: DetailRow[]) =>
+  renderDetails(documentRelationshipsDetailsTarget, rows);
+
+const renderDocumentRelationshipsStateElements = (...elements: HTMLElement[]) => {
+  documentRelationshipsStateTarget?.replaceChildren(...elements);
+};
+
+const renderDocumentRelationshipsActions = (
+  primaryLabel: string,
+  primaryDisabled: boolean,
+  secondaryVisible = false,
+) => {
+  if (documentRelationshipsSecondaryButton) {
+    documentRelationshipsSecondaryButton.textContent = 'Tilbake';
+  }
+
+  renderActions(
+    {
+      primaryButton: documentRelationshipsPrimaryButton,
+      secondaryButton: documentRelationshipsSecondaryButton,
+    },
+    primaryLabel,
+    primaryDisabled,
+    secondaryVisible,
+  );
+};
+
+const createDocumentRelationshipsSection = (title: string, body?: string) => {
+  const section = document.createElement('section');
+  section.className = 'document-relationships-section';
+
+  const heading = document.createElement('h3');
+  heading.textContent = title;
+
+  const content = document.createElement('pre');
+  content.textContent = body?.trim() || 'Ingen innhold i denne seksjonen.';
+
+  section.append(heading, content);
+
+  return section;
+};
+
+const renderDocumentRelationshipsReport = (snapshot?: DocumentRelationshipsSnapshot) => {
+  clear(documentRelationshipsReportTarget);
+
+  if (!documentRelationshipsReportTarget || snapshot?.status !== 'complete') {
+    return;
+  }
+
+  documentRelationshipsReportTarget.append(
+    createDocumentRelationshipsSection('Oversikt', snapshot.overview),
+    createDocumentRelationshipsSection('Relasjonskart', snapshot.relationshipMap),
+    createDocumentRelationshipsSection('Tematiske klynger', snapshot.thematicClusters),
+    createDocumentRelationshipsSection('Overlapp', snapshot.notableOverlaps),
+    createDocumentRelationshipsSection('Mulige motsetninger', snapshot.possibleContradictions),
+    createDocumentRelationshipsSection('Lav sikkerhet eller manglende belegg', snapshot.lowConfidenceOrMissingEvidence),
+  );
+};
+
+const documentRelationshipsDetailsRows = (
+  scan: ProjectFolderScan,
+  snapshot?: DocumentRelationshipsSnapshot,
+) =>
+  [
+    ['Prosjektmappe', scan.rootName],
+    ['Omfang', 'Hele valgt prosjektmappe'],
+    ['Kildemodell', snapshot?.sourceModel ?? 'Fysisk prosjektmappe'],
+    ['Rapportfil', snapshot?.path ?? '.sidekick/document-relationships.md'],
+    ['Oppdatert', snapshot?.generatedAt ? formatDate(snapshot.generatedAt) : 'Ikke generert'],
+    ['Kontekstpakke', snapshot?.contextPackagePath ?? 'Genereres før analysen'],
+  ] satisfies DetailRow[];
+
+const renderDocumentRelationshipsUnavailable = () => {
+  setText(documentRelationshipsTitleTarget, 'Ingen prosjektmappe valgt');
+  setText(
+    documentRelationshipsMessageTarget,
+    window.sidekick
+      ? 'Velg en prosjektmappe før du analyserer sammenhenger.'
+      : 'Åpne appen i Electron for å analysere sammenhenger.',
+  );
+  renderDocumentRelationshipsStateElements();
+  renderDocumentRelationshipsDetails([]);
+  renderDocumentRelationshipsReport();
+  renderDocumentRelationshipsActions('Finn sammenhenger', true);
+};
+
+const renderDocumentRelationshipsChecking = (scan: ProjectFolderScan) => {
+  setText(documentRelationshipsTitleTarget, 'Sjekker rapport');
+  setText(documentRelationshipsMessageTarget, 'Ser etter eksisterende rapport for dokumentsammenhenger.');
+  renderDocumentRelationshipsStateElements(createDocumentRelationshipsSteps(1));
+  renderDocumentRelationshipsDetails(documentRelationshipsDetailsRows(scan));
+  renderDocumentRelationshipsReport();
+  renderDocumentRelationshipsActions('Sjekker...', true);
+};
+
+const renderDocumentRelationshipsReady = (
+  scan: ProjectFolderScan,
+  snapshot: DocumentRelationshipsSnapshot,
+) => {
+  if (snapshot.status === 'complete') {
+    setText(documentRelationshipsTitleTarget, 'Dokumentsammenhenger');
+    setText(documentRelationshipsMessageTarget, 'Siste rapport er tilgjengelig. Du kan lage en ny ved behov.');
+    renderDocumentRelationshipsStateElements(createDocumentRelationshipsSteps(3));
+    renderDocumentRelationshipsDetails(documentRelationshipsDetailsRows(scan, snapshot));
+    renderDocumentRelationshipsReport(snapshot);
+    renderDocumentRelationshipsActions('Analyser på nytt', false, true);
+    return;
+  }
+
+  setText(documentRelationshipsTitleTarget, 'Finn sammenhenger');
+  setText(
+    documentRelationshipsMessageTarget,
+    snapshot.status === 'invalid'
+      ? snapshot.message ?? 'Eksisterende rapport kan ikke leses. Lag en ny rapport for å erstatte den.'
+      : 'Generer en kontekstpakke og la Codex beskrive sammenhenger på tvers av dokumentene.',
+  );
+  renderDocumentRelationshipsStateElements(
+    createDocumentRelationshipsSteps(1),
+    ...(snapshot.status === 'invalid'
+      ? [createResultBanner('warning', 'Rapporten kan ikke leses', 'Sidekick kan lage en ny rapport.')]
+      : []),
+  );
+  renderDocumentRelationshipsDetails(documentRelationshipsDetailsRows(scan, snapshot));
+  renderDocumentRelationshipsReport();
+  renderDocumentRelationshipsActions('Finn sammenhenger', false, true);
+};
+
+const renderDocumentRelationshipsGenerating = (
+  scan: ProjectFolderScan,
+  previousReport?: DocumentRelationshipsSnapshot,
+) => {
+  setText(documentRelationshipsTitleTarget, 'Analyserer sammenhenger');
+  setText(
+    documentRelationshipsMessageTarget,
+    'Sidekick lager først en ny kontekstpakke og bruker den deretter som grunnlag for rapporten.',
+  );
+  renderDocumentRelationshipsStateElements(
+    createDocumentRelationshipsSteps(2),
+    createWriteOperationBadge(),
+    createWriteWarning('Sidekick oppdaterer kontekstpakken og skriver .sidekick/document-relationships.md.'),
+  );
+  renderDocumentRelationshipsDetails(documentRelationshipsDetailsRows(scan, previousReport));
+  renderDocumentRelationshipsReport(previousReport);
+  renderDocumentRelationshipsActions('Analyserer...', true);
+};
+
+const renderDocumentRelationshipsComplete = (
+  scan: ProjectFolderScan,
+  result: DocumentRelationshipsGenerationResult,
+) => {
+  const report = result.report;
+
+  setText(documentRelationshipsTitleTarget, 'Dokumentsammenhenger oppdatert');
+  setText(documentRelationshipsMessageTarget, 'Rapporten er skrevet og kan brukes som grunnlag for videre tasks.');
+  renderDocumentRelationshipsStateElements(
+    createDocumentRelationshipsSteps(3),
+    createResultBanner(
+      'success',
+      'Rapporten er klar',
+      'Funnene er strukturert som Markdown i prosjektets .sidekick-mappe.',
+    ),
+  );
+  renderDocumentRelationshipsDetails([
+    ...documentRelationshipsDetailsRows(scan, report),
+    ['Tokens i kontekstpakke', result.contextPackage?.totalTokens.toString() ?? 'Ukjent'],
+  ]);
+  renderDocumentRelationshipsReport(report);
+  renderDocumentRelationshipsActions('Analyser på nytt', false, true);
+};
+
+const renderDocumentRelationshipsFailed = (
+  scan: ProjectFolderScan,
+  message: string,
+  previousReport?: DocumentRelationshipsSnapshot,
+) => {
+  setText(documentRelationshipsTitleTarget, 'Analyse feilet');
+  setText(documentRelationshipsMessageTarget, message);
+  renderDocumentRelationshipsStateElements(
+    createDocumentRelationshipsSteps(2),
+    createResultBanner(
+      'error',
+      'Ingen ny rapport ble skrevet',
+      previousReport ? 'Tidligere rapport vises under.' : 'Rett problemet og prøv igjen.',
+    ),
+  );
+  renderDocumentRelationshipsDetails(documentRelationshipsDetailsRows(scan, previousReport));
+  renderDocumentRelationshipsReport(previousReport);
+  renderDocumentRelationshipsActions('Prøv igjen', false, true);
+};
+
+const renderDocumentRelationships = (scan?: ProjectFolderScan) => {
+  if (!scan || !window.sidekick || documentRelationshipsState.status === 'unavailable') {
+    renderDocumentRelationshipsUnavailable();
+    return;
+  }
+
+  if (
+    'rootPath' in documentRelationshipsState &&
+    documentRelationshipsState.rootPath !== scan.rootPath
+  ) {
+    renderDocumentRelationshipsChecking(scan);
+    return;
+  }
+
+  switch (documentRelationshipsState.status) {
+    case 'checking':
+      renderDocumentRelationshipsChecking(scan);
+      break;
+    case 'ready':
+      renderDocumentRelationshipsReady(scan, documentRelationshipsState.snapshot);
+      break;
+    case 'generating':
+      renderDocumentRelationshipsGenerating(scan, documentRelationshipsState.previousReport);
+      break;
+    case 'complete':
+      renderDocumentRelationshipsComplete(scan, documentRelationshipsState.result);
+      break;
+    case 'failed':
+      renderDocumentRelationshipsFailed(
+        scan,
+        documentRelationshipsState.message,
+        documentRelationshipsState.previousReport,
+      );
       break;
   }
 };
@@ -2680,12 +3088,56 @@ const refreshProjectInfo = async (scan: ProjectFolderScan) => {
   render();
 };
 
+const refreshDocumentRelationships = async (scan: ProjectFolderScan) => {
+  if (!window.sidekick) {
+    documentRelationshipsState = { status: 'unavailable' };
+    return;
+  }
+
+  const rootPath = scan.rootPath;
+  documentRelationshipsState = { status: 'checking', rootPath };
+
+  try {
+    const snapshot = await window.sidekick.readDocumentRelationships(rootPath);
+    const activeScan = getActiveScan();
+
+    if (!activeScan || activeScan.rootPath !== rootPath) {
+      return;
+    }
+
+    documentRelationshipsState = {
+      status: 'ready',
+      rootPath,
+      snapshot,
+    };
+  } catch (error) {
+    const activeScan = getActiveScan();
+
+    if (!activeScan || activeScan.rootPath !== rootPath) {
+      return;
+    }
+
+    documentRelationshipsState = {
+      status: 'ready',
+      rootPath,
+      snapshot: {
+        status: 'invalid',
+        path: '',
+        message: error instanceof Error ? error.message : 'Kunne ikke lese rapport for sammenhenger.',
+      },
+    };
+  }
+
+  render();
+};
+
 const renderNoScanPanels = () => {
   overviewEmptyTarget?.toggleAttribute('hidden', true);
   renderOverviewScanStatus();
   renderOverviewContextPackageStatus();
   renderContextPackage();
   renderTranscriptionImport();
+  renderDocumentRelationships();
   renderCodex();
   renderTree();
 };
@@ -2732,6 +3184,7 @@ const renderErrorState = (message: string) => {
   overviewEmptyTarget?.toggleAttribute('hidden', true);
   renderContextPackage();
   renderTranscriptionImport();
+  renderDocumentRelationships();
   renderCodex();
   renderWarnings([
     {
@@ -2783,6 +3236,7 @@ const renderReadyState = (scan: ProjectFolderScan, status: 'ready' | 'partial') 
   renderSelectedTreeContext(scan);
   renderContextPackage(scan);
   renderTranscriptionImport(scan);
+  renderDocumentRelationships(scan);
   renderCodex(scan);
   renderTree(scan);
 };
@@ -2854,6 +3308,10 @@ const render = () => {
   openSettingsButton?.toggleAttribute('disabled', isNavigationBlocked);
   overviewGenerateContextButton?.toggleAttribute('disabled', !hasActiveProject || isBusy || hasActiveWorkflow);
   overviewImportTranscriptionButton?.toggleAttribute('disabled', !hasActiveProject || isBusy || hasActiveWorkflow);
+  overviewDocumentRelationshipsButton?.toggleAttribute(
+    'disabled',
+    !hasActiveProject || isBusy || hasActiveWorkflow,
+  );
   overviewRunCodexButton?.toggleAttribute('disabled', !hasActiveProject || isBusy || hasActiveWorkflow);
   appMainTarget?.classList.toggle('app-main--single', !hasActiveProject);
   contextSurfaceTarget?.toggleAttribute('hidden', !hasActiveProject);
@@ -3162,24 +3620,29 @@ const generateContextPackage = async () => {
       ...getPathAncestors(result.scan, selectedPathAfterScan).map((node) => node.relativePath),
     ]);
     setTranscriptionImportStateForScan(result.scan);
+    setDocumentRelationshipsStateForScan(result.scan);
     contextPackageState = { status: 'complete', result };
     if (result.scope === 'project') {
-      projectInfoState = {
-        rootPath: result.scan.rootPath,
-        snapshot:
-          result.projectSummary.projectInfo ??
-          result.projectSummary.previousProjectInfo ?? {
-            status: 'missing',
-            path: '',
-          },
-        message: result.projectSummary.status === 'failed' ? result.projectSummary.message : undefined,
-      };
+      if (result.projectSummary) {
+        projectInfoState = {
+          rootPath: result.scan.rootPath,
+          snapshot:
+            result.projectSummary.projectInfo ??
+            result.projectSummary.previousProjectInfo ?? {
+              status: 'missing',
+              path: '',
+            },
+          message:
+            result.projectSummary.status === 'failed' ? result.projectSummary.message : undefined,
+        };
+      }
       overviewContextPackageStatus = {
         status: 'exists',
         rootPath: result.scan.rootPath,
         outputFileName: result.outputFileName,
       };
     }
+    void refreshDocumentRelationships(result.scan);
     void refreshCodexStatus(result.scan);
   } catch (error) {
     contextPackageState = {
@@ -3260,8 +3723,10 @@ const importTranscription = async () => {
         : { status: 'idle' };
     setContextPackageStateForScan(result.scan);
     setOverviewContextPackageStatusForScan(result.scan);
+    setDocumentRelationshipsStateForScan(result.scan);
     transcriptionImportState = { status: 'complete', result };
     void refreshOverviewContextPackageStatus(result.scan);
+    void refreshDocumentRelationships(result.scan);
   } catch (error) {
     transcriptionImportState = {
       status: 'error',
@@ -3279,6 +3744,78 @@ const handleTranscriptionImportPrimary = () => {
   }
 
   void openTranscriptionImportConfirmation();
+};
+
+const generateDocumentRelationships = async () => {
+  const scan = getActiveScan();
+
+  if (!window.sidekick || !scan) {
+    documentRelationshipsState = { status: 'unavailable' };
+    render();
+    return;
+  }
+
+  const previousReport = getCurrentDocumentRelationshipsSnapshot(scan);
+  documentRelationshipsState = {
+    status: 'generating',
+    rootPath: scan.rootPath,
+    previousReport: previousReport?.status === 'complete' ? previousReport : undefined,
+  };
+  render();
+
+  try {
+    const result = await window.sidekick.generateDocumentRelationships(scan.rootPath);
+    const activeScan = getActiveScan();
+
+    if (!activeScan || activeScan.rootPath !== scan.rootPath) {
+      return;
+    }
+
+    if (result.status === 'complete' && result.contextPackage) {
+      const selectedPathAfterScan = getNodeByPath(result.contextPackage.scan.tree, selectedTreePath)
+        ? selectedTreePath
+        : result.contextPackage.scan.tree.relativePath;
+      state =
+        result.contextPackage.scan.status === 'partial'
+          ? { status: 'partial', scan: result.contextPackage.scan }
+          : { status: 'ready', scan: result.contextPackage.scan };
+      selectedTreePath = selectedPathAfterScan;
+      focusedTreePath = selectedPathAfterScan;
+      setContextPackageStateForScan(result.contextPackage.scan);
+      setTranscriptionImportStateForScan(result.contextPackage.scan);
+      overviewContextPackageStatus = {
+        status: 'exists',
+        rootPath: result.contextPackage.scan.rootPath,
+        outputFileName: result.contextPackage.outputFileName,
+      };
+      documentRelationshipsState = {
+        status: 'complete',
+        rootPath: result.contextPackage.scan.rootPath,
+        result,
+      };
+      void refreshCodexStatus(result.contextPackage.scan);
+    } else {
+      documentRelationshipsState = {
+        status: 'failed',
+        rootPath: scan.rootPath,
+        message: result.message ?? 'Kunne ikke analysere sammenhenger.',
+        previousReport: result.previousReport,
+      };
+    }
+  } catch (error) {
+    documentRelationshipsState = {
+      status: 'failed',
+      rootPath: scan.rootPath,
+      message: error instanceof Error ? error.message : 'Kunne ikke analysere sammenhenger.',
+      previousReport: previousReport?.status === 'complete' ? previousReport : undefined,
+    };
+  }
+
+  render();
+};
+
+const handleDocumentRelationshipsPrimary = () => {
+  void generateDocumentRelationships();
 };
 
 const refreshCodexStatus = async (scan: ProjectFolderScan) => {
@@ -3451,7 +3988,9 @@ const completeCodexRun = (completion: CodexCompletionEvent) => {
     setContextPackageStateForScan(completion.scan);
     setOverviewContextPackageStatusForScan(completion.scan);
     setTranscriptionImportStateForScan(completion.scan);
+    setDocumentRelationshipsStateForScan(completion.scan);
     void refreshOverviewContextPackageStatus(completion.scan);
+    void refreshDocumentRelationships(completion.scan);
   }
 
   const output = codexState.output;
@@ -3493,6 +4032,7 @@ const chooseFolder = async () => {
       setContextPackageStateForScan();
       setOverviewContextPackageStatusForScan();
       setTranscriptionImportStateForScan();
+      setDocumentRelationshipsStateForScan();
       setCodexStateForScan();
       state = { status: 'empty' };
       render();
@@ -3508,6 +4048,7 @@ const chooseFolder = async () => {
     setContextPackageStateForScan();
     setOverviewContextPackageStatusForScan();
     setTranscriptionImportStateForScan();
+    setDocumentRelationshipsStateForScan();
     setCodexStateForScan();
     state = {
       status: 'error',
@@ -3856,6 +4397,13 @@ overviewImportTranscriptionButton?.addEventListener('click', () => {
   openWorkflow('transcription-import');
 });
 transcriptionImportSecondaryButton?.addEventListener('click', () => {
+  closeActiveWorkflow();
+});
+documentRelationshipsPrimaryButton?.addEventListener('click', handleDocumentRelationshipsPrimary);
+overviewDocumentRelationshipsButton?.addEventListener('click', () => {
+  openWorkflow('document-relationships');
+});
+documentRelationshipsSecondaryButton?.addEventListener('click', () => {
   closeActiveWorkflow();
 });
 codexEditModeInput?.addEventListener('change', () => {
