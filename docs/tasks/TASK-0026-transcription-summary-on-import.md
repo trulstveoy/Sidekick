@@ -1,7 +1,7 @@
 # Task: Transcription Summary On Import
 
 ID: TASK-0026
-Status: Specified
+Status: Approved
 Class: Major
 Owner: Pair
 Created: 2026-05-12
@@ -13,9 +13,13 @@ Write scope:
 - `src/main/transcription-importer.ts`
 - `src/main/transcription-summary.ts`
 - `src/main/prompts/transcription-summary.nb.ts`
+- `src/main/project-info.ts`
+- `src/main/context-package.ts`
+- `src/main/codex-runner.ts`
 - `src/main.ts`
 - `src/preload.ts`
 - `src/shared/sidekick-api.ts`
+- `index.html`
 - `src/renderer.ts`
 - `src/index.css`
 - `tests/unit`
@@ -29,31 +33,34 @@ Depends on:
 - `closed/TASK-0012-strict-numbering-format.md`
 - `closed/TASK-0023-codex-cli-path-discovery.md`
 - `closed/TASK-0024-settings-codex-path.md`
-- `TASK-0018-folder-hierarchy-artifact-detail.md`
-- `TASK-0019-write-pattern-transcript-import.md`
+- `closed/TASK-0018-folder-hierarchy-artifact-detail.md`
+- `closed/TASK-0019-write-pattern-transcript-import.md`
+- `closed/TASK-0021-controlled-codex-assistant-refresh.md`
+- `closed/TASK-0033-revised-navigation-model.md`
 Coordinates with:
 - `TASK-0025-project-summary-from-context.md`
-- `TASK-0021-controlled-codex-assistant-refresh.md`
+- `TASK-0028-generate-summaries-for-existing-transcriptions.md`
+- `BACKLOG.md` (`BL-0008`)
 
 ## Summary
 
-Generate a short Norwegian conversation summary every time Sidekick imports a transcription.
+Generate a short Norwegian conversation summary when Sidekick imports a transcription.
 
-The summary is produced by Codex from the imported transcription file, stored under the project `.sidekick/` metadata folder, and shown read-only in the GUI when the user selects that transcription.
+The first version stays project-local: the imported file is copied into the detected transcription folder, Codex summarizes that copied file in read-only mode, Sidekick stores the generated summary under `.sidekick/`, and the summary appears read-only when that transcription file is selected.
 
 ## Current Phase
 
-Specify
+Plan
 
-Specification is complete. Planning has not started.
+Specification and planning are complete. Human approval is received. Build can start.
 
 ## Progress Checklist
 
 - [x] Explore complete
 - [x] Spec complete
-- [ ] Plan complete
-- [ ] Worktree created or reused, if required
-- [ ] Human approval received, if required
+- [x] Plan complete
+- [x] Worktree created or reused, if required
+- [x] Human approval received, if required
 - [ ] Build complete
 - [ ] Verification complete
 - [ ] Review complete
@@ -62,12 +69,20 @@ Specification is complete. Planning has not started.
 
 ## Resolved Decisions
 
-- Summary generation happens when a transcription is added through the import workflow.
+- Summary generation happens after a transcription import has successfully copied the file.
+- The summary is based on the copied transcription inside the selected project, not the original source file outside the project.
 - The summary is only a summary of the conversation in the transcription.
-- The summary is shown in the GUI when that transcription file is selected.
+- The summary is shown in the selected file context surface when that transcription file is selected.
 - The prompt is application logic and should live in Sidekick's source code.
-- The generated summary should be stored in the project folder under `.sidekick/`.
+- Generated summaries are stored in the project folder under `.sidekick/`.
 - The summary is read-only in the UI.
+- Import still succeeds if summary generation fails.
+- Summary generation failure should be visible in the import result and later as a compact missing/failed state for the selected transcription.
+- The summary lookup key is a hash of the transcription's project-relative path.
+- The transcription content hash is stored as metadata and used for stale detection, not as the primary lookup key.
+- Selecting a transcription with a stale summary should show a compact warning state in the context surface.
+- Retry after failed import-time summary generation is deferred to `TASK-0028`.
+- Shared-library or project-independent transcription ownership is deferred. This task remains project-local.
 
 ## Storage Recommendation
 
@@ -252,18 +267,134 @@ Implementation should use these assumptions unless changed before planning:
 
 ## Implementation Plan
 
-Not started. Stop after Specify until this task is explicitly approved for planning/build.
+Files or areas:
 
-Suggested build sequence:
-1. Add transcription summary writer/parser and path-key helper.
-2. Add reusable Norwegian transcription-summary prompt template.
-3. Add main-process transcription summary generator that runs Codex from imported transcription text and captures Markdown output.
-4. Couple summary generation to `confirmTranscriptionImport` after copy succeeds.
-5. Extend shared import result types with summary status.
-6. Add typed API to read summary by selected transcript path.
-7. Show read-only summary in selected artifact/detail UI after `TASK-0018`.
-8. Add unit, integration, and UI tests.
-9. Run full verification.
+- `src/main/transcription-importer.ts`
+- `src/main/transcription-summary.ts`
+- `src/main/prompts/transcription-summary.nb.ts`
+- `src/main/project-info.ts`
+- `src/main/context-package.ts`
+- `src/main/codex-runner.ts`
+- `src/main.ts`
+- `src/preload.ts`
+- `src/shared/sidekick-api.ts`
+- `index.html`
+- `src/renderer.ts`
+- `src/index.css`
+- `tests/unit`
+- `tests/integration`
+- `tests/e2e`
+- `docs/tasks/TASK-0026-transcription-summary-on-import.md`
+
+Build setup:
+
+1. Build in `../Sidekick-worktrees/TASK-0026-transcription-summary-on-import`.
+2. Use `origin/main` as the base for this task worktree.
+3. Do not absorb unrelated cleanup from the local `main` checkout.
+4. Run a baseline `npm run check` before implementation when practical.
+
+Steps:
+
+1. Metadata and summary-file helpers
+   - Add `src/main/transcription-summary.ts`.
+   - Define constants for `.sidekick/transcription-summaries/` and `transcription-summary.v1`.
+   - Add helper to create a stable summary filename from SHA-256 of the project-relative transcription path.
+   - Add helper to calculate transcription content SHA-256.
+   - Add write/read/parse helpers for transcription summary Markdown.
+   - Validate required `## Conversation Summary` section.
+   - Treat unknown future sections as ignored.
+
+2. Codex summary generation
+   - Add `src/main/prompts/transcription-summary.nb.ts`.
+   - Build a prompt from the copied transcription content.
+   - Run Codex through the existing controlled main-process runner in `read-only` mode.
+   - Capture stdout, normalize it to the required Markdown section, validate it, then let Sidekick write the summary file.
+   - Ensure Codex never writes summary files directly.
+
+3. Import workflow integration
+   - After `confirmTranscriptionImport` copies the destination file, start summary generation for the copied project-local transcription.
+   - Preserve the existing successful import result if summary generation fails.
+   - Extend the import result with summary status:
+     - `complete` with summary metadata when written;
+     - `failed` with message when generation fails.
+   - Keep strict `NN. filename.ext` numbering unchanged.
+   - Refresh the project scan as today after import.
+
+4. Typed API and IPC
+   - Add shared types for `TranscriptionSummarySnapshot` and `TranscriptionSummaryGenerationResult`.
+   - Add a typed preload/main API to read a transcription summary by project root and project-relative transcription path.
+   - Validate the selected transcription path in the main process:
+     - must be relative;
+     - must stay inside the selected project root;
+     - must point to a file;
+     - should only be used for `.txt`, `.md`, or `.markdown` transcription-like files in this first version.
+   - Do not expose raw filesystem or Codex arguments to the renderer.
+
+5. Context-package and scanner hygiene
+   - Ensure `.sidekick/**` is excluded from context-package input.
+   - Ensure `.sidekick` does not pollute user-facing project scan counts or tree display if that exclusion is not already in the scanner.
+   - Keep generated summaries outside the numbered transcription folder.
+
+6. Renderer and UI
+   - Show import result summary status in the primary workspace:
+     - success: compact text that the summary was generated;
+     - failure: import succeeded, summary failed, with actionable but short message.
+   - When a transcription file is selected, call the read-summary API and render `Samtalesammendrag` in the context surface.
+   - Show a compact missing state when no summary exists.
+   - Show a compact stale warning when stored `transcription_sha256` differs from the current transcription content hash.
+   - Keep the summary read-only.
+   - Do not add manual retry/regenerate controls in this task.
+
+7. Tests
+   - Add unit tests for summary filename/key generation from relative path.
+   - Add unit tests for transcription summary Markdown creation, parsing, validation, and stale detection.
+   - Add unit tests for prompt construction and output normalization where practical.
+   - Add integration tests for import success plus summary success.
+   - Add integration tests for import success plus summary failure.
+   - Add integration/path-safety tests for reading summary metadata by selected transcription path.
+   - Add or update UI smoke tests for:
+     - import result summary success;
+     - import result summary failure;
+     - selected transcription summary display;
+     - selected transcription missing summary state;
+     - selected transcription stale summary warning.
+
+8. Documentation and closeout
+   - Update this task record with build log, verification log, review notes, and closeout.
+   - Do not create a new decision record unless implementation introduces a durable metadata, security, or Codex execution decision beyond this plan.
+
+Verification:
+
+- `npm run check`
+- `npm test`
+- `npm run test:ui`
+- Manual verification with `npm start`:
+  - import a `.txt`, `.md`, or `.markdown` transcription;
+  - confirm the imported file keeps strict numbering;
+  - confirm import success still completes if summary generation fails;
+  - confirm successful summary generation writes `.sidekick/transcription-summaries/<relative-path-hash>.summary.md`;
+  - select the imported transcription and confirm `Samtalesammendrag` appears in the context surface;
+  - modify the transcription content and confirm the context surface shows a compact stale warning;
+  - confirm `.sidekick/` does not appear in the tree or in generated context packages.
+
+Security and risk review:
+
+- Main process validates all selected transcription paths before reading or writing summary metadata.
+- Renderer never sends destination summary paths.
+- Codex runs only through the controlled main-process runner in read-only mode.
+- Codex output is captured and validated before Sidekick writes any summary file.
+- Import succeeds independently from summary generation failure.
+- `.sidekick/` is excluded from context-package input to avoid recursive generated metadata.
+
+Docs:
+
+- This task record is the primary documentation artifact.
+- `docs/architecture/desktop-design-guidelines.md` does not need changes unless UI behavior deviates from the context-surface pattern.
+
+Human gates:
+
+- Required.
+- Approval status: Approved.
 
 ## Build Log
 
