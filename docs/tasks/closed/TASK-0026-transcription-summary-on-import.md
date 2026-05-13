@@ -1,7 +1,7 @@
 # Task: Transcription Summary On Import
 
 ID: TASK-0026
-Status: Ready For Review
+Status: Done
 Class: Major
 Owner: Pair
 Created: 2026-05-12
@@ -50,9 +50,9 @@ The first version stays project-local: the imported file is copied into the dete
 
 ## Current Phase
 
-Ready For Review
+Closeout
 
-Build and automated verification are complete. Human review is next.
+Human review is approved. The task is complete.
 
 ## Progress Checklist
 
@@ -63,9 +63,9 @@ Build and automated verification are complete. Human review is next.
 - [x] Human approval received, if required
 - [x] Build complete
 - [x] Verification complete
-- [ ] Review complete
+- [x] Review complete
 - [x] Documentation complete
-- [ ] Closeout complete
+- [x] Closeout complete
 
 ## Resolved Decisions
 
@@ -414,7 +414,7 @@ Human gates:
 
 ## Review Notes
 
-- Ready for human review.
+- Human review completed successfully.
 - Manual verification should confirm both the happy path and the fallback path:
   1. Start the app with `npm start`.
   2. Select a project folder with one transcription folder.
@@ -431,4 +431,24 @@ Human gates:
 
 ## Closeout
 
-Not started.
+TASK-0026 added project-local transcription summaries after import.
+
+Final behavior:
+
+- Import still copies `.txt`, `.md`, and `.markdown` transcriptions into the detected transcription folder using strict numbering.
+- After copy, Sidekick asks Codex to summarize the copied project-local transcription in read-only mode.
+- Summary files are written under `.sidekick/transcription-summaries/`.
+- `.sidekick/` is excluded from project scans and context-package generation.
+- Import remains successful if summary generation fails.
+- Selecting an imported transcription shows `Samtalesammendrag` in the context surface when a summary exists.
+- Missing, invalid, and stale summary states are represented as compact context-surface states.
+
+Final verification:
+
+- `npm run check` passed on `main`.
+- `npm test` passed on `main`: 20 test files, 87 tests.
+- `npm run test:ui` passed on `main`: 27 UI tests.
+
+Integration:
+
+- Merged into `main`.
