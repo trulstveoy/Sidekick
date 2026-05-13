@@ -43,7 +43,7 @@ This extends the imported-transcription summary contract from `TASK-0026` so old
 
 Specify
 
-Specification is updated. Planning has not started.
+Specification is complete. Planning has not started.
 
 ## Progress Checklist
 
@@ -83,6 +83,22 @@ Current baseline:
 - Codex has controlled read-only execution, login/status checks, cancellation, and one-active-run behavior.
 - The project-independent content model is only an exploration. This task should process files in the selected project folder only.
 
+## Resolved Decisions
+
+- First version generates summaries for files with missing or invalid summary metadata.
+- First version detects stale summaries using transcription content hash, but does not regenerate stale summaries automatically.
+- Existing valid summaries are not overwritten in this task.
+- Stale-summary regeneration is deferred to a later explicit regeneration workflow.
+- The workflow processes all missing and invalid summaries in the detected transcription folder after one confirmation.
+- Users do not select individual transcription files in the first version.
+- Long-running batch jobs are not cancelable in the first version once generation has started.
+- Codex failures are handled per file. A failed file does not stop the batch.
+- The workflow continues with the next file after Codex failure, malformed output, write failure, or read failure.
+- The result shows completed, skipped, stale, invalid, and failed counts plus per-file failure details.
+- The action should live in selected transcription-folder context in the first version.
+- The action starts a primary-workspace workflow. The right context surface remains tied to the selected transcription folder while the batch runs.
+- Shared transcription libraries and multi-project transcription assignment remain out of scope.
+
 ## Task Spec
 
 ### Problem
@@ -101,7 +117,8 @@ Allow Sidekick to find existing project-local transcription files without summar
 - Compare detected transcription files with existing `.sidekick/transcription-summaries/` metadata.
 - Preview counts for missing, present, invalid, and stale summaries.
 - Generate missing summaries through Codex in read-only mode.
-- Optionally regenerate stale summaries when a transcription hash has changed, if the user confirms that behavior.
+- Generate replacement summaries for invalid summary metadata after the user confirms the batch.
+- Detect stale summaries using transcription hash, but leave them unchanged in the first version.
 - Store summaries using the same file contract as `TASK-0026`.
 - Show preview, progress, partial completion, and failures in the primary workspace.
 - Preserve successful summaries when later files fail.
@@ -120,24 +137,31 @@ Allow Sidekick to find existing project-local transcription files without summar
 - Changing strict filename numbering.
 - Running without explicit user action.
 - Replacing local search or project indexing.
+- Regenerating stale summaries.
+- Selecting individual files for summary generation.
+- Canceling a batch after generation has started.
 
 ### User Workflow
 
-1. User starts transcription summary maintenance from a project or transcription-folder context action.
+1. User selects the detected transcription folder in the tree.
+2. User starts transcription summary maintenance from the selected transcription-folder context action.
 2. Sidekick scans the selected project's transcription folder.
 3. Sidekick shows a preview of missing, present, invalid, and stale summaries.
-4. User confirms generation.
+4. User confirms generation for all missing and invalid summaries.
 5. Sidekick generates summaries one file at a time.
-6. Sidekick reports completed and failed files.
-7. Selecting a transcript shows the available read-only summary in the file context surface.
+6. Sidekick continues after per-file failures.
+7. Sidekick reports completed, skipped, stale, invalid, and failed files.
+8. Selecting a transcript shows the available read-only summary in the file context surface.
 
 ### UI Requirements
 
 - The maintenance workflow runs in the primary workspace.
 - The right context surface must not become the batch progress surface.
-- The action should be contextual to project/transcription maintenance, not a generic always-visible global action unless planning explicitly chooses an overflow placement.
+- The action is shown from selected transcription-folder context, not as an always-visible global action.
+- The action is not shown for ordinary folders, files, or project root.
 - Preview must show how many files will be written before confirmation.
 - Progress should make partial success and failed files easy to scan.
+- Stale summaries should be visible in the preview and result as "not regenerated in this version".
 - User-facing text should be Norwegian.
 
 ### Security Requirements
@@ -149,29 +173,35 @@ Allow Sidekick to find existing project-local transcription files without summar
 - Do not let Codex write summary files directly.
 - Preserve existing summaries unless regeneration is explicitly confirmed.
 - Do not let the renderer submit arbitrary file paths for batch processing.
+- Do not let the renderer choose individual file paths for this first batch workflow.
+- Confirmation should use a main-process-owned preview/batch id, not a renderer-provided file list.
 
 ### Acceptance Criteria
 
 - [ ] Sidekick can detect existing transcription files without summaries.
 - [ ] User sees a preview before summary generation starts.
 - [ ] Missing summaries can be generated through Codex in read-only mode.
+- [ ] Invalid summary metadata can be replaced after batch confirmation.
 - [ ] Existing valid summaries are not overwritten by default.
 - [ ] Stale summaries can be detected using transcription hash.
+- [ ] Stale summaries are not regenerated in this first version.
 - [ ] Partial failures do not discard successful summaries.
+- [ ] Codex failure for one file does not stop remaining files.
 - [ ] Summary files use the same contract as `TASK-0026`.
 - [ ] UI shows generation progress and per-file failures in the primary workspace.
+- [ ] The action appears only for selected transcription-folder context.
 - [ ] Selected-transcription display remains read-only in the file context surface.
 - [ ] Tests cover missing, present, stale, invalid, and failed summary cases.
-- [ ] UI smoke coverage covers preview, confirmation, partial failure, and selected-file summary display.
+- [ ] Tests cover continue-after-failure behavior.
+- [ ] UI smoke coverage covers selected transcription-folder action, preview, confirmation, partial failure, and selected-file summary display.
 
-## Open Points For Future Planning
+## Deferred Questions
 
-- Should the first version include stale-summary regeneration, or only missing-summary generation?
-- Should users be able to select individual transcription files, or should the workflow process all missing summaries?
-- Should long batch jobs be cancelable?
-- Should Codex failures stop the batch or continue with the next file?
-- Should this action live in project context, selected transcription-folder context, an action-bar overflow, or a future maintenance/settings surface?
 - How should this workflow evolve if transcriptions later live in a shared library and are linked to multiple projects?
+- Should stale-summary regeneration become a separate explicit workflow?
+- Should users later be able to select individual transcription files before generation?
+- Should long-running batches become cancelable?
+- Should a future maintenance/settings surface collect summary repair workflows across projects?
 
 ## Implementation Plan
 

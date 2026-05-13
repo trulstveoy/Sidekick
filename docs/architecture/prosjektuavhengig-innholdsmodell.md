@@ -248,19 +248,57 @@ Ulemper:
 - prosjektspesifikke filer kan bli mindre ryddige;
 - kontekstpakker må velge filer basert på metadata, ikke bare mappe.
 
-#### Parkert analyse: Strategi og Operasjon
+#### Testcase: Strategi og Operasjon
 
-Dette eksempelet bør brukes når Modell A vurderes videre.
+Dette caset bør brukes som testgrunnlag når Modell A og Modell B vurderes videre.
 
-Vi har to prosjekter:
+Formålet er å teste om modellen fungerer i en realistisk situasjon der noen filer er tydelig prosjektspesifikke, mens andre filer er relevante for flere prosjekter.
+
+Vi har to samtidige prosjekter:
 
 - Strategi
 - Operasjon
 
-Vi har to dokumenter:
+Arbeidet skjer i samme organisasjon. Strategi-prosjektet skal beskrive retning, prioriteringer og mål. Operasjon-prosjektet skal beskrive hvordan organisasjonen faktisk skal styres, bemannes og følge opp leveranser.
 
-- En transkripsjon av et intervju med direktør. Den handler om både Strategi og Operasjon.
-- Et dokument som beskriver operasjonsmodellen. Det hører kun til Operasjon.
+Minimumsdatasettet bør inneholde:
+
+| Artefakt | Type | Relevans | Hvorfor den finnes |
+| --- | --- | --- | --- |
+| `2026-05-13 intervju med direktør.md` | Transkripsjon | Strategi og Operasjon | Direktøren snakker både om strategisk retning og operasjonelle utfordringer. |
+| `2026-05-14 operasjonsmodell.md` | Dokument | Operasjon | Beskriver roller, styringsmodell, møtefora og oppfølging. |
+| `2026-05-15 strategiske veivalg.md` | Dokument | Strategi | Beskriver strategiske valg, prioriteringer og begrunnelser. |
+
+Caset kan utvides med flere artefakter senere, men dette er nok til å teste de viktigste forskjellene:
+
+- én delt transkripsjon;
+- ett dokument som bare hører til Operasjon;
+- ett dokument som bare hører til Strategi.
+
+Brukeroppgaver caset må støtte:
+
+1. Brukeren legger inn eller importerer direktørintervjuet én gang.
+2. Brukeren kobler intervjuet til både Strategi og Operasjon.
+3. Brukeren lager et operasjonsdokument som bare skal ligge i Operasjon.
+4. Brukeren lager et strategidokument som bare skal ligge i Strategi.
+5. Brukeren åpner Strategi og ser strategidokumentet pluss det delte intervjuet.
+6. Brukeren åpner Operasjon og ser operasjonsdokumentet pluss det delte intervjuet.
+7. Brukeren lager en kontekstpakke for Strategi og får riktig utvalg.
+8. Brukeren lager en kontekstpakke for Operasjon og får riktig utvalg.
+9. Brukeren kan se hvorfor intervjuet er inkludert i begge prosjektkontekster.
+10. Brukeren kan finne fysisk plassering for alle filer uten å måtte forstå Sidekick-intern metadata.
+
+Evalueringsspørsmål:
+
+- Må brukeren vite for mye om Sidekick-metadata for å lagre en ny fil riktig?
+- Unngår modellen duplisering av intervjuet?
+- Er det tydelig hvilke filer som fysisk ligger hvor?
+- Er det tydelig hvorfor en fil vises i en prosjektkontekst?
+- Kan brukeren rette feil prosjekttilknytning uten å flytte filer manuelt?
+- Kan Markdown-filene fortsatt leses og vedlikeholdes i andre verktøy?
+- Hva skjer hvis `.sidekick/` mangler eller er utdatert?
+
+##### Modell A brukt på caset
 
 I en rent prosjektuavhengig bibliotekmodell kan diskstrukturen se slik ut:
 
@@ -271,6 +309,7 @@ Arbeidsområde/
     2026-05-13 intervju med direktør.md
   02. Dokumenter/
     2026-05-14 operasjonsmodell.md
+    2026-05-15 strategiske veivalg.md
   03. Prosjekter/
     strategi.md
     operasjon.md
@@ -310,12 +349,30 @@ date: 2026-05-14
 # Operasjonsmodell
 ```
 
+Strategidokumentet kan ha metadata som sier at det kun hører til Strategi:
+
+```markdown
+---
+type: dokument
+projects:
+  - Strategi
+topics:
+  - strategiske valg
+  - prioriteringer
+date: 2026-05-15
+---
+
+# Strategiske veivalg
+```
+
 Sidekick kan da visualisere prosjektene som logiske samlinger:
 
 ```text
 Prosjekt: Strategi
   Transkripsjoner
     2026-05-13 intervju med direktør.md
+  Dokumenter
+    2026-05-15 strategiske veivalg.md
 
 Prosjekt: Operasjon
   Transkripsjoner
@@ -326,7 +383,7 @@ Prosjekt: Operasjon
 
 Dette viser styrken i Modell A: transkripsjonen trenger ikke dupliseres. Den finnes ett sted på disk, men vises i begge prosjektkontekster.
 
-Problemet er brukeropplevelsen utenfor Sidekick. Brukeren skriver Markdown i et annet verktøy. Når brukeren lager `operasjonsmodell.md`, må brukeren vite:
+Problemet er brukeropplevelsen utenfor Sidekick. Brukeren skriver Markdown i et annet verktøy. Når brukeren lager `operasjonsmodell.md` eller `strategiske veivalg.md`, må brukeren vite:
 
 - hvilken fysisk mappe dokumentet skal ligge i;
 - hvilken `type` dokumentet skal ha;
@@ -349,6 +406,7 @@ Foreløpig vurdering:
 
 - Modell A passer godt for delte artefakter, særlig transkripsjoner og felles bakgrunnsmateriale.
 - Modell A passer dårligere for dokumenter som intuitivt og praktisk bare hører til ett prosjekt.
+- Modell A krever en sterk innboks-, klassifiserings- og metadataflyt for å bli brukbar.
 - Eksempelet peker derfor mot at en hybrid modell kan være mer naturlig: delte transkripsjoner i bibliotek, prosjektspesifikke dokumenter i prosjektmappe.
 
 ### Modell B: Hybrid modell
@@ -398,6 +456,90 @@ Ulemper:
 - krever tydelig skille mellom fysisk plassering og prosjektkobling;
 - metadata må være synlig, forståelig og lett å rette;
 - risiko for at brukeren mister oversikten over hva som faktisk ligger hvor.
+
+#### Strategi og Operasjon i hybridmodellen
+
+Med samme testcase kan en hybrid diskstruktur se slik ut:
+
+```text
+Arbeidsområde/
+  Prosjekter/
+    Strategi/
+      00. Retning/
+        2026-05-15 strategiske veivalg.md
+    Operasjon/
+      00. Leveranse/
+        2026-05-14 operasjonsmodell.md
+  Bibliotek/
+    Transkripsjoner/
+      2026-05-13 intervju med direktør.md
+  .sidekick/
+    workspace.md
+    content-index.md
+```
+
+Brukerens prosjektspesifikke dokumenter ligger da der brukeren naturlig forventer dem: under hvert prosjekt. Det delte intervjuet ligger ett sted i biblioteket.
+
+Prosjekttilknytning kan lagres i en sentral Sidekick-indeks:
+
+```yaml
+artifacts:
+  - id: transcription-2026-05-13-director
+    path: Bibliotek/Transkripsjoner/2026-05-13 intervju med direktør.md
+    type: transkripsjon
+    projects:
+      - Strategi
+      - Operasjon
+    participants:
+      - Direktør
+    date: 2026-05-13
+  - id: strategy-choices-2026-05-15
+    path: Prosjekter/Strategi/00. Retning/2026-05-15 strategiske veivalg.md
+    type: dokument
+    projects:
+      - Strategi
+    date: 2026-05-15
+  - id: operating-model-2026-05-14
+    path: Prosjekter/Operasjon/00. Leveranse/2026-05-14 operasjonsmodell.md
+    type: dokument
+    projects:
+      - Operasjon
+    date: 2026-05-14
+```
+
+Sidekick kan vise to supplerende sannheter samtidig:
+
+```text
+Prosjektvisning: Strategi
+  Prosjektfiler
+    2026-05-15 strategiske veivalg.md
+  Koblede bibliotekfiler
+    2026-05-13 intervju med direktør.md
+
+Prosjektvisning: Operasjon
+  Prosjektfiler
+    2026-05-14 operasjonsmodell.md
+  Koblede bibliotekfiler
+    2026-05-13 intervju med direktør.md
+
+Mappevisning
+  Prosjekter/
+    Strategi/
+    Operasjon/
+  Bibliotek/
+    Transkripsjoner/
+```
+
+Denne modellen gjør det lettere å forklare kontekstpakker:
+
+- Strategi-pakken inkluderer strategidokumentet fordi det fysisk ligger i Strategi.
+- Strategi-pakken inkluderer intervjuet fordi intervjuet er koblet til Strategi.
+- Operasjon-pakken inkluderer operasjonsmodellen fordi den fysisk ligger i Operasjon.
+- Operasjon-pakken inkluderer intervjuet fordi intervjuet er koblet til Operasjon.
+
+Hybridmodellen virker mer naturlig for dette caset fordi brukeren slipper å flytte prosjektspesifikke dokumenter inn i et generelt bibliotek. Samtidig unngår modellen duplisering av intervjuet.
+
+Den viktigste designutfordringen er at GUI-et må vise forskjellen mellom `ligger i prosjektet` og `er koblet til prosjektet`. Hvis Sidekick ikke gjør dette tydelig, kan brukeren miste tillit til hvorfor filer dukker opp i en prosjektvisning.
 
 Foreløpig vurdering: Hybridmodellen virker mest relevant, men den må designes forsiktig.
 
