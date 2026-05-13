@@ -59,15 +59,26 @@ Sidekick uses a calm desktop workspace with persistent project context and compa
 
 Preferred shell areas:
 
-- Topbar: app identity, selected project name, selected project path, and high-level mode/context.
-- Primary workspace: the main object the user is working with, usually project overview, folder hierarchy, a write-operation preview, or a controlled assistant run.
-- Context surface: secondary information about the selected project, folder, file, operation, or assistant state.
-- Action bar: stable area for the primary action and safe secondary actions for the current workflow.
+- Topbar: app identity, selected project name, selected project path, project switching, and app-level settings.
+- Primary workspace: the main object the user is working with, usually project overview, folder hierarchy, a write-operation preview, settings, or a controlled assistant run.
+- Context surface: secondary information about the selected project, folder, or file.
+- Action bar: stable area for global project actions that open explicit workflow surfaces.
 - Status bar: compact operational status such as scan state, Codex state, context-package state, or latest operation result.
 
 The primary workspace is the main surface. Context surfaces, action bars, and status bars should support it without competing for attention.
 
 The selected project folder must remain visible in the shell whenever a project is active. Long project names and paths must truncate predictably.
+
+Workflow responsibility model:
+
+- Project switching belongs in the topbar and should not appear as a routine bottom action.
+- Settings is an app-level view that replaces the primary workspace body while keeping the topbar stable.
+- Project-level actions such as full-project context-package generation, transcript import, and controlled Codex runs start from the action bar and run in the primary workspace.
+- Starting an exclusive workflow should replace the folder tree in the primary workspace, not take over the context surface.
+- The context surface should remain tied to the selected project, folder, or file while workflows run. It should not become the workflow progress panel.
+- Competing global actions should be disabled while an exclusive workflow is active.
+- Project switching and settings navigation should not silently hide an active workflow. Disable or explicitly guard them while a workflow is in progress.
+- Folder-scoped actions, when introduced, should live near the selected folder context rather than in the global action bar.
 
 The shell should avoid page-like composition. Do not introduce landing-page sections, hero copy, marketing language, or decorative feature cards inside the app.
 

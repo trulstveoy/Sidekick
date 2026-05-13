@@ -1080,6 +1080,12 @@ test('selects folders and shows selected folder detail', async ({ page }) => {
   await expect(page.locator('[data-selection-details]')).toContainText('2 filer');
   await expect(page.locator('[data-selection-contents]')).toContainText('brief.pdf');
   await expect(page.locator('[data-selection-contents]')).toContainText('notes.md');
+
+  await page.locator('[data-selection-contents]').getByRole('button', { name: /brief.pdf/ }).click();
+  await expect(page.locator('[data-selection-title]')).toHaveText('brief.pdf');
+  await expect(page.locator('[data-selection-details]')).toContainText('01-bakgrunn/brief.pdf');
+  await expect(page.locator('[data-selection-details]')).toContainText('PDF');
+  await expect(page.getByRole('button', { name: /Åpne fil/i })).toHaveCount(0);
 });
 
 test('supports keyboard navigation and breadcrumb selection in the folder tree', async ({ page }) => {
@@ -1180,6 +1186,13 @@ test('confirms and displays a generated context package', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
   await page.getByRole('button', { name: 'Generer kontekstpakke' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Lag kontekstpakke' })).toBeVisible();
+  await expect(page.locator('[data-selection-title]')).toHaveText('sidekick-project');
+  await expect(page.getByRole('button', { name: 'Importer transkripsjon' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Kjør Codex' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Velg annen mappe...' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Innstillinger' })).toBeDisabled();
 
   await expect(page.getByRole('button', { name: 'Forhåndsvis' })).toBeEnabled();
   await page.getByRole('button', { name: 'Forhåndsvis' }).click();
@@ -1443,11 +1456,9 @@ test('operates refreshed workflow controls from keyboard focus', async ({ page }
   await expect(contextAction).toBeFocused();
   await contextAction.press('Enter');
   await expect(page.getByRole('heading', { name: 'Lag kontekstpakke' })).toBeVisible();
-  await page.locator('[data-context-package-primary]').focus();
-  await page.keyboard.press('Enter');
+  await page.locator('[data-context-package-primary]').press('Enter');
   await expect(page.getByRole('heading', { name: 'Bekreft kontekstpakke' })).toBeVisible();
-  await page.locator('[data-context-package-secondary]').focus();
-  await page.keyboard.press('Enter');
+  await page.locator('[data-context-package-secondary]').press('Enter');
   await expect(page.getByRole('heading', { name: 'Prosjektoversikt' })).toBeVisible();
 
   const importAction = page.locator('[data-overview-action-import-transcription]');
@@ -1455,11 +1466,9 @@ test('operates refreshed workflow controls from keyboard focus', async ({ page }
   await expect(importAction).toBeFocused();
   await importAction.press('Enter');
   await expect(page.getByRole('heading', { name: 'Importer transkripsjon' })).toBeVisible();
-  await page.locator('[data-transcription-import-primary]').focus();
-  await page.keyboard.press('Enter');
+  await page.locator('[data-transcription-import-primary]').press('Enter');
   await expect(page.getByRole('heading', { name: 'Bekreft import' })).toBeVisible();
-  await page.locator('[data-transcription-import-secondary]').focus();
-  await page.keyboard.press('Enter');
+  await page.locator('[data-transcription-import-secondary]').press('Enter');
   await expect(page.getByRole('heading', { name: 'Prosjektoversikt' })).toBeVisible();
 
   await page.locator('[data-overview-action-run-codex]').focus();
