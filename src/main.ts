@@ -9,6 +9,7 @@ import type {
   CodexRunRequest,
   ProjectCreationRequest,
   ProjectInitializationPreview,
+  TranscriptionSummaryBatchPreview,
   TranscriptionSummaryReadRequest,
   TranscriptionImportPreview,
 } from './shared/sidekick-api';
@@ -38,6 +39,10 @@ import {
   generateTranscriptionSummary,
   readTranscriptionSummary,
 } from './main/transcription-summary';
+import {
+  confirmTranscriptionSummaryBatch,
+  createTranscriptionSummaryBatchPreview,
+} from './main/transcription-summary-batch';
 import { AppSettingsStore, normalizeCodexPath, validateCodexPath } from './main/settings-store';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -64,6 +69,7 @@ const appIconPath = () =>
 const selectedProjectRoots = new Set<string>();
 const selectedProjectParentFolders = new Set<string>();
 const pendingTranscriptionImports = new Map<string, TranscriptionImportPreview>();
+const pendingTranscriptionSummaryBatches = new Map<string, TranscriptionSummaryBatchPreview>();
 const pendingProjectInitializations = new Map<string, ProjectInitializationPreview>();
 let settingsStore: AppSettingsStore | undefined;
 const codexRunner = new CodexRunner();
@@ -352,6 +358,46 @@ ipcMain.handle('transcription:read-summary', (_event, request) => {
     summaryRequest.rootPath,
     summaryRequest.transcriptionRelativePath,
   );
+});
+
+ipcMain.handle('transcription:preview-summary-batch', async (_event, rootPath) => {
+  const projectRoot = assertKnownProjectRoot(rootPath);
+  const preview = await createTranscriptionSummaryBatchPreview(
+    projectRoot,
+    readTranscriptionSummary,
+  );
+  pendingTranscriptionSummaryBatches.set(preview.previewId, preview);
+
+  return preview;
+});
+
+ipcMain.handle('transcription:confirm-summary-batch', async (_event, previewId) => {
+  if (typeof previewId !== 'string' || previewId.trim().length === 0) {
+    throw new Error('A transcription summary preview is required.');
+  }
+
+  const preview = pendingTranscriptionSummaryBatches.get(previewId);
+
+  if (!preview) {
+    throw new Error('The transcription summary preview has expired.');
+  }
+
+  try {
+    const projectRoot = assertKnownProjectRoot(preview.rootPath);
+
+    return await confirmTranscriptionSummaryBatch({
+      rootPath: projectRoot,
+      reader: readTranscriptionSummary,
+      generateSummary: ({ rootPath: summaryRootPath, transcriptionPath }) =>
+        generateTranscriptionSummary({
+          rootPath: summaryRootPath,
+          transcriptionPath,
+          codexRunner,
+        }),
+    });
+  } finally {
+    pendingTranscriptionSummaryBatches.delete(previewId);
+  }
 });
 
 const assertCodexRunRequest = (request: unknown): CodexRunRequest => {

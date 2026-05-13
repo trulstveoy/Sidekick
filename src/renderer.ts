@@ -22,6 +22,10 @@ import type {
   ScanWarning,
   TranscriptionImportPreview,
   TranscriptionImportResult,
+  TranscriptionSummaryBatchItemStatus,
+  TranscriptionSummaryBatchPreview,
+  TranscriptionSummaryBatchResult,
+  TranscriptionSummaryBatchResultItemStatus,
   TranscriptionSummarySnapshot,
 } from './shared/sidekick-api';
 
@@ -52,6 +56,15 @@ type TranscriptionImportState =
   | { status: 'importing'; preview: TranscriptionImportPreview }
   | { status: 'complete'; result: TranscriptionImportResult }
   | { status: 'error'; message: string };
+
+type TranscriptionSummaryBatchState =
+  | { status: 'unavailable' }
+  | { status: 'ready' }
+  | { status: 'previewing' }
+  | { status: 'confirming'; preview: TranscriptionSummaryBatchPreview }
+  | { status: 'generating'; preview: TranscriptionSummaryBatchPreview }
+  | { status: 'complete'; result: TranscriptionSummaryBatchResult }
+  | { status: 'error'; message: string; phase: 'preview' | 'generation' };
 
 type ProjectCreationState =
   | { status: 'closed'; message: string; parentPath: string | null }
@@ -112,6 +125,7 @@ type AppView = 'workspace' | 'settings';
 type ActiveWorkflow =
   | 'context-package'
   | 'transcription-import'
+  | 'transcription-summary-batch'
   | 'document-relationships'
   | 'codex'
   | null;
@@ -265,6 +279,27 @@ const transcriptionImportPrimaryButton = document.querySelector<HTMLButtonElemen
 const transcriptionImportSecondaryButton = document.querySelector<HTMLButtonElement>(
   '[data-transcription-import-secondary]',
 );
+const transcriptionSummaryBatchTitleTarget = document.querySelector<HTMLElement>(
+  '[data-transcription-summary-batch-title]',
+);
+const transcriptionSummaryBatchMessageTarget = document.querySelector<HTMLElement>(
+  '[data-transcription-summary-batch-message]',
+);
+const transcriptionSummaryBatchStateTarget = document.querySelector<HTMLElement>(
+  '[data-transcription-summary-batch-state]',
+);
+const transcriptionSummaryBatchDetailsTarget = document.querySelector<HTMLElement>(
+  '[data-transcription-summary-batch-details]',
+);
+const transcriptionSummaryBatchListTarget = document.querySelector<HTMLUListElement>(
+  '[data-transcription-summary-batch-list]',
+);
+const transcriptionSummaryBatchPrimaryButton = document.querySelector<HTMLButtonElement>(
+  '[data-transcription-summary-batch-primary]',
+);
+const transcriptionSummaryBatchSecondaryButton = document.querySelector<HTMLButtonElement>(
+  '[data-transcription-summary-batch-secondary]',
+);
 const documentRelationshipsTitleTarget = document.querySelector<HTMLElement>(
   '[data-document-relationships-title]',
 );
@@ -348,6 +383,7 @@ let contextPackageState: ContextPackageState = { status: 'unavailable' };
 let contextPackageTarget: ContextPackageTarget = { scope: 'project' };
 let overviewContextPackageStatus: OverviewContextPackageStatus = { status: 'unavailable' };
 let transcriptionImportState: TranscriptionImportState = { status: 'unavailable' };
+let transcriptionSummaryBatchState: TranscriptionSummaryBatchState = { status: 'unavailable' };
 let documentRelationshipsState: DocumentRelationshipsState = { status: 'unavailable' };
 let projectCreationState: ProjectCreationState = {
   status: 'closed',
@@ -560,6 +596,17 @@ const getTranscriptionFolderLabel = (scan: ProjectFolderScan) => {
   return 'Ingen transkripsjonsmappe funnet';
 };
 
+const isSingleDetectedTranscriptionFolder = (scan: ProjectFolderScan, node: FolderTreeNode) => {
+  const folders = findNodesByFolderSignal(scan.tree, 'transcript');
+
+  return (
+    isFolderNode(node) &&
+    (node.folderSignals?.includes('transcript') || node.contextHints.includes('transcript')) &&
+    folders.length === 1 &&
+    folders[0].relativePath === node.relativePath
+  );
+};
+
 const overviewWarnings = (scan?: ProjectFolderScan) => {
   if (!scan) {
     return [];
@@ -597,6 +644,13 @@ const setTranscriptionImportStateForScan = (scan?: ProjectFolderScan) => {
     scan && window.sidekick ? { status: 'ready' } : { status: 'unavailable' };
 };
 
+const setTranscriptionSummaryBatchStateForScan = (scan?: ProjectFolderScan) => {
+  transcriptionSummaryBatchState =
+    scan && window.sidekick?.previewTranscriptionSummaryBatch
+      ? { status: 'ready' }
+      : { status: 'unavailable' };
+};
+
 const setDocumentRelationshipsStateForScan = (scan?: ProjectFolderScan) => {
   documentRelationshipsState =
     scan && window.sidekick ? { status: 'checking', rootPath: scan.rootPath } : { status: 'unavailable' };
@@ -620,6 +674,7 @@ const setActiveScan = (scan: ProjectFolderScan) => {
   setContextPackageStateForScan(scan);
   setOverviewContextPackageStatusForScan(scan);
   setTranscriptionImportStateForScan(scan);
+  setTranscriptionSummaryBatchStateForScan(scan);
   setDocumentRelationshipsStateForScan(scan);
   setCodexStateForScan(scan);
   state = scan.status === 'partial' ? { status: 'partial', scan } : { status: 'ready', scan };
@@ -661,6 +716,10 @@ const focusActiveWorkflow = () => {
 
 const focusSelectedTreeRow = () => {
   window.requestAnimationFrame(() => {
+    if (document.activeElement && document.activeElement !== document.body) {
+      return;
+    }
+
     const row = treeTarget?.querySelector<HTMLElement>(
       `.tree-row[data-tree-path="${CSS.escape(focusedTreePath)}"]`,
     );
@@ -686,6 +745,16 @@ const closeActiveWorkflow = () => {
 
   if (activeWorkflow === 'transcription-import' && transcriptionImportState.status !== 'importing') {
     transcriptionImportState = getActiveScan() ? { status: 'ready' } : { status: 'unavailable' };
+  }
+
+  if (
+    activeWorkflow === 'transcription-summary-batch' &&
+    transcriptionSummaryBatchState.status !== 'generating'
+  ) {
+    transcriptionSummaryBatchState =
+      getActiveScan() && window.sidekick?.previewTranscriptionSummaryBatch
+        ? { status: 'ready' }
+        : { status: 'unavailable' };
   }
 
   if (activeWorkflow === 'document-relationships' && documentRelationshipsState.status !== 'generating') {
@@ -722,6 +791,9 @@ const isExclusiveWorkflowActive = () =>
     transcriptionImportState.status === 'previewing' ||
     transcriptionImportState.status === 'confirming' ||
     transcriptionImportState.status === 'importing' ||
+    transcriptionSummaryBatchState.status === 'previewing' ||
+    transcriptionSummaryBatchState.status === 'confirming' ||
+    transcriptionSummaryBatchState.status === 'generating' ||
     documentRelationshipsState.status === 'checking' ||
     documentRelationshipsState.status === 'generating' ||
     codexState.status === 'checking' ||
@@ -1523,7 +1595,7 @@ const clearSelectionActions = () => {
   selectionActionsTarget?.replaceChildren();
 };
 
-const renderSelectionActions = (node: FolderTreeNode) => {
+const renderSelectionActions = (scan: ProjectFolderScan, node: FolderTreeNode) => {
   const target = selectionActionsTarget ?? selectionContentsTarget;
 
   if (!target) {
@@ -1542,16 +1614,33 @@ const renderSelectionActions = (node: FolderTreeNode) => {
   actionTitle.className = 'selection-contents-title';
   actionTitle.textContent = 'Handlinger';
 
-  const button = document.createElement('button');
-  button.className = 'btn btn-secondary btn-sm selection-action-button';
-  button.type = 'button';
-  button.textContent = 'Generer kontekstpakke for denne mappen';
-  button.toggleAttribute('disabled', isExclusiveWorkflowActive());
-  button.addEventListener('click', () => {
+  const contextPackageButton = document.createElement('button');
+  contextPackageButton.className = 'btn btn-secondary btn-sm selection-action-button';
+  contextPackageButton.type = 'button';
+  contextPackageButton.textContent = 'Generer kontekstpakke for denne mappen';
+  contextPackageButton.toggleAttribute('disabled', isExclusiveWorkflowActive());
+  contextPackageButton.addEventListener('click', () => {
     openFolderContextPackageWorkflow(node.relativePath);
   });
 
-  target.append(actionTitle, button);
+  const buttons = [contextPackageButton];
+
+  if (isSingleDetectedTranscriptionFolder(scan, node)) {
+    const summaryButton = document.createElement('button');
+    summaryButton.className = 'btn btn-secondary btn-sm selection-action-button';
+    summaryButton.type = 'button';
+    summaryButton.textContent = 'Generer manglende sammendrag';
+    summaryButton.toggleAttribute(
+      'disabled',
+      isExclusiveWorkflowActive() || !window.sidekick?.previewTranscriptionSummaryBatch,
+    );
+    summaryButton.addEventListener('click', () => {
+      openWorkflow('transcription-summary-batch');
+    });
+    buttons.push(summaryButton);
+  }
+
+  target.append(actionTitle, ...buttons);
 };
 
 const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
@@ -1619,7 +1708,7 @@ const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
 
   renderSelectionContents(node);
   appendTranscriptionSummary(scan, node);
-  renderSelectionActions(node);
+  renderSelectionActions(scan, node);
   appendSelectionWarnings(
     warnings.map((warning) =>
       warning.path === ROOT_PATH ? warning.message : `${warning.path}: ${warning.message}`,
@@ -1795,6 +1884,16 @@ const renderTranscriptionImportStateElements = (...elements: HTMLElement[]) => {
   transcriptionImportStateTarget?.replaceChildren(...elements);
 };
 
+const renderTranscriptionSummaryBatchDetails = (rows: DetailRow[]) =>
+  renderDetails(transcriptionSummaryBatchDetailsTarget, rows);
+
+const renderTranscriptionSummaryBatchList = (items: string[]) =>
+  renderList(transcriptionSummaryBatchListTarget, items);
+
+const renderTranscriptionSummaryBatchStateElements = (...elements: HTMLElement[]) => {
+  transcriptionSummaryBatchStateTarget?.replaceChildren(...elements);
+};
+
 const createOperationSteps = (labels: string[], activeStep: number) => {
   const steps = document.createElement('ol');
   steps.className = 'operation-steps';
@@ -1824,6 +1923,9 @@ const createOperationSteps = (labels: string[], activeStep: number) => {
 
 const createImportSteps = (activeStep: 1 | 2 | 3) =>
   createOperationSteps(['Velg fil', 'Bekreft', 'Ferdig'], activeStep);
+
+const createTranscriptionSummaryBatchSteps = (activeStep: 1 | 2 | 3) =>
+  createOperationSteps(['Forhåndsvis', 'Generer', 'Ferdig'], activeStep);
 
 const createContextPackageSteps = (activeStep: 1 | 2 | 3) =>
   createOperationSteps(['Forhåndsvis', 'Bekreft', 'Ferdig'], activeStep);
@@ -1899,6 +2001,26 @@ const renderTranscriptionImportActions = (
     {
       primaryButton: transcriptionImportPrimaryButton,
       secondaryButton: transcriptionImportSecondaryButton,
+    },
+    primaryLabel,
+    primaryDisabled,
+    secondaryVisible,
+  );
+};
+
+const renderTranscriptionSummaryBatchActions = (
+  primaryLabel: string,
+  primaryDisabled: boolean,
+  secondaryVisible = false,
+) => {
+  if (transcriptionSummaryBatchSecondaryButton) {
+    transcriptionSummaryBatchSecondaryButton.textContent = 'Tilbake';
+  }
+
+  renderActions(
+    {
+      primaryButton: transcriptionSummaryBatchPrimaryButton,
+      secondaryButton: transcriptionSummaryBatchSecondaryButton,
     },
     primaryLabel,
     primaryDisabled,
@@ -2270,6 +2392,229 @@ const renderTranscriptionImport = (scan?: ProjectFolderScan) => {
       break;
     case 'error':
       renderTranscriptionImportError(transcriptionImportState.message);
+      break;
+  }
+};
+
+const transcriptionSummaryBatchStatusLabel = (
+  status: TranscriptionSummaryBatchItemStatus | TranscriptionSummaryBatchResultItemStatus,
+) => {
+  switch (status) {
+    case 'missing':
+      return 'Mangler';
+    case 'invalid':
+      return 'Ugyldig';
+    case 'stale':
+      return 'Utdatert';
+    case 'complete':
+      return 'Finnes';
+    case 'generated':
+      return 'Generert';
+    case 'failed':
+      return 'Feilet';
+    case 'skipped-complete':
+      return 'Hoppet over';
+    case 'skipped-stale':
+      return 'Utdatert, hoppet over';
+  }
+};
+
+const renderTranscriptionSummaryBatchUnavailable = () => {
+  setText(transcriptionSummaryBatchTitleTarget, 'Ingen prosjektmappe valgt');
+  setText(
+    transcriptionSummaryBatchMessageTarget,
+    window.sidekick
+      ? 'Velg en prosjektmappe før du lager samtalesammendrag.'
+      : 'Åpne appen i Electron for å lage samtalesammendrag.',
+  );
+  renderTranscriptionSummaryBatchStateElements();
+  renderTranscriptionSummaryBatchDetails([]);
+  renderTranscriptionSummaryBatchList([]);
+  renderTranscriptionSummaryBatchActions('Forhåndsvis', true);
+};
+
+const renderTranscriptionSummaryBatchReady = (scan: ProjectFolderScan) => {
+  setText(transcriptionSummaryBatchTitleTarget, 'Lag manglende sammendrag');
+  setText(
+    transcriptionSummaryBatchMessageTarget,
+    'Sidekick sjekker transkripsjonsmappen og lager sammendrag for filer som mangler det.',
+  );
+  renderTranscriptionSummaryBatchStateElements(createTranscriptionSummaryBatchSteps(1));
+  renderTranscriptionSummaryBatchDetails([
+    ['Transkripsjonsmappe', getTranscriptionFolderLabel(scan)],
+    ['Omfang', 'Direkte transkripsjonsfiler i denne mappen'],
+    ['Lager for', 'Manglende eller ugyldige sammendrag'],
+    ['Hopper over', 'Eksisterende og utdaterte sammendrag'],
+  ]);
+  renderTranscriptionSummaryBatchList([]);
+  renderTranscriptionSummaryBatchActions('Forhåndsvis', false, true);
+};
+
+const renderTranscriptionSummaryBatchPreviewing = () => {
+  setText(transcriptionSummaryBatchTitleTarget, 'Sjekker transkripsjoner');
+  setText(transcriptionSummaryBatchMessageTarget, 'Ser etter eksisterende samtalesammendrag.');
+  renderTranscriptionSummaryBatchStateElements(createTranscriptionSummaryBatchSteps(1));
+  renderTranscriptionSummaryBatchDetails([]);
+  renderTranscriptionSummaryBatchList([]);
+  renderTranscriptionSummaryBatchActions('Sjekker...', true);
+};
+
+const renderTranscriptionSummaryBatchConfirming = (preview: TranscriptionSummaryBatchPreview) => {
+  const previewItems = preview.items.slice(0, 8).map(
+    (item) =>
+      `${item.transcriptionFileName}: ${transcriptionSummaryBatchStatusLabel(item.status)}${
+        item.message ? ` (${item.message})` : ''
+      }`,
+  );
+
+  setText(transcriptionSummaryBatchTitleTarget, 'Bekreft sammendrag');
+  setText(
+    transcriptionSummaryBatchMessageTarget,
+    'Kontroller hvor mange filer Sidekick skal behandle før Codex kjøres.',
+  );
+  renderTranscriptionSummaryBatchStateElements(
+    createTranscriptionSummaryBatchSteps(2),
+    createWriteOperationBadge(),
+    createWriteWarning(
+      `Sidekick skriver samtalesammendrag i prosjektets .sidekick-mappe for ${preview.counts.toGenerate} transkripsjoner.`,
+    ),
+  );
+  renderTranscriptionSummaryBatchDetails([
+    ['Transkripsjonsmappe', preview.targetFolderRelativePath],
+    ['Transkripsjoner', preview.counts.total.toString()],
+    ['Mangler sammendrag', preview.counts.missing.toString()],
+    ['Ugyldige sammendrag', preview.counts.invalid.toString()],
+    ['Finnes fra før', preview.counts.complete.toString()],
+    ['Utdaterte', preview.counts.stale.toString()],
+    ['Skal genereres', preview.counts.toGenerate.toString()],
+  ]);
+  renderTranscriptionSummaryBatchList([
+    ...preview.warnings.map((warning) =>
+      warning.path ? `${warning.path}: ${warning.message}` : warning.message,
+    ),
+    ...previewItems,
+    ...(preview.items.length > previewItems.length
+      ? [`${preview.items.length - previewItems.length} flere transkripsjoner`]
+      : []),
+  ]);
+  renderTranscriptionSummaryBatchActions(
+    preview.counts.toGenerate > 0 ? 'Generer sammendrag' : 'Ingenting å generere',
+    preview.counts.toGenerate === 0,
+    true,
+  );
+};
+
+const renderTranscriptionSummaryBatchGenerating = (preview: TranscriptionSummaryBatchPreview) => {
+  setText(transcriptionSummaryBatchTitleTarget, 'Genererer sammendrag');
+  setText(transcriptionSummaryBatchMessageTarget, 'Codex lager sammendrag én transkripsjon av gangen.');
+  renderTranscriptionSummaryBatchStateElements(
+    createTranscriptionSummaryBatchSteps(2),
+    createWriteOperationBadge(),
+    createWriteWarning('Sidekick skriver bare sammendrag i prosjektets .sidekick-mappe.'),
+  );
+  renderTranscriptionSummaryBatchDetails([
+    ['Transkripsjonsmappe', preview.targetFolderRelativePath],
+    ['Gjenstår å generere', preview.counts.toGenerate.toString()],
+    ['Hoppes over', (preview.counts.complete + preview.counts.stale).toString()],
+  ]);
+  renderTranscriptionSummaryBatchList([]);
+  renderTranscriptionSummaryBatchActions('Genererer...', true);
+};
+
+const renderTranscriptionSummaryBatchComplete = (result: TranscriptionSummaryBatchResult) => {
+  const failedItems = result.items
+    .filter((item) => item.status === 'failed')
+    .map((item) => `${item.transcriptionFileName}: ${item.message ?? 'Ukjent feil'}`);
+  const generatedItems = result.items
+    .filter((item) => item.status === 'generated')
+    .slice(0, 8)
+    .map((item) => `${item.transcriptionFileName}: Generert`);
+
+  setText(transcriptionSummaryBatchTitleTarget, 'Sammendrag ferdig');
+  setText(
+    transcriptionSummaryBatchMessageTarget,
+    result.counts.failed > 0
+      ? 'Noen sammendrag feilet. Filer som lyktes er beholdt.'
+      : 'Alle manglende sammendrag som kunne genereres er oppdatert.',
+  );
+  renderTranscriptionSummaryBatchStateElements(
+    createTranscriptionSummaryBatchSteps(3),
+    createResultBanner(
+      result.counts.failed > 0 ? 'warning' : 'success',
+      result.counts.failed > 0 ? 'Delvis fullført' : 'Sammendragene er klare',
+      `${result.counts.generated} generert, ${result.counts.failed} feilet.`,
+    ),
+  );
+  renderTranscriptionSummaryBatchDetails([
+    ['Transkripsjonsmappe', result.targetFolderRelativePath],
+    ['Generert', result.counts.generated.toString()],
+    ['Feilet', result.counts.failed.toString()],
+    ['Hoppet over, finnes', result.counts.skippedComplete.toString()],
+    ['Hoppet over, utdatert', result.counts.skippedStale.toString()],
+  ]);
+  renderTranscriptionSummaryBatchList([
+    ...failedItems,
+    ...generatedItems,
+    ...(result.counts.generated > generatedItems.length
+      ? [`${result.counts.generated - generatedItems.length} flere sammendrag ble generert`]
+      : []),
+  ]);
+  renderTranscriptionSummaryBatchActions('Sjekk på nytt', false, true);
+};
+
+const renderTranscriptionSummaryBatchError = (
+  message: string,
+  phase: Extract<TranscriptionSummaryBatchState, { status: 'error' }>['phase'],
+) => {
+  setText(
+    transcriptionSummaryBatchTitleTarget,
+    phase === 'preview' ? 'Sammendrag kan ikke forberedes' : 'Generering feilet',
+  );
+  setText(transcriptionSummaryBatchMessageTarget, message);
+  renderTranscriptionSummaryBatchStateElements(
+    createTranscriptionSummaryBatchSteps(phase === 'preview' ? 1 : 2),
+    createResultBanner(
+      'error',
+      phase === 'preview' ? 'Ingen sammendrag ble skrevet' : 'Genereringen ble ikke fullført',
+      'Rett problemet og prøv igjen.',
+    ),
+  );
+  renderTranscriptionSummaryBatchDetails([]);
+  renderTranscriptionSummaryBatchList([]);
+  renderTranscriptionSummaryBatchActions('Prøv igjen', false, true);
+};
+
+const renderTranscriptionSummaryBatch = (scan?: ProjectFolderScan) => {
+  if (
+    !scan ||
+    !window.sidekick?.previewTranscriptionSummaryBatch ||
+    transcriptionSummaryBatchState.status === 'unavailable'
+  ) {
+    renderTranscriptionSummaryBatchUnavailable();
+    return;
+  }
+
+  switch (transcriptionSummaryBatchState.status) {
+    case 'ready':
+      renderTranscriptionSummaryBatchReady(scan);
+      break;
+    case 'previewing':
+      renderTranscriptionSummaryBatchPreviewing();
+      break;
+    case 'confirming':
+      renderTranscriptionSummaryBatchConfirming(transcriptionSummaryBatchState.preview);
+      break;
+    case 'generating':
+      renderTranscriptionSummaryBatchGenerating(transcriptionSummaryBatchState.preview);
+      break;
+    case 'complete':
+      renderTranscriptionSummaryBatchComplete(transcriptionSummaryBatchState.result);
+      break;
+    case 'error':
+      renderTranscriptionSummaryBatchError(
+        transcriptionSummaryBatchState.message,
+        transcriptionSummaryBatchState.phase,
+      );
       break;
   }
 };
@@ -3137,6 +3482,7 @@ const renderNoScanPanels = () => {
   renderOverviewContextPackageStatus();
   renderContextPackage();
   renderTranscriptionImport();
+  renderTranscriptionSummaryBatch();
   renderDocumentRelationships();
   renderCodex();
   renderTree();
@@ -3184,6 +3530,7 @@ const renderErrorState = (message: string) => {
   overviewEmptyTarget?.toggleAttribute('hidden', true);
   renderContextPackage();
   renderTranscriptionImport();
+  renderTranscriptionSummaryBatch();
   renderDocumentRelationships();
   renderCodex();
   renderWarnings([
@@ -3236,6 +3583,7 @@ const renderReadyState = (scan: ProjectFolderScan, status: 'ready' | 'partial') 
   renderSelectedTreeContext(scan);
   renderContextPackage(scan);
   renderTranscriptionImport(scan);
+  renderTranscriptionSummaryBatch(scan);
   renderDocumentRelationships(scan);
   renderCodex(scan);
   renderTree(scan);
@@ -3620,6 +3968,7 @@ const generateContextPackage = async () => {
       ...getPathAncestors(result.scan, selectedPathAfterScan).map((node) => node.relativePath),
     ]);
     setTranscriptionImportStateForScan(result.scan);
+    setTranscriptionSummaryBatchStateForScan(result.scan);
     setDocumentRelationshipsStateForScan(result.scan);
     contextPackageState = { status: 'complete', result };
     if (result.scope === 'project') {
@@ -3723,6 +4072,7 @@ const importTranscription = async () => {
         : { status: 'idle' };
     setContextPackageStateForScan(result.scan);
     setOverviewContextPackageStatusForScan(result.scan);
+    setTranscriptionSummaryBatchStateForScan(result.scan);
     setDocumentRelationshipsStateForScan(result.scan);
     transcriptionImportState = { status: 'complete', result };
     void refreshOverviewContextPackageStatus(result.scan);
@@ -3744,6 +4094,95 @@ const handleTranscriptionImportPrimary = () => {
   }
 
   void openTranscriptionImportConfirmation();
+};
+
+const openTranscriptionSummaryBatchPreview = async () => {
+  const scan = getActiveScan();
+
+  if (!window.sidekick?.previewTranscriptionSummaryBatch || !scan) {
+    transcriptionSummaryBatchState = { status: 'unavailable' };
+    render();
+    return;
+  }
+
+  transcriptionSummaryBatchState = { status: 'previewing' };
+  render();
+
+  try {
+    const preview = await window.sidekick.previewTranscriptionSummaryBatch(scan.rootPath);
+    transcriptionSummaryBatchState = { status: 'confirming', preview };
+  } catch (error) {
+    transcriptionSummaryBatchState = {
+      status: 'error',
+      phase: 'preview',
+      message: error instanceof Error ? error.message : 'Kunne ikke forberede sammendrag.',
+    };
+  }
+
+  render();
+};
+
+const generateTranscriptionSummaryBatch = async () => {
+  const scan = getActiveScan();
+
+  if (
+    !window.sidekick?.confirmTranscriptionSummaryBatch ||
+    !scan ||
+    transcriptionSummaryBatchState.status !== 'confirming'
+  ) {
+    return;
+  }
+
+  const { preview } = transcriptionSummaryBatchState;
+  transcriptionSummaryBatchState = { status: 'generating', preview };
+  render();
+
+  try {
+    const result = await window.sidekick.confirmTranscriptionSummaryBatch(preview.previewId);
+    const selectedPathAfterScan = getNodeByPath(result.scan.tree, preview.targetFolderRelativePath)
+      ? preview.targetFolderRelativePath
+      : getNodeByPath(result.scan.tree, selectedTreePath)
+        ? selectedTreePath
+        : result.scan.tree.relativePath;
+
+    state =
+      result.scan.status === 'partial'
+        ? { status: 'partial', scan: result.scan }
+        : { status: 'ready', scan: result.scan };
+    selectedTreePath = selectedPathAfterScan;
+    focusedTreePath = selectedPathAfterScan;
+    expandedPaths = new Set([
+      ...expandedPaths,
+      ROOT_PATH,
+      ...getPathAncestors(result.scan, selectedPathAfterScan).map((node) => node.relativePath),
+    ]);
+    transcriptionSummaryState = { status: 'idle' };
+    setContextPackageStateForScan(result.scan);
+    setOverviewContextPackageStatusForScan(result.scan);
+    setTranscriptionImportStateForScan(result.scan);
+    setDocumentRelationshipsStateForScan(result.scan);
+    transcriptionSummaryBatchState = { status: 'complete', result };
+    void refreshOverviewContextPackageStatus(result.scan);
+    void refreshDocumentRelationships(result.scan);
+    void refreshCodexStatus(result.scan);
+  } catch (error) {
+    transcriptionSummaryBatchState = {
+      status: 'error',
+      phase: 'generation',
+      message: error instanceof Error ? error.message : 'Kunne ikke generere sammendrag.',
+    };
+  }
+
+  render();
+};
+
+const handleTranscriptionSummaryBatchPrimary = () => {
+  if (transcriptionSummaryBatchState.status === 'confirming') {
+    void generateTranscriptionSummaryBatch();
+    return;
+  }
+
+  void openTranscriptionSummaryBatchPreview();
 };
 
 const generateDocumentRelationships = async () => {
@@ -3783,6 +4222,7 @@ const generateDocumentRelationships = async () => {
       focusedTreePath = selectedPathAfterScan;
       setContextPackageStateForScan(result.contextPackage.scan);
       setTranscriptionImportStateForScan(result.contextPackage.scan);
+      setTranscriptionSummaryBatchStateForScan(result.contextPackage.scan);
       overviewContextPackageStatus = {
         status: 'exists',
         rootPath: result.contextPackage.scan.rootPath,
@@ -3988,6 +4428,7 @@ const completeCodexRun = (completion: CodexCompletionEvent) => {
     setContextPackageStateForScan(completion.scan);
     setOverviewContextPackageStatusForScan(completion.scan);
     setTranscriptionImportStateForScan(completion.scan);
+    setTranscriptionSummaryBatchStateForScan(completion.scan);
     setDocumentRelationshipsStateForScan(completion.scan);
     void refreshOverviewContextPackageStatus(completion.scan);
     void refreshDocumentRelationships(completion.scan);
@@ -4032,6 +4473,7 @@ const chooseFolder = async () => {
       setContextPackageStateForScan();
       setOverviewContextPackageStatusForScan();
       setTranscriptionImportStateForScan();
+      setTranscriptionSummaryBatchStateForScan();
       setDocumentRelationshipsStateForScan();
       setCodexStateForScan();
       state = { status: 'empty' };
@@ -4048,6 +4490,7 @@ const chooseFolder = async () => {
     setContextPackageStateForScan();
     setOverviewContextPackageStatusForScan();
     setTranscriptionImportStateForScan();
+    setTranscriptionSummaryBatchStateForScan();
     setDocumentRelationshipsStateForScan();
     setCodexStateForScan();
     state = {
@@ -4397,6 +4840,13 @@ overviewImportTranscriptionButton?.addEventListener('click', () => {
   openWorkflow('transcription-import');
 });
 transcriptionImportSecondaryButton?.addEventListener('click', () => {
+  closeActiveWorkflow();
+});
+transcriptionSummaryBatchPrimaryButton?.addEventListener(
+  'click',
+  handleTranscriptionSummaryBatchPrimary,
+);
+transcriptionSummaryBatchSecondaryButton?.addEventListener('click', () => {
   closeActiveWorkflow();
 });
 documentRelationshipsPrimaryButton?.addEventListener('click', handleDocumentRelationshipsPrimary);

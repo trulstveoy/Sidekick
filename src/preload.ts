@@ -29,6 +29,10 @@ const sidekickApi: SidekickApi = {
     ipcRenderer.invoke('transcription:confirm-import', previewId),
   readTranscriptionSummary: (request) =>
     ipcRenderer.invoke('transcription:read-summary', request),
+  previewTranscriptionSummaryBatch: (rootPath) =>
+    ipcRenderer.invoke('transcription:preview-summary-batch', rootPath),
+  confirmTranscriptionSummaryBatch: (previewId) =>
+    ipcRenderer.invoke('transcription:confirm-summary-batch', previewId),
   getCodexStatus: (rootPath) => ipcRenderer.invoke('codex:get-status', rootPath),
   startCodexLogin: (rootPath) => ipcRenderer.invoke('codex:start-login', rootPath),
   startCodexRun: (request) => ipcRenderer.invoke('codex:start-run', request),

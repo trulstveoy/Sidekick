@@ -1,7 +1,7 @@
 # Task: Generate Summaries For Existing Transcriptions
 
 ID: TASK-0028
-Status: Approved
+Status: Ready For Review
 Class: Major
 Owner: Pair
 Created: 2026-05-12
@@ -41,9 +41,9 @@ This extends the imported-transcription summary contract from `TASK-0026` so old
 
 ## Current Phase
 
-Plan
+Ready For Review
 
-Specification and planning are complete. Human approval is received. Build can start.
+Build and automated verification are complete. Human review is next.
 
 ## Progress Checklist
 
@@ -52,10 +52,10 @@ Specification and planning are complete. Human approval is received. Build can s
 - [x] Plan complete
 - [x] Worktree created or reused, if required
 - [x] Human approval received, if required
-- [ ] Build complete
-- [ ] Verification complete
+- [x] Build complete
+- [x] Verification complete
 - [ ] Review complete
-- [ ] Documentation complete
+- [x] Documentation complete
 - [ ] Closeout complete
 
 ## Backlog Source
@@ -178,22 +178,22 @@ Allow Sidekick to find existing project-local transcription files without summar
 
 ### Acceptance Criteria
 
-- [ ] Sidekick can detect existing transcription files without summaries.
-- [ ] User sees a preview before summary generation starts.
-- [ ] Missing summaries can be generated through Codex in read-only mode.
-- [ ] Invalid summary metadata can be replaced after batch confirmation.
-- [ ] Existing valid summaries are not overwritten by default.
-- [ ] Stale summaries can be detected using transcription hash.
-- [ ] Stale summaries are not regenerated in this first version.
-- [ ] Partial failures do not discard successful summaries.
-- [ ] Codex failure for one file does not stop remaining files.
-- [ ] Summary files use the same contract as `TASK-0026`.
-- [ ] UI shows generation progress and per-file failures in the primary workspace.
-- [ ] The action appears only for selected transcription-folder context.
-- [ ] Selected-transcription display remains read-only in the file context surface.
-- [ ] Tests cover missing, present, stale, invalid, and failed summary cases.
-- [ ] Tests cover continue-after-failure behavior.
-- [ ] UI smoke coverage covers selected transcription-folder action, preview, confirmation, partial failure, and selected-file summary display.
+- [x] Sidekick can detect existing transcription files without summaries.
+- [x] User sees a preview before summary generation starts.
+- [x] Missing summaries can be generated through Codex in read-only mode.
+- [x] Invalid summary metadata can be replaced after batch confirmation.
+- [x] Existing valid summaries are not overwritten by default.
+- [x] Stale summaries can be detected using transcription hash.
+- [x] Stale summaries are not regenerated in this first version.
+- [x] Partial failures do not discard successful summaries.
+- [x] Codex failure for one file does not stop remaining files.
+- [x] Summary files use the same contract as `TASK-0026`.
+- [x] UI shows generation progress and per-file failures in the primary workspace.
+- [x] The action appears only for selected transcription-folder context.
+- [x] Selected-transcription display remains read-only in the file context surface.
+- [x] Tests cover missing, present, stale, invalid, and failed summary cases.
+- [x] Tests cover continue-after-failure behavior.
+- [x] UI smoke coverage covers selected transcription-folder action, preview, confirmation, partial failure, and selected-file summary display.
 
 ## Deferred Questions
 
@@ -311,19 +311,40 @@ After build, verify from `main` or the task worktree with `npm start`:
 
 ## Build Log
 
-Not started.
+- Added shared preview/result contracts for batch transcription summary generation.
+- Added `src/main/transcription-summary-batch.ts` for main-process preview and sequential generation.
+- Added IPC/preload methods:
+  - `previewTranscriptionSummaryBatch(rootPath)`
+  - `confirmTranscriptionSummaryBatch(previewId)`
+- Added a primary-workspace workflow for generating missing transcription summaries.
+- Added the selected-folder action only for the detected transcription folder.
+- Kept existing valid summaries untouched and stale summaries skipped in this version.
+- Preserved existing import, context package, document relationship, and Codex workflows.
 
 ## Verification Log
 
-Not started.
+- `npm run check` passed.
+- `npm test` passed: 100 tests.
+- `npm run test:ui` passed: 30 UI tests.
 
 ## Review Notes
 
-Not started.
+Ready for human review.
+
+Manual check:
+
+1. Start the app with `npm start`.
+2. Select a project with exactly one transcriptions folder.
+3. Select the transcriptions folder in the tree.
+4. Confirm the right panel shows `Generer manglende sammendrag`.
+5. Click it, run the preview, and confirm the counts look right.
+6. Generate summaries and check the result counts.
+7. Select a transcript afterwards and confirm the read-only `Samtalesammendrag` still appears when a summary exists.
+8. Confirm the action is not shown on project root, ordinary folders, or files.
 
 ## Documentation Notes
 
-Not started.
+Task record updated with build and verification status.
 
 ## Closeout
 

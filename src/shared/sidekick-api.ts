@@ -301,6 +301,67 @@ export type TranscriptionSummaryReadRequest = {
   transcriptionRelativePath: string;
 };
 
+export type TranscriptionSummaryBatchItemStatus = 'missing' | 'complete' | 'stale' | 'invalid';
+
+export type TranscriptionSummaryBatchItem = {
+  transcriptionRelativePath: string;
+  transcriptionFileName: string;
+  status: TranscriptionSummaryBatchItemStatus;
+  summaryRelativePath: string;
+  message?: string;
+};
+
+export type TranscriptionSummaryBatchCounts = {
+  total: number;
+  missing: number;
+  complete: number;
+  stale: number;
+  invalid: number;
+  toGenerate: number;
+};
+
+export type TranscriptionSummaryBatchPreview = {
+  previewId: string;
+  rootPath: string;
+  targetFolderPath: string;
+  targetFolderRelativePath: string;
+  counts: TranscriptionSummaryBatchCounts;
+  items: TranscriptionSummaryBatchItem[];
+  warnings: TranscriptionImportWarning[];
+};
+
+export type TranscriptionSummaryBatchResultItemStatus =
+  | 'generated'
+  | 'failed'
+  | 'skipped-complete'
+  | 'skipped-stale';
+
+export type TranscriptionSummaryBatchResultItem = {
+  transcriptionRelativePath: string;
+  transcriptionFileName: string;
+  status: TranscriptionSummaryBatchResultItemStatus;
+  message?: string;
+  summary?: TranscriptionSummarySnapshot;
+};
+
+export type TranscriptionSummaryBatchResultCounts = {
+  total: number;
+  generated: number;
+  failed: number;
+  skippedComplete: number;
+  skippedStale: number;
+};
+
+export type TranscriptionSummaryBatchResult = {
+  status: 'complete';
+  rootPath: string;
+  targetFolderPath: string;
+  targetFolderRelativePath: string;
+  counts: TranscriptionSummaryBatchResultCounts;
+  items: TranscriptionSummaryBatchResultItem[];
+  scan: ProjectFolderScan;
+};
+
 export type TranscriptionImportResult = {
   status: 'complete';
   rootPath: string;
@@ -408,6 +469,12 @@ export type SidekickApi = {
   readTranscriptionSummary?: (
     request: TranscriptionSummaryReadRequest,
   ) => Promise<TranscriptionSummarySnapshot>;
+  previewTranscriptionSummaryBatch?: (
+    rootPath: string,
+  ) => Promise<TranscriptionSummaryBatchPreview>;
+  confirmTranscriptionSummaryBatch?: (
+    previewId: string,
+  ) => Promise<TranscriptionSummaryBatchResult>;
   getCodexStatus: (rootPath: string) => Promise<CodexStatus>;
   startCodexLogin: (rootPath: string) => Promise<CodexRunStartResult>;
   startCodexRun: (request: CodexRunRequest) => Promise<CodexRunStartResult>;
