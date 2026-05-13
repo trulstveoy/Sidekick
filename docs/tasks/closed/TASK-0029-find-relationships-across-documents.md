@@ -1,7 +1,7 @@
 # Task: Find Relationships Across Documents
 
 ID: TASK-0029
-Status: Ready For Review
+Status: Done
 Class: Major
 Owner: Pair
 Created: 2026-05-12
@@ -47,9 +47,9 @@ The first version should produce a traceable relationship report for the selecte
 
 ## Current Phase
 
-Ready For Review
+Done
 
-Build and verification are complete. Human approval to build was received on 2026-05-13. The task is waiting for human review.
+Build, verification, merge, and human GUI review are complete.
 
 ## Progress Checklist
 
@@ -60,9 +60,9 @@ Build and verification are complete. Human approval to build was received on 202
 - [x] Human approval received, if required
 - [x] Build complete
 - [x] Verification complete
-- [ ] Review complete
+- [x] Review complete
 - [x] Documentation complete
-- [ ] Closeout complete
+- [x] Closeout complete
 
 ## Backlog Source
 
@@ -429,9 +429,9 @@ Final Ready For Review message should include:
 
 ## Review Notes
 
-Waiting for human review.
+Human GUI review accepted on 2026-05-13. The user confirmed that the feature works.
 
-Suggested GUI review:
+Reviewed GUI flow:
 
 - Select a project.
 - Start `Finn sammenhenger`.
@@ -449,4 +449,11 @@ Suggested GUI review:
 
 ## Closeout
 
-Not started. Move to `Done` and archive under `docs/tasks/closed/` only after human review and approval.
+- Completed on 2026-05-13.
+- Merged to `main` with merge commit `53b4908`.
+- Final main-branch verification after merge:
+  - `npm run check`
+  - `npm test` (22 files, 98 tests)
+  - `npm run test:ui` (29 tests)
+- Human GUI test passed.
+- Task record moved to `docs/tasks/closed/`.
