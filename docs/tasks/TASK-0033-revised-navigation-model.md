@@ -1,7 +1,7 @@
 # Task: Revised Navigation Model
 
 ID: TASK-0033
-Status: Planned
+Status: Ready For Review
 Class: Major
 Owner: Pair
 Created: 2026-05-13
@@ -569,20 +569,51 @@ Final Ready For Review message should include:
 
 ## Build Log
 
-Not started.
+- 2026-05-13: Built directly on local `main` after approved plan update. No task worktree was used because the user explicitly said no parallel development was happening for this task.
+- 2026-05-13: Revised the app shell so project switching lives in the topbar, settings is app-level, and the bottom action bar only starts project workflows.
+- 2026-05-13: Moved transcript import, full-project context-package generation, and Codex into middle-panel workflow surfaces.
+- 2026-05-13: Simplified the right panel into stable project/folder/file context and kept workflow progress out of that panel.
+- 2026-05-13: Localized the nearby settings UI to Norwegian.
+- 2026-05-13: Added/updated UI coverage for workflow entry/exit, guarded global actions, stable context panel behavior, file metadata selection without unsupported open-file action, and Norwegian settings labels.
+- 2026-05-13: Tightened one keyboard workflow test to wait for the workflow primary action before pressing Enter.
+
+Implementation commits:
+
+- `9495dbf feat: revise navigation shell workflows`
+- `520d6bf test: cover revised navigation model`
 
 ## Verification Log
 
-Not started.
+- 2026-05-13: Baseline before build passed:
+  - `npm run check`
+  - `npm test` - 16 files, 62 tests
+  - `npm run test:ui` - 25 UI tests
+- 2026-05-13: After shell/workflow implementation passed:
+  - `npm run check`
+  - `npm run test:ui` - 25 UI tests
+- 2026-05-13: After test/docs update passed:
+  - `npm run check`
+  - `npm test` - 16 files, 62 tests
+  - `npm run test:ui` - 25 UI tests
+- 2026-05-13: Final verification after keyboard-test stabilization passed:
+  - `npm run check`
+  - `npm run test:ui` - 25 UI tests
+  - `npm test` was already green after the same implementation changes; this last stabilization only touched the UI test file.
 
 ## Review Notes
 
-Not started.
+- Human review should focus on the revised navigation model:
+  - topbar project switching and settings placement;
+  - action bar workflow entry;
+  - middle-panel workflow surfaces;
+  - right-panel context stability;
+  - keyboard entry/exit behavior;
+  - whether the simplified right panel still exposes enough project/folder/file information.
 
 ## Documentation Notes
 
-Not started.
+- Updated `docs/architecture/desktop-design-guidelines.md` with the durable shell responsibility model used by this task.
 
 ## Closeout
 
-Not started.
+Ready for human review. Do not close until the revised GUI has been manually checked from the local review server.

@@ -1456,7 +1456,9 @@ test('operates refreshed workflow controls from keyboard focus', async ({ page }
   await expect(contextAction).toBeFocused();
   await contextAction.press('Enter');
   await expect(page.getByRole('heading', { name: 'Lag kontekstpakke' })).toBeVisible();
-  await page.locator('[data-context-package-primary]').press('Enter');
+  const contextPrimary = page.locator('[data-context-package-primary]');
+  await expect(contextPrimary).toBeEnabled();
+  await contextPrimary.press('Enter');
   await expect(page.getByRole('heading', { name: 'Bekreft kontekstpakke' })).toBeVisible();
   await page.locator('[data-context-package-secondary]').press('Enter');
   await expect(page.getByRole('heading', { name: 'Prosjektoversikt' })).toBeVisible();
@@ -1466,7 +1468,9 @@ test('operates refreshed workflow controls from keyboard focus', async ({ page }
   await expect(importAction).toBeFocused();
   await importAction.press('Enter');
   await expect(page.getByRole('heading', { name: 'Importer transkripsjon' })).toBeVisible();
-  await page.locator('[data-transcription-import-primary]').press('Enter');
+  const importPrimary = page.locator('[data-transcription-import-primary]');
+  await expect(importPrimary).toBeEnabled();
+  await importPrimary.press('Enter');
   await expect(page.getByRole('heading', { name: 'Bekreft import' })).toBeVisible();
   await page.locator('[data-transcription-import-secondary]').press('Enter');
   await expect(page.getByRole('heading', { name: 'Prosjektoversikt' })).toBeVisible();
