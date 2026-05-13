@@ -179,6 +179,33 @@ export type ProjectSummaryGenerationResult = {
   message?: string;
 };
 
+export type DocumentRelationshipsSnapshot = {
+  status: 'missing' | 'complete' | 'invalid';
+  path: string;
+  generatedAt?: string;
+  sourceScope?: 'full-project';
+  sourceModel?: 'physical-project-folder';
+  contextPackagePath?: string;
+  contextPackageSha256?: string;
+  summaryLanguage?: 'nb';
+  overview?: string;
+  relationshipMap?: string;
+  thematicClusters?: string;
+  notableOverlaps?: string;
+  possibleContradictions?: string;
+  lowConfidenceOrMissingEvidence?: string;
+  markdown?: string;
+  message?: string;
+};
+
+export type DocumentRelationshipsGenerationResult = {
+  status: 'complete' | 'failed';
+  report?: DocumentRelationshipsSnapshot;
+  previousReport?: DocumentRelationshipsSnapshot;
+  contextPackage?: ContextPackageResult;
+  message?: string;
+};
+
 export type ContextPackageScope = 'project' | 'folder';
 
 export type FolderContextPackageRequest = {
@@ -334,6 +361,10 @@ export type SidekickApi = {
   previewContextPackage: (rootPath: string) => Promise<ContextPackagePreview>;
   generateContextPackage: (rootPath: string) => Promise<ContextPackageResult>;
   readProjectInfo: (rootPath: string) => Promise<ProjectInfoSnapshot>;
+  readDocumentRelationships: (rootPath: string) => Promise<DocumentRelationshipsSnapshot>;
+  generateDocumentRelationships: (
+    rootPath: string,
+  ) => Promise<DocumentRelationshipsGenerationResult>;
   previewFolderContextPackage?: (
     request: FolderContextPackageRequest,
   ) => Promise<ContextPackagePreview>;

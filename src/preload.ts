@@ -15,6 +15,10 @@ const sidekickApi: SidekickApi = {
   previewContextPackage: (rootPath) => ipcRenderer.invoke('context-package:preview', rootPath),
   generateContextPackage: (rootPath) => ipcRenderer.invoke('context-package:generate', rootPath),
   readProjectInfo: (rootPath) => ipcRenderer.invoke('project-info:read', rootPath),
+  readDocumentRelationships: (rootPath) =>
+    ipcRenderer.invoke('document-relationships:read', rootPath),
+  generateDocumentRelationships: (rootPath) =>
+    ipcRenderer.invoke('document-relationships:generate', rootPath),
   previewFolderContextPackage: (request) =>
     ipcRenderer.invoke('context-package:preview-folder', request),
   generateFolderContextPackage: (request) =>

@@ -17,6 +17,10 @@ import {
   getContextPackagePreview,
   getFolderContextPackagePreview,
 } from './main/context-package';
+import {
+  generateDocumentRelationships,
+  readDocumentRelationships,
+} from './main/document-relationships';
 import { CodexRunner } from './main/codex-runner';
 import { scanProjectFolder } from './main/folder-scanner';
 import { readProjectInfo } from './main/project-info';
@@ -221,6 +225,17 @@ ipcMain.handle('context-package:generate', (_event, rootPath) =>
 
 ipcMain.handle('project-info:read', (_event, rootPath) =>
   readProjectInfo(assertKnownProjectRoot(rootPath)),
+);
+
+ipcMain.handle('document-relationships:read', (_event, rootPath) =>
+  readDocumentRelationships(assertKnownProjectRoot(rootPath)),
+);
+
+ipcMain.handle('document-relationships:generate', (_event, rootPath) =>
+  generateDocumentRelationships({
+    rootPath: assertKnownProjectRoot(rootPath),
+    codexRunner,
+  }),
 );
 
 const assertFolderContextPackageRequest = (request: unknown) => {

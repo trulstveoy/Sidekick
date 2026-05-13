@@ -238,6 +238,7 @@ const toWarnings = (
 
 type GenerateContextPackageOptions = {
   codexRunner?: CodexRunner;
+  generateProjectSummary?: boolean;
 };
 
 const generateProjectSummary = async (
@@ -284,11 +285,14 @@ export const generateContextPackage = async (
   });
 
   const outputStats = await stat(preview.outputPath);
-  const projectSummary = await generateProjectSummary(
-    rootPath,
-    preview.outputPath,
-    options.codexRunner ?? new CodexRunner(),
-  );
+  const shouldGenerateProjectSummary = options.generateProjectSummary ?? true;
+  const projectSummary = shouldGenerateProjectSummary
+    ? await generateProjectSummary(
+        rootPath,
+        preview.outputPath,
+        options.codexRunner ?? new CodexRunner(),
+      )
+    : undefined;
   const scan = await scanProjectFolder(rootPath);
 
   return {
