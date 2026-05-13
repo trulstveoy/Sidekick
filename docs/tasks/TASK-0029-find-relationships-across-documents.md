@@ -1,7 +1,7 @@
 # Task: Find Relationships Across Documents
 
 ID: TASK-0029
-Status: Specified
+Status: Approved
 Class: Major
 Owner: Pair
 Created: 2026-05-12
@@ -47,17 +47,17 @@ The first version should produce a traceable relationship report for the selecte
 
 ## Current Phase
 
-Specify
+Build
 
-Specification is updated. Planning has not started.
+Specification and planning are complete. Human approval to build was received on 2026-05-13.
 
 ## Progress Checklist
 
 - [x] Explore complete
 - [x] Spec complete
-- [ ] Plan complete
+- [x] Plan complete
 - [ ] Worktree created or reused, if required
-- [ ] Human approval received, if required
+- [x] Human approval received, if required
 - [ ] Build complete
 - [ ] Verification complete
 - [ ] Review complete
@@ -110,7 +110,7 @@ Relationships may include shared themes, dependencies, overlaps, contradictions,
 ### Scope
 
 - Use an explicit user-triggered relationship-analysis workflow.
-- Use a generated context package as the first-version input.
+- Generate a fresh full-project context package as the first-version input.
 - Run Codex with a relationship-analysis prompt.
 - Produce a human-readable relationship report.
 - Store the report under `.sidekick/`.
@@ -119,6 +119,8 @@ Relationships may include shared themes, dependencies, overlaps, contradictions,
 - Make uncertainty visible instead of inventing relationships.
 - Include source scope metadata so the report is traceable to the input context.
 - Exclude `.sidekick/` and generated reports from context-package input.
+- Keep the first version scoped to the selected physical project folder.
+- Keep the first version Markdown-only, but structure it so later parsing or visualization is possible.
 
 ### Recommended Output
 
@@ -135,6 +137,7 @@ Recommended sections:
 sidekick_schema: document-relationships.v1
 generated_at: 2026-05-13T12:00:00.000Z
 source_scope: full-project
+source_model: physical-project-folder
 context_package_path: ./<project-name>.context-package.md
 context_package_sha256: <hash>
 summary_language: nb
@@ -145,6 +148,14 @@ summary_language: nb
 ## Overview
 
 ## Relationship Map
+
+Each relationship should include:
+
+- relationship type;
+- related source documents;
+- explanation;
+- supporting evidence or source references when available;
+- confidence: high, medium, or low.
 
 ## Thematic Clusters
 
@@ -166,6 +177,9 @@ summary_language: nb
 - Automatic relationship generation after every context-package generation.
 - Treating Codex output as authoritative when evidence is weak.
 - Cross-project relationship analysis or logical-project relationship analysis.
+- Producing a separate JSON artifact in the first version.
+- Implementing chunking or multi-pass analysis for oversized context packages.
+- Letting the user choose among historical context packages in the first version.
 
 ### UI Requirements
 
@@ -174,6 +188,7 @@ summary_language: nb
 - The latest relationship report may be surfaced from project context, but detailed report reading can use a dedicated primary-workspace view if planning chooses that.
 - User-facing labels should be Norwegian.
 - Uncertainty and low-confidence sections should be visible, not hidden behind success styling.
+- If the context package is too large for practical analysis, fail clearly and point users toward future folder-scoped or thematic context-package workflows rather than attempting an unreliable run.
 
 ### Security Requirements
 
@@ -187,30 +202,208 @@ summary_language: nb
 
 ### Acceptance Criteria
 
-- [ ] User can generate a relationship analysis from the selected project's current generated context.
+- [ ] User can generate a relationship analysis from a freshly generated full-project context package.
 - [ ] Sidekick runs Codex with a dedicated relationship-analysis prompt.
 - [ ] Output is stored under `.sidekick/`.
 - [ ] Output identifies related documents and explains the relationship in text.
 - [ ] Output includes source scope and context hash metadata.
 - [ ] Output includes uncertainty/low-confidence notes.
+- [ ] Output is Markdown-only in the first version.
 - [ ] GUI can show the latest relationship report without turning the context surface into workflow progress.
 - [ ] The report is not included in future context package input.
+- [ ] Oversized context packages fail with clear no-write feedback before Codex analysis starts.
 - [ ] Tests cover report writing/parsing and Codex failure behavior.
 - [ ] UI smoke coverage covers starting analysis, success, failure, and viewing the latest report.
 
-## Open Points For Future Planning
+## Resolved Planning Decisions
 
-- What relationship types should be first-class: themes, dependencies, contradictions, participants, chronology, or all of these?
-- Should visualization be part of first build, or should first build only create structured text that later visualization can use?
-- If visualization is included, should it be graph, matrix, timeline, or thematic cluster view?
-- Should the report use Markdown only, or Markdown plus a machine-readable JSON artifact?
-- Should relationship generation use the latest full-project context package, generate a fresh one, or let the user choose?
-- How should large context packages be handled if they exceed practical Codex limits?
-- How should this report evolve if Sidekick later supports logical projects or shared content libraries?
+- First-class relationship types for the first report:
+  - shared themes;
+  - document overlap;
+  - document dependency;
+  - possible contradiction;
+  - chronology;
+  - recurring participants or organizations.
+- Visualization is not part of the first build. First build creates structured text that can support later visualization.
+- Later visualization options remain open. The likely candidates are thematic cluster view or graph view. Timeline should wait until chronology proves useful.
+- The first version writes one Markdown report only. It should use YAML frontmatter and repeated structured sections rather than a separate JSON artifact.
+- Relationship generation should generate a fresh full-project context package as part of the workflow. The report stores the source context path and hash so it is traceable.
+- Large context packages should fail with a clear message before Codex analysis starts. First build should not implement chunking, splitting, or multi-pass analysis.
+- First build analyzes the selected physical project folder only. The report should include `source_scope` and `source_model` so future logical-project or shared-library reports can coexist with this format.
+
+## Deferred Questions
+
+- Should later builds generate a machine-readable JSON sidecar for graph visualization?
+- Should later builds support relationship analysis over folder-scoped, thematic, manual-selection, or logical-project context?
+- Should later builds support chunked analysis for very large projects?
 
 ## Implementation Plan
 
-Not started. Stop after Specify until this task is explicitly approved for planning.
+### Build Control
+
+This is a major task and must be built in a dedicated worktree.
+
+Build setup:
+
+1. Preserve unrelated local edits in the main checkout.
+2. Create or reuse `../Sidekick-worktrees/TASK-0029-find-relationships-across-documents`.
+3. Use a branch named `task/TASK-0029-find-relationships-across-documents`.
+4. Base the task branch on the current local task-spec commits plus `origin/main`, because this task depends on the closed `TASK-0034` work currently on `origin/main`.
+5. Build only inside the task worktree.
+6. Make separate commits for the implementation steps below.
+7. Run targeted verification before each commit when practical, and full verification before Ready For Review.
+
+### Step 0: Baseline And Integration
+
+Goal: prepare the task branch without losing existing local task documentation or the `TASK-0034` implementation.
+
+Actions:
+
+- Create or reuse the task worktree.
+- Integrate `origin/main` so the task branch includes closed `TASK-0034`.
+- Resolve conflicts by preserving newer implemented code and the current TASK-0029 spec.
+- Run baseline verification.
+
+Verification:
+
+```bash
+npm run check
+npm test
+```
+
+Commit:
+
+- No implementation commit unless conflict-resolution changes are required.
+
+### Step 1: Main-Process Relationship Report Service
+
+Goal: add the filesystem and report-generation service without exposing new privileged renderer APIs.
+
+Actions:
+
+- Add `src/main/document-relationships.ts`.
+- Add `src/main/prompts/document-relationships.nb.ts`.
+- Ensure `.sidekick/` exists before writing the report.
+- Generate a fresh full-project context package and compute a SHA-256 hash of the generated context file.
+- Build a Norwegian Codex prompt for relationship analysis.
+- Run Codex through the existing controlled runner.
+- Write only the final Sidekick-owned report to `<project-root>/.sidekick/document-relationships.md`.
+- Add helpers to read the latest report and parse frontmatter needed by the UI.
+- Add a practical context-size guard before starting Codex analysis.
+
+Verification:
+
+```bash
+npm run check
+npm test -- tests/unit tests/integration
+```
+
+Commit:
+
+```text
+feat: add document relationship report service
+```
+
+### Step 2: Typed IPC Contract
+
+Goal: expose relationship analysis through narrow, task-specific APIs.
+
+Actions:
+
+- Extend `src/shared/sidekick-api.ts` with request/result/report-status types.
+- Add main-process IPC handlers in `src/main.ts`.
+- Add preload bridge methods in `src/preload.ts`.
+- Validate selected project roots before reading or writing relationship reports.
+- Do not expose raw paths beyond the existing selected-project contract.
+
+Verification:
+
+```bash
+npm run check
+npm test -- tests/unit tests/integration
+```
+
+Commit:
+
+```text
+feat: expose document relationship APIs
+```
+
+### Step 3: Renderer Workflow And Report View
+
+Goal: let users run analysis and inspect the latest report from the revised navigation model.
+
+Actions:
+
+- Add a global action for relationship analysis in the action bar or overflow area.
+- Render the workflow in the primary workspace, not the right context surface.
+- Show Norwegian labels and states for preparing context, analyzing, success, failure, and oversized-context failure.
+- Show latest report availability in project context without turning the right surface into workflow progress.
+- Add a primary-workspace report view for reading the latest Markdown report.
+- Keep global actions disabled or guarded during active relationship analysis.
+
+Verification:
+
+```bash
+npm run check
+npm run test:ui -- --grep "relationship|context|Codex"
+```
+
+Commit:
+
+```text
+feat(ui): add document relationship workflow
+```
+
+### Step 4: Exclusion, Regression Tests, And Documentation
+
+Goal: verify the report is traceable, excluded from future context, and safe to review.
+
+Actions:
+
+- Ensure `.sidekick/` and relationship reports are excluded from generated context packages.
+- Add integration tests for report writing, report reading, context hash metadata, Codex failure, and oversized context handling.
+- Add UI smoke tests for starting analysis, success, failure, and viewing the latest report.
+- Update task Build Log and Verification Log.
+
+Verification:
+
+```bash
+npm run check
+npm test
+npm run test:ui
+```
+
+Commit:
+
+```text
+test: cover document relationship workflow
+```
+
+### Final Verification Before Ready For Review
+
+Run from the task worktree:
+
+```bash
+npm run check
+npm test
+npm run test:ui
+```
+
+Final Ready For Review message should include:
+
+- worktree path;
+- commit list;
+- verification results;
+- any known limitations;
+- concrete human GUI checks:
+  - select a project;
+  - start relationship analysis;
+  - confirm a new context package is generated first;
+  - confirm the workflow runs in the primary workspace;
+  - confirm the report appears under `.sidekick/document-relationships.md`;
+  - confirm low-confidence/uncertainty sections are visible;
+  - confirm the latest report can be viewed in the GUI.
 
 ## Build Log
 
