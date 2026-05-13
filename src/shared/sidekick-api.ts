@@ -310,10 +310,10 @@ export type SidekickApi = {
   confirmProjectInitialization: (previewId: string) => Promise<ProjectInitializationResult>;
   previewContextPackage: (rootPath: string) => Promise<ContextPackagePreview>;
   generateContextPackage: (rootPath: string) => Promise<ContextPackageResult>;
-  previewFolderContextPackage: (
+  previewFolderContextPackage?: (
     request: FolderContextPackageRequest,
   ) => Promise<ContextPackagePreview>;
-  generateFolderContextPackage: (
+  generateFolderContextPackage?: (
     request: FolderContextPackageRequest,
   ) => Promise<ContextPackageResult>;
   previewTranscriptionImport: (rootPath: string) => Promise<TranscriptionImportPreview | null>;

@@ -937,6 +937,17 @@ textarea:disabled {
   margin-top: 10px;
 }
 
+.selection-actions {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.selection-action-button {
+  justify-self: start;
+  text-align: left;
+}
+
 .selection-contents-title {
   margin: 0;
   color: var(--text-3);

@@ -92,6 +92,10 @@ type VisibleTreeEntry = {
   parentPath?: string;
 };
 
+type ContextPackageTarget =
+  | { scope: 'project' }
+  | { scope: 'folder'; folderRelativePath: string };
+
 type AppView = 'workspace' | 'settings';
 type ActiveWorkflow = 'context-package' | 'transcription-import' | 'codex' | null;
 
@@ -183,6 +187,7 @@ const selectionLabelTarget = document.querySelector<HTMLElement>('[data-selectio
 const selectionTitleTarget = document.querySelector<HTMLElement>('[data-selection-title]');
 const selectionBreadcrumbTarget = document.querySelector<HTMLElement>('[data-selection-breadcrumb]');
 const selectionDetailsTarget = document.querySelector<HTMLElement>('[data-selection-details]');
+const selectionActionsTarget = document.querySelector<HTMLElement>('[data-selection-actions]');
 const selectionContentsTarget = document.querySelector<HTMLElement>('[data-selection-contents]');
 const overviewGenerateContextButton = document.querySelector<HTMLButtonElement>(
   '[data-overview-action-generate-context]',
@@ -288,6 +293,7 @@ let expandedPaths = new Set<string>();
 let selectedTreePath = ROOT_PATH;
 let focusedTreePath = ROOT_PATH;
 let contextPackageState: ContextPackageState = { status: 'unavailable' };
+let contextPackageTarget: ContextPackageTarget = { scope: 'project' };
 let overviewContextPackageStatus: OverviewContextPackageStatus = { status: 'unavailable' };
 let transcriptionImportState: TranscriptionImportState = { status: 'unavailable' };
 let projectCreationState: ProjectCreationState = {
@@ -548,6 +554,7 @@ const setActiveScan = (scan: ProjectFolderScan) => {
   focusedTreePath = scan.tree.relativePath;
   activeWorkflow = null;
   appView = 'workspace';
+  resetContextPackageTarget();
   setContextPackageStateForScan(scan);
   setOverviewContextPackageStatusForScan(scan);
   setTranscriptionImportStateForScan(scan);
@@ -559,6 +566,20 @@ const getActiveScan = () =>
   state.status === 'ready' || state.status === 'partial' ? state.scan : undefined;
 
 const isFolderNode = (node: FolderTreeNode) => node.kind === 'folder';
+
+const resetContextPackageTarget = () => {
+  contextPackageTarget = { scope: 'project' };
+};
+
+const openProjectContextPackageWorkflow = () => {
+  resetContextPackageTarget();
+  openWorkflow('context-package');
+};
+
+const openFolderContextPackageWorkflow = (folderRelativePath: string) => {
+  contextPackageTarget = { scope: 'folder', folderRelativePath };
+  openWorkflow('context-package');
+};
 
 const focusActiveWorkflow = () => {
   window.requestAnimationFrame(() => {
@@ -1096,9 +1117,37 @@ const appendSelectionWarnings = (warnings: string[]) => {
   selectionContentsTarget.append(title, list);
 };
 
+const renderSelectionActions = (node: FolderTreeNode) => {
+  if (!selectionActionsTarget) {
+    return;
+  }
+
+  selectionActionsTarget.replaceChildren();
+
+  if (!isFolderNode(node) || node.relativePath === ROOT_PATH) {
+    return;
+  }
+
+  const actionTitle = document.createElement('p');
+  actionTitle.className = 'selection-contents-title';
+  actionTitle.textContent = 'Handlinger';
+
+  const button = document.createElement('button');
+  button.className = 'btn btn-secondary btn-sm selection-action-button';
+  button.type = 'button';
+  button.textContent = 'Generer kontekstpakke for denne mappen';
+  button.toggleAttribute('disabled', isExclusiveWorkflowActive());
+  button.addEventListener('click', () => {
+    openFolderContextPackageWorkflow(node.relativePath);
+  });
+
+  selectionActionsTarget.append(actionTitle, button);
+};
+
 const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
   if (!scan) {
     selectionPanelTarget?.toggleAttribute('hidden', true);
+    selectionActionsTarget?.replaceChildren();
     return;
   }
 
@@ -1125,6 +1174,7 @@ const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
       ['Markdown/tekst', scan.summary.artifactTypeCounts['markdown-text'].toString()],
       ['Transkripsjoner', scan.summary.artifactTypeCounts.transcript.toString()],
     ]);
+    selectionActionsTarget?.replaceChildren();
     renderSelectionContents(node);
     appendSelectionWarnings(overviewWarnings(scan));
     return;
@@ -1153,6 +1203,7 @@ const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
     ]);
   }
 
+  renderSelectionActions(node);
   renderSelectionContents(node);
   appendSelectionWarnings(
     warnings.map((warning) =>
@@ -1452,17 +1503,34 @@ const renderContextPackageUnavailable = () => {
 };
 
 const renderContextPackageReady = (scan: ProjectFolderScan) => {
-  setText(contextPackageTitleTarget, 'Lag kontekstpakke');
+  const folderNode =
+    contextPackageTarget.scope === 'folder'
+      ? getNodeByPath(scan.tree, contextPackageTarget.folderRelativePath)
+      : undefined;
+
+  setText(
+    contextPackageTitleTarget,
+    contextPackageTarget.scope === 'folder'
+      ? 'Lag kontekstpakke for mappe'
+      : 'Lag kontekstpakke',
+  );
   setText(
     contextPackageMessageTarget,
-    'Forbered én Markdown-fil som samler prosjektmaterialet for bruk utenfor Sidekick.',
+    contextPackageTarget.scope === 'folder'
+      ? 'Forbered én Markdown-fil som samler innholdet i den valgte mappen.'
+      : 'Forbered én Markdown-fil som samler prosjektmaterialet for bruk utenfor Sidekick.',
   );
   renderContextPackageStateElements(createContextPackageSteps(1));
   renderContextPackageDetails([
     ['Prosjektmappe', scan.rootName],
-    ['Omfang', 'Hele valgt prosjektmappe'],
+    [
+      'Omfang',
+      contextPackageTarget.scope === 'folder'
+        ? `Valgt mappe: ${folderNode?.relativePath ?? contextPackageTarget.folderRelativePath}`
+        : 'Hele valgt prosjektmappe',
+    ],
     ['Format', 'Markdown'],
-    ['Plassering', 'Prosjektroten'],
+    ['Plassering', contextPackageTarget.scope === 'folder' ? 'Valgt mappe' : 'Prosjektroten'],
   ]);
   renderContextPackageList([]);
   renderContextPackageActions('Forhåndsvis', false, true);
@@ -1485,13 +1553,14 @@ const renderContextPackageConfirming = (preview: ContextPackagePreview) => {
     createWriteOperationBadge(),
     createWriteWarning(
       preview.willOverwrite
-        ? `Sidekick erstatter eksisterende ${preview.outputFileName} i prosjektroten.`
-        : `Sidekick skriver én Markdown-fil til prosjektroten: ${preview.outputFileName}.`,
+        ? `Sidekick erstatter eksisterende ${preview.outputFileName} i ${preview.scope === 'folder' ? 'valgt mappe' : 'prosjektroten'}.`
+        : `Sidekick skriver én Markdown-fil til ${preview.scope === 'folder' ? 'valgt mappe' : 'prosjektroten'}: ${preview.outputFileName}.`,
     ),
   );
   renderContextPackageDetails([
     ['Filnavn', preview.outputFileName],
-    ['Plassering', 'Prosjektroten'],
+    ['Omfang', preview.scope === 'folder' ? preview.targetRelativePath : 'Hele prosjektet'],
+    ['Plassering', preview.scope === 'folder' ? 'Valgt mappe' : 'Prosjektroten'],
     ['Overskriver', preview.willOverwrite ? 'Ja' : 'Nei'],
     ['Filsti', preview.outputPath],
   ]);
@@ -1501,7 +1570,12 @@ const renderContextPackageConfirming = (preview: ContextPackagePreview) => {
 
 const renderContextPackageGenerating = (preview: ContextPackagePreview) => {
   setText(contextPackageTitleTarget, 'Genererer kontekstpakke');
-  setText(contextPackageMessageTarget, 'Sidekick skriver kontekstpakken til prosjektmappen.');
+  setText(
+    contextPackageMessageTarget,
+    preview.scope === 'folder'
+      ? 'Sidekick skriver kontekstpakken til den valgte mappen.'
+      : 'Sidekick skriver kontekstpakken til prosjektmappen.',
+  );
   renderContextPackageStateElements(
     createContextPackageSteps(2),
     createWriteOperationBadge(),
@@ -1509,6 +1583,7 @@ const renderContextPackageGenerating = (preview: ContextPackagePreview) => {
   );
   renderContextPackageDetails([
     ['Filnavn', preview.outputFileName],
+    ['Omfang', preview.scope === 'folder' ? preview.targetRelativePath : 'Hele prosjektet'],
     ['Filsti', preview.outputPath],
   ]);
   renderContextPackageList([]);
@@ -1533,11 +1608,14 @@ const renderContextPackageComplete = (result: ContextPackageResult) => {
     createResultBanner(
       'success',
       'Kontekstpakken er klar',
-      result.overwritten ? 'Filen ble skrevet over i prosjektroten.' : 'Filen ble skrevet til prosjektroten.',
+      result.overwritten
+        ? `Filen ble skrevet over i ${result.scope === 'folder' ? 'valgt mappe' : 'prosjektroten'}.`
+        : `Filen ble skrevet til ${result.scope === 'folder' ? 'valgt mappe' : 'prosjektroten'}.`,
     ),
   );
   renderContextPackageDetails([
     ['Filnavn', result.outputFileName],
+    ['Omfang', result.scope === 'folder' ? result.targetRelativePath : 'Hele prosjektet'],
     ['Filsti', result.outputPath],
     ['Overskrevet', result.overwritten ? 'Ja' : 'Nei'],
     ['Inkludert', result.totalFiles.toString()],
@@ -2723,7 +2801,17 @@ const openContextPackageConfirmation = async () => {
   render();
 
   try {
-    const preview = await window.sidekick.previewContextPackage(scan.rootPath);
+    const preview =
+      contextPackageTarget.scope === 'folder'
+        ? window.sidekick.previewFolderContextPackage
+          ? await window.sidekick.previewFolderContextPackage({
+              rootPath: scan.rootPath,
+              folderRelativePath: contextPackageTarget.folderRelativePath,
+            })
+          : (() => {
+              throw new Error('Folder-scoped context packages are not available.');
+            })()
+        : await window.sidekick.previewContextPackage(scan.rootPath);
     contextPackageState = { status: 'confirming', preview };
   } catch (error) {
     contextPackageState = {
@@ -2748,8 +2836,22 @@ const generateContextPackage = async () => {
   render();
 
   try {
-    const result = await window.sidekick.generateContextPackage(scan.rootPath);
-    const selectedPathAfterScan = getNodeByPath(result.scan.tree, selectedTreePath)
+    const result =
+      preview.scope === 'folder'
+        ? window.sidekick.generateFolderContextPackage
+          ? await window.sidekick.generateFolderContextPackage({
+              rootPath: scan.rootPath,
+              folderRelativePath: preview.targetRelativePath,
+            })
+          : (() => {
+              throw new Error('Folder-scoped context packages are not available.');
+            })()
+        : await window.sidekick.generateContextPackage(scan.rootPath);
+    const preferredSelectedPath =
+      result.scope === 'folder' ? result.targetRelativePath : selectedTreePath;
+    const selectedPathAfterScan = getNodeByPath(result.scan.tree, preferredSelectedPath)
+      ? preferredSelectedPath
+      : getNodeByPath(result.scan.tree, selectedTreePath)
       ? selectedTreePath
       : result.scan.tree.relativePath;
     state =
@@ -2758,14 +2860,20 @@ const generateContextPackage = async () => {
         : { status: 'ready', scan: result.scan };
     selectedTreePath = selectedPathAfterScan;
     focusedTreePath = selectedPathAfterScan;
-    expandedPaths = new Set([...expandedPaths, ROOT_PATH]);
+    expandedPaths = new Set([
+      ...expandedPaths,
+      ROOT_PATH,
+      ...getPathAncestors(result.scan, selectedPathAfterScan).map((node) => node.relativePath),
+    ]);
     setTranscriptionImportStateForScan(result.scan);
     contextPackageState = { status: 'complete', result };
-    overviewContextPackageStatus = {
-      status: 'exists',
-      rootPath: result.scan.rootPath,
-      outputFileName: result.outputFileName,
-    };
+    if (result.scope === 'project') {
+      overviewContextPackageStatus = {
+        status: 'exists',
+        rootPath: result.scan.rootPath,
+        outputFileName: result.outputFileName,
+      };
+    }
     void refreshCodexStatus(result.scan);
   } catch (error) {
     contextPackageState = {
@@ -3423,7 +3531,7 @@ expandAllButton?.addEventListener('click', expandAllFolders);
 collapseAllButton?.addEventListener('click', collapseAllFolders);
 contextPackagePrimaryButton?.addEventListener('click', handleContextPackagePrimary);
 overviewGenerateContextButton?.addEventListener('click', () => {
-  openWorkflow('context-package');
+  openProjectContextPackageWorkflow();
 });
 contextPackageSecondaryButton?.addEventListener('click', () => {
   closeActiveWorkflow();

@@ -142,7 +142,10 @@ const mockScan: ProjectFolderScan = {
 };
 
 const mockContextPackagePreview: ContextPackagePreview = {
+  scope: 'project',
   rootPath: '/tmp/sidekick-project',
+  targetPath: '/tmp/sidekick-project',
+  targetRelativePath: '.',
   outputPath: '/tmp/sidekick-project/sidekick-project.context-package.md',
   outputFileName: 'sidekick-project.context-package.md',
   willOverwrite: true,
@@ -153,7 +156,10 @@ const mockContextPackagePreview: ContextPackagePreview = {
 
 const mockContextPackageResult: ContextPackageResult = {
   status: 'complete',
+  scope: 'project',
   rootPath: '/tmp/sidekick-project',
+  targetPath: '/tmp/sidekick-project',
+  targetRelativePath: '.',
   outputPath: '/tmp/sidekick-project/sidekick-project.context-package.md',
   outputFileName: 'sidekick-project.context-package.md',
   overwritten: true,
@@ -1261,6 +1267,160 @@ test('confirms and displays a generated context package', async ({ page }) => {
     page.getByRole('tree', { name: 'Skannet mappetre' }).getByText('sidekick-project.context-package.md'),
   ).toBeVisible();
   await expect(page.locator('[data-overview-stats]')).toContainText('4');
+});
+
+test('generates a folder-scoped context package from selected folder context', async ({ page }) => {
+  const folderPreview: ContextPackagePreview = {
+    ...mockContextPackagePreview,
+    scope: 'folder',
+    targetPath: '/tmp/sidekick-project/02-transkripsjoner',
+    targetRelativePath: '02-transkripsjoner',
+    outputPath: '/tmp/sidekick-project/02-transkripsjoner/transkripsjoner.context-package.md',
+    outputFileName: 'transkripsjoner.context-package.md',
+    willOverwrite: false,
+  };
+  const folderResult: ContextPackageResult = {
+    ...mockContextPackageResult,
+    scope: 'folder',
+    targetPath: '/tmp/sidekick-project/02-transkripsjoner',
+    targetRelativePath: '02-transkripsjoner',
+    outputPath: '/tmp/sidekick-project/02-transkripsjoner/transkripsjoner.context-package.md',
+    outputFileName: 'transkripsjoner.context-package.md',
+    overwritten: false,
+    scan: {
+      ...mockContextPackageResult.scan,
+      tree: {
+        ...mockContextPackageResult.scan.tree,
+        children: mockContextPackageResult.scan.tree.children?.map((child) =>
+          child.relativePath === '02-transkripsjoner'
+            ? {
+                ...child,
+                children: [
+                  ...(child.children ?? []),
+                  {
+                    name: 'transkripsjoner.context-package.md',
+                    relativePath: '02-transkripsjoner/transkripsjoner.context-package.md',
+                    kind: 'file' as const,
+                    artifactType: 'markdown-text' as const,
+                    contextHints: [],
+                    size: 4096,
+                    modifiedAt: '2026-05-09T12:12:00.000Z',
+                  },
+                ],
+              }
+            : child,
+        ),
+      },
+    },
+  };
+
+  await page.addInitScript(
+    ({ scan, preview, result }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseProjectFolder: async () => scan,
+        chooseProjectParentFolder: async () => null,
+        createProjectFolder: async () => null,
+        previewContextPackage: async () => {
+          throw new Error('Use folder preview in this test.');
+        },
+        generateContextPackage: async () => {
+          throw new Error('Use folder generation in this test.');
+        },
+        previewFolderContextPackage: async () => preview,
+        generateFolderContextPackage: async () => result,
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+      };
+    },
+    {
+      scan: mockScan,
+      preview: folderPreview,
+      result: folderResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.locator('.tree-row[data-tree-path="02-transkripsjoner"]').click();
+
+  await expect(page.locator('[data-selection-title]')).toHaveText('02-transkripsjoner');
+  await expect(
+    page.getByRole('button', { name: 'Generer kontekstpakke for denne mappen' }),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Generer kontekstpakke for denne mappen' }).click();
+  await expect(page.getByRole('heading', { name: 'Lag kontekstpakke for mappe' })).toBeVisible();
+  await expect(page.locator('[data-selection-title]')).toHaveText('02-transkripsjoner');
+
+  await page.getByRole('button', { name: 'Forhåndsvis' }).click();
+  const contextPackageDetails = page.locator('[data-context-package-details]');
+  await expect(page.getByRole('heading', { name: 'Bekreft kontekstpakke' })).toBeVisible();
+  await expect(contextPackageDetails).toContainText('02-transkripsjoner');
+  await expect(contextPackageDetails).toContainText('transkripsjoner.context-package.md');
+  await expect(contextPackageDetails).toContainText(
+    '/tmp/sidekick-project/02-transkripsjoner/transkripsjoner.context-package.md',
+  );
+  await expect(page.getByText(/Sidekick skriver én Markdown-fil til valgt mappe/)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Generer pakke' }).click();
+  await expect(page.getByRole('heading', { name: 'Kontekstpakke generert' })).toBeVisible();
+  await expect(contextPackageDetails).toContainText('02-transkripsjoner');
+  await page.getByRole('button', { name: 'Tilbake' }).click();
+  await expect(
+    page.getByRole('tree', { name: 'Skannet mappetre' }).getByText('transkripsjoner.context-package.md'),
+  ).toBeVisible();
+});
+
+test('shows folder-scoped context package action only for non-root folders', async ({ page }) => {
+  await page.addInitScript(({ scan }) => {
+    window.sidekick = {
+      getAppInfo: async () => ({
+        name: 'Sidekick',
+        version: '1.0.0',
+        platform: 'linux',
+        isPackaged: false,
+      }),
+      chooseProjectFolder: async () => scan,
+      chooseProjectParentFolder: async () => null,
+      createProjectFolder: async () => null,
+      previewContextPackage: async () => {
+        throw new Error('No context package preview.');
+      },
+      generateContextPackage: async () => {
+        throw new Error('No context package result.');
+      },
+      previewTranscriptionImport: async () => null,
+      confirmTranscriptionImport: async () => {
+        throw new Error('No transcription import preview.');
+      },
+    };
+  }, { scan: mockScan });
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+
+  await expect(
+    page.getByRole('button', { name: 'Generer kontekstpakke for denne mappen' }),
+  ).toBeHidden();
+
+  await page.locator('.tree-row[data-tree-path="01-bakgrunn"]').click();
+  await expect(
+    page.getByRole('button', { name: 'Generer kontekstpakke for denne mappen' }),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Utvid 01-bakgrunn' }).click();
+  await page.locator('.tree-row[data-tree-path="01-bakgrunn/notes.md"]').click();
+  await expect(
+    page.getByRole('button', { name: 'Generer kontekstpakke for denne mappen' }),
+  ).toBeHidden();
 });
 
 test('shows no-write feedback when context package preview fails', async ({ page }) => {
