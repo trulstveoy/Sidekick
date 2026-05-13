@@ -7,6 +7,7 @@ import type {
   FolderSignal,
   ProjectCreationResult,
   ProjectFolderScan,
+  ProjectInfoSnapshot,
   ProjectInitializationPreview,
   ProjectInitializationResult,
   TranscriptionImportPreview,
@@ -151,6 +152,20 @@ const mockContextPackagePreview: ContextPackagePreview = {
   selfIgnoreWarning: 'Generated context-package files are ignored during generation.',
 };
 
+const mockProjectInfo: ProjectInfoSnapshot = {
+  status: 'complete',
+  path: '/tmp/sidekick-project/.sidekick/project-info.md',
+  generatedAt: '2026-05-09T12:10:00.000Z',
+  sourceScope: 'full-project',
+  contextPackagePath: './sidekick-project.context-package.md',
+  contextPackageSha256: 'abc123',
+  summaryLanguage: 'nb',
+  projectSummary: 'Prosjektet handler om lokal prosjektforståelse og kontekstpakker.',
+  participants: '- Sidekick-teamet',
+  themes: ['Lokal lagring', 'Kontekstpakker'],
+  openQuestions: ['Hvordan skal metadata utvikles?'],
+};
+
 const mockContextPackageResult: ContextPackageResult = {
   status: 'complete',
   rootPath: '/tmp/sidekick-project',
@@ -167,6 +182,10 @@ const mockContextPackageResult: ContextPackageResult = {
     { path: '02-transkripsjoner/intervju-01.docx', reason: 'binary-extension' },
   ],
   warnings: [{ path: '03-modeller/model.md', message: 'Suspicious file content detected.' }],
+  projectSummary: {
+    status: 'complete',
+    projectInfo: mockProjectInfo,
+  },
   scan: {
     ...mockScan,
     scannedAt: '2026-05-09T12:10:00.000Z',
@@ -997,6 +1016,7 @@ test('expands and collapses scanned folders', async ({ page }) => {
         createProjectFolder: async () => null,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => result,
+        readProjectInfo: async () => result.projectSummary.projectInfo ?? mockProjectInfo,
         previewTranscriptionImport: async () => null,
         confirmTranscriptionImport: async () => {
           throw new Error('No transcription import preview.');
@@ -1253,6 +1273,7 @@ test('confirms and displays a generated context package', async ({ page }) => {
   await expect(contextPackageDetails).toContainText('Hoppet over');
   await expect(contextPackageDetails).toContainText('Tokens');
   await expect(contextPackageDetails).toContainText('523');
+  await expect(contextPackageDetails).toContainText('Prosjektsammendrag oppdatert');
   await expect(page.getByText('01-bakgrunn/brief.pdf: binary-extension')).toBeVisible();
   await expect(page.getByText('03-modeller/model.md: Suspicious file content detected.')).toBeVisible();
   await expect(page.locator('[data-selection-details]')).toContainText('Finnes');
@@ -1260,6 +1281,8 @@ test('confirms and displays a generated context package', async ({ page }) => {
   await expect(
     page.getByRole('tree', { name: 'Skannet mappetre' }).getByText('sidekick-project.context-package.md'),
   ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Prosjektsammendrag' })).toBeVisible();
+  await expect(page.getByText('Prosjektet handler om lokal prosjektforståelse')).toBeVisible();
   await expect(page.locator('[data-overview-stats]')).toContainText('4');
 });
 

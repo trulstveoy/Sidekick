@@ -36,6 +36,20 @@ if (args[0] === 'exec') {
     input += chunk.toString();
   });
   process.stdin.on('end', () => {
+    if (!args.includes('--json')) {
+      console.log('## Project Summary');
+      console.log('');
+      console.log('Prosjektet handler om Sidekick.');
+      console.log('');
+      console.log('## Participants');
+      console.log('');
+      console.log('- Sidekick-teamet');
+      console.log('');
+      console.log('## Themes');
+      console.log('');
+      console.log('- Lokal kontekst');
+      process.exit(0);
+    }
     console.log(JSON.stringify({ type: 'argv', args }));
     console.log(JSON.stringify({ type: 'stdin', input }));
     process.exit(0);
@@ -108,6 +122,17 @@ describe('codex runner', () => {
         '-',
       ],
     });
+  });
+
+  it('can run a non-streaming text response for internal workflows', async () => {
+    const fake = await createFakeCodex();
+    const runner = new CodexRunner(fake.executablePath);
+
+    const result = await runner.runExecText(fake.rootPath, 'summarize this folder', 'read-only');
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('## Project Summary');
+    expect(result.stdout).toContain('## Themes');
   });
 
   it('enforces one active run and supports cancellation', async () => {

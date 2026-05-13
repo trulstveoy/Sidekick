@@ -1,7 +1,8 @@
-import { cp, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { CodexRunner } from '../../src/main/codex-runner';
 import {
   generateContextPackage,
   getContextPackageOutputPath,
@@ -18,6 +19,34 @@ const copyFixtureToTemp = async () => {
 
   return rootPath;
 };
+
+const summaryMarkdown = [
+  '## Project Summary',
+  '',
+  'Prosjektet handler om Sidekick.',
+  '',
+  '## Participants',
+  '',
+  '- Sidekick-teamet',
+  '',
+  '## Themes',
+  '',
+  '- Lokal kontekst',
+].join('\n');
+
+const fakeCodexRunner = {
+  getStatus: async () => ({
+    state: 'ready',
+    available: true,
+    loggedIn: true,
+  }),
+  runExecText: async () => ({
+    code: 0,
+    signal: null,
+    stdout: summaryMarkdown,
+    stderr: '',
+  }),
+} as unknown as CodexRunner;
 
 describe('context package generation', () => {
   afterEach(async () => {
@@ -46,13 +75,16 @@ describe('context package generation', () => {
     const rootPath = await copyFixtureToTemp();
     const outputPath = getContextPackageOutputPath(rootPath);
     await writeFile(outputPath, 'SHOULD_NOT_BE_INCLUDED');
+    await mkdir(path.join(rootPath, '.sidekick'), { recursive: true });
+    await writeFile(path.join(rootPath, '.sidekick', 'project-info.md'), 'SIDEKICK_METADATA_SECRET');
 
-    const result = await generateContextPackage(rootPath);
+    const result = await generateContextPackage(rootPath, { codexRunner: fakeCodexRunner });
     const output = await readFile(outputPath, 'utf8');
     const outputStats = await stat(outputPath);
     const skippedPaths = result.skippedFiles.map((file) => file.path);
 
     expect(result.status).toBe('complete');
+    expect(result.projectSummary.status).toBe('complete');
     expect(result.outputPath).toBe(outputPath);
     expect(result.outputFileName).toBe(`${path.basename(rootPath)}.context-package.md`);
     expect(result.overwritten).toBe(true);
@@ -78,5 +110,6 @@ describe('context package generation', () => {
     expect(output).toContain('marked-notes.md');
     expect(output).toContain('intervju-01.txt');
     expect(output).not.toContain('SHOULD_NOT_BE_INCLUDED');
+    expect(output).not.toContain('SIDEKICK_METADATA_SECRET');
   });
 });

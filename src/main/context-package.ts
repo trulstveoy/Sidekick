@@ -1,12 +1,20 @@
-import { stat } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type {
   ContextPackagePreview,
   ContextPackageResult,
   ContextPackageSkippedFile,
   ContextPackageWarning,
+  ProjectSummaryGenerationResult,
 } from '../shared/sidekick-api';
+import { CodexRunner } from './codex-runner';
 import { scanProjectFolder } from './folder-scanner';
+import { writeProjectInfo } from './project-info';
+import {
+  createFailedProjectSummaryResult,
+  generateProjectSummaryMarkdown,
+} from './project-summary';
 import { runRepomixContextPackage } from './repomix-runner';
 
 export const CONTEXT_PACKAGE_SUFFIX = 'context-package.md';
@@ -22,6 +30,7 @@ export const CONTEXT_PACKAGE_IGNORE_PATTERNS = [
   'dist/**',
   '.vite/**',
   '.cache/**',
+  '.sidekick/**',
 ];
 
 export const BINARY_FILE_WARNING =
@@ -61,6 +70,12 @@ export const createContextPackageFileName = (rootPath: string) => {
 
 export const getContextPackageOutputPath = (rootPath: string) =>
   path.join(rootPath, createContextPackageFileName(rootPath));
+
+export const calculateFileSha256 = async (filePath: string) => {
+  const contents = await readFile(filePath);
+
+  return createHash('sha256').update(contents).digest('hex');
+};
 
 const pathExists = async (targetPath: string) => {
   try {
@@ -115,8 +130,45 @@ const toWarnings = (
     })),
   );
 
+type GenerateContextPackageOptions = {
+  codexRunner?: CodexRunner;
+};
+
+const generateProjectSummary = async (
+  rootPath: string,
+  contextPackagePath: string,
+  codexRunner: CodexRunner,
+): Promise<ProjectSummaryGenerationResult> => {
+  const contextPackageSha256 = await calculateFileSha256(contextPackagePath);
+
+  try {
+    const summary = await generateProjectSummaryMarkdown({
+      rootPath,
+      contextPackagePath,
+      codexRunner,
+    });
+    const projectInfo = await writeProjectInfo({
+      rootPath,
+      contextPackagePath,
+      contextPackageSha256,
+      summaryMarkdown: summary.markdown,
+    });
+
+    return {
+      status: 'complete',
+      projectInfo,
+    };
+  } catch (error) {
+    return createFailedProjectSummaryResult(
+      rootPath,
+      error instanceof Error ? error.message : 'Project summary generation failed.',
+    );
+  }
+};
+
 export const generateContextPackage = async (
   rootPath: string,
+  options: GenerateContextPackageOptions = {},
 ): Promise<ContextPackageResult> => {
   const preview = await getContextPackagePreview(rootPath);
   const { packResult } = await runRepomixContextPackage({
@@ -126,6 +178,11 @@ export const generateContextPackage = async (
   });
 
   const outputStats = await stat(preview.outputPath);
+  const projectSummary = await generateProjectSummary(
+    rootPath,
+    preview.outputPath,
+    options.codexRunner ?? new CodexRunner(),
+  );
   const scan = await scanProjectFolder(rootPath);
 
   return {
@@ -141,6 +198,7 @@ export const generateContextPackage = async (
     processedFiles: packResult.processedFiles.map((file) => file.path).sort(),
     skippedFiles: toSkippedFiles(packResult.skippedFiles),
     warnings: toWarnings(packResult.suspiciousFilesResults),
+    projectSummary,
     scan,
   };
 };

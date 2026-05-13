@@ -14,6 +14,7 @@ const sidekickApi: SidekickApi = {
     ipcRenderer.invoke('project-folder:confirm-initialization', previewId),
   previewContextPackage: (rootPath) => ipcRenderer.invoke('context-package:preview', rootPath),
   generateContextPackage: (rootPath) => ipcRenderer.invoke('context-package:generate', rootPath),
+  readProjectInfo: (rootPath) => ipcRenderer.invoke('project-info:read', rootPath),
   previewTranscriptionImport: (rootPath) =>
     ipcRenderer.invoke('transcription:preview-import', rootPath),
   confirmTranscriptionImport: (previewId) =>

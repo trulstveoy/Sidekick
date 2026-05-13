@@ -30,5 +30,6 @@ describe('context package helpers', () => {
     expect(CONTEXT_PACKAGE_IGNORE_PATTERNS).toContain('*context-package*');
     expect(CONTEXT_PACKAGE_IGNORE_PATTERNS).toContain('node_modules/**');
     expect(CONTEXT_PACKAGE_IGNORE_PATTERNS).toContain('dist/**');
+    expect(CONTEXT_PACKAGE_IGNORE_PATTERNS).toContain('.sidekick/**');
   });
 });

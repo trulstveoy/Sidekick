@@ -157,6 +157,28 @@ export type ContextPackageWarning = {
   message: string;
 };
 
+export type ProjectInfoSnapshot = {
+  status: 'missing' | 'complete' | 'invalid';
+  path: string;
+  generatedAt?: string;
+  sourceScope?: 'full-project';
+  contextPackagePath?: string;
+  contextPackageSha256?: string;
+  summaryLanguage?: 'nb';
+  projectSummary?: string;
+  participants?: string;
+  themes?: string[];
+  openQuestions?: string[];
+  message?: string;
+};
+
+export type ProjectSummaryGenerationResult = {
+  status: 'complete' | 'failed';
+  projectInfo?: ProjectInfoSnapshot;
+  previousProjectInfo?: ProjectInfoSnapshot;
+  message?: string;
+};
+
 export type ContextPackagePreview = {
   rootPath: string;
   outputPath: string;
@@ -179,6 +201,7 @@ export type ContextPackageResult = {
   processedFiles: string[];
   skippedFiles: ContextPackageSkippedFile[];
   warnings: ContextPackageWarning[];
+  projectSummary: ProjectSummaryGenerationResult;
   scan: ProjectFolderScan;
 };
 
@@ -297,6 +320,7 @@ export type SidekickApi = {
   confirmProjectInitialization: (previewId: string) => Promise<ProjectInitializationResult>;
   previewContextPackage: (rootPath: string) => Promise<ContextPackagePreview>;
   generateContextPackage: (rootPath: string) => Promise<ContextPackageResult>;
+  readProjectInfo: (rootPath: string) => Promise<ProjectInfoSnapshot>;
   previewTranscriptionImport: (rootPath: string) => Promise<TranscriptionImportPreview | null>;
   confirmTranscriptionImport: (previewId: string) => Promise<TranscriptionImportResult>;
   getCodexStatus: (rootPath: string) => Promise<CodexStatus>;

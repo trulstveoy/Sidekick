@@ -952,6 +952,26 @@ textarea:disabled {
   line-height: 1.5;
 }
 
+.selection-summary,
+.selection-summary-meta {
+  margin: 0;
+  color: var(--text-1);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.selection-summary-meta {
+  color: var(--text-2);
+}
+
+.selection-summary-details {
+  margin: 0;
+}
+
+.selection-summary-list {
+  margin: 0;
+}
+
 .direct-content-list {
   display: grid;
   gap: 3px;

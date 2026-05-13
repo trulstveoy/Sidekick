@@ -14,6 +14,7 @@ import type {
 import { generateContextPackage, getContextPackagePreview } from './main/context-package';
 import { CodexRunner } from './main/codex-runner';
 import { scanProjectFolder } from './main/folder-scanner';
+import { readProjectInfo } from './main/project-info';
 import { createProjectFolder } from './main/project-creator';
 import {
   confirmProjectInitialization,
@@ -210,7 +211,11 @@ ipcMain.handle('context-package:preview', (_event, rootPath) =>
 );
 
 ipcMain.handle('context-package:generate', (_event, rootPath) =>
-  generateContextPackage(assertKnownProjectRoot(rootPath)),
+  generateContextPackage(assertKnownProjectRoot(rootPath), { codexRunner }),
+);
+
+ipcMain.handle('project-info:read', (_event, rootPath) =>
+  readProjectInfo(assertKnownProjectRoot(rootPath)),
 );
 
 ipcMain.handle('transcription:preview-import', async (event, rootPath) => {

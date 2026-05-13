@@ -50,6 +50,17 @@ export const buildCodexExecArgs = (rootPath: string, mode: CodexRunMode) => [
   '-',
 ];
 
+export const buildCodexExecTextArgs = (rootPath: string, mode: CodexRunMode) => [
+  'exec',
+  '--ephemeral',
+  '--skip-git-repo-check',
+  '--cd',
+  rootPath,
+  '--sandbox',
+  mode,
+  '-',
+];
+
 export const buildCodexLoginArgs = () => ['login', '--device-auth'];
 
 export const parseCodexJsonLine = (line: string): unknown | undefined => {
@@ -319,6 +330,67 @@ export class CodexRunner extends EventEmitter {
     });
 
     return runId;
+  }
+
+  runExecText(rootPath: string, prompt: string, mode: CodexRunMode): Promise<ProcessResult> {
+    const trimmedPrompt = prompt.trim();
+
+    if (!trimmedPrompt) {
+      throw new Error('Enter a Codex prompt before running.');
+    }
+
+    if (this.activeRun) {
+      throw new Error('A Codex run is already active.');
+    }
+
+    return new Promise((resolve) => {
+      const child = spawn(this.executable.command, buildCodexExecTextArgs(rootPath, mode), {
+        cwd: rootPath,
+        detached: process.platform !== 'win32',
+        shell: this.executable.shell,
+        windowsHide: true,
+      });
+      const stdout: Buffer[] = [];
+      const stderr: Buffer[] = [];
+
+      this.activeRun = {
+        process: child,
+        mode,
+        canceled: false,
+      };
+
+      child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
+      child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
+
+      const complete = (result: ProcessResult) => {
+        if (this.activeRun?.process === child) {
+          this.activeRun = undefined;
+        }
+
+        resolve(result);
+      };
+
+      child.on('error', (error) => {
+        complete({
+          code: null,
+          signal: null,
+          stdout: Buffer.concat(stdout).toString('utf8'),
+          stderr: Buffer.concat(stderr).toString('utf8'),
+          error,
+        });
+      });
+
+      child.on('close', (code, signal) => {
+        complete({
+          code,
+          signal,
+          stdout: Buffer.concat(stdout).toString('utf8'),
+          stderr: Buffer.concat(stderr).toString('utf8'),
+        });
+      });
+
+      child.stdin.end(trimmedPrompt);
+    });
   }
 
   cancel(runId: string) {

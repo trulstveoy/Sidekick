@@ -14,6 +14,7 @@ import type {
   AppSettingsSnapshot,
   ProjectCreationResult,
   ProjectFolderScan,
+  ProjectInfoSnapshot,
   ProjectInitializationPreview,
   ProjectInitializationResult,
   ScanWarning,
@@ -304,6 +305,8 @@ let codexState: CodexState = { status: 'unavailable', message: 'Choose a folder 
 let appView: AppView = 'workspace';
 let activeWorkflow: ActiveWorkflow = null;
 let settingsState: SettingsState = { status: 'idle', message: '' };
+let projectInfoState: { rootPath: string; snapshot: ProjectInfoSnapshot; message?: string } | null =
+  null;
 
 if (!workflowHostTarget && legacyWorkflowSurfaceTarget) {
   // Vite HMR can update renderer code while leaving an older index.html DOM in
@@ -553,6 +556,8 @@ const setActiveScan = (scan: ProjectFolderScan) => {
   setTranscriptionImportStateForScan(scan);
   setCodexStateForScan(scan);
   state = scan.status === 'partial' ? { status: 'partial', scan } : { status: 'ready', scan };
+  projectInfoState = null;
+  void refreshProjectInfo(scan);
 };
 
 const getActiveScan = () =>
@@ -1096,6 +1101,97 @@ const appendSelectionWarnings = (warnings: string[]) => {
   selectionContentsTarget.append(title, list);
 };
 
+const projectInfoStatusText = (scan: ProjectFolderScan) => {
+  if (!projectInfoState || projectInfoState.rootPath !== scan.rootPath) {
+    return 'Sjekker';
+  }
+
+  if (projectInfoState.message) {
+    return 'Feilet';
+  }
+
+  switch (projectInfoState.snapshot.status) {
+    case 'complete':
+      return projectInfoState.snapshot.generatedAt
+        ? `Oppdatert ${formatDate(projectInfoState.snapshot.generatedAt)}`
+        : 'Tilgjengelig';
+    case 'invalid':
+      return 'Ugyldig';
+    case 'missing':
+      return 'Mangler';
+  }
+};
+
+const appendProjectSummary = (scan: ProjectFolderScan) => {
+  if (!selectionContentsTarget || !projectInfoState || projectInfoState.rootPath !== scan.rootPath) {
+    return;
+  }
+
+  const { snapshot, message } = projectInfoState;
+  const title = document.createElement('h3');
+  title.className = 'selection-contents-title';
+  title.textContent = 'Prosjektsammendrag';
+
+  if (snapshot.status !== 'complete') {
+    const empty = document.createElement('p');
+    empty.className = 'selection-empty';
+    empty.textContent =
+      message ??
+      (snapshot.status === 'invalid'
+        ? snapshot.message ?? 'Prosjektsammendraget kan ikke leses.'
+        : 'Ingen prosjektsammendrag er generert ennå.');
+    selectionContentsTarget.append(title, empty);
+    return;
+  }
+
+  const summary = document.createElement('p');
+  summary.className = 'selection-summary';
+  summary.textContent = snapshot.projectSummary ?? '';
+
+  const details = document.createElement('dl');
+  details.className = 'detail-list selection-summary-details';
+  const rows: DetailRow[] = [
+      ['Oppdatert', snapshot.generatedAt ? formatDate(snapshot.generatedAt) : 'Ukjent'],
+      ['Kilde', snapshot.contextPackagePath ?? 'Ukjent'],
+    ];
+  details.append(...rows.map(createDetailRow));
+
+  const fragments: HTMLElement[] = [title, summary, details];
+
+  if (snapshot.participants) {
+    const participants = document.createElement('p');
+    participants.className = 'selection-summary-meta';
+    participants.textContent = `Deltakere: ${snapshot.participants.replace(/\n+/g, ' ')}`;
+    fragments.push(participants);
+  }
+
+  if (snapshot.themes && snapshot.themes.length > 0) {
+    const themeList = document.createElement('ul');
+    themeList.className = 'plain-list selection-summary-list';
+    themeList.append(...snapshot.themes.map(createListItem));
+    fragments.push(themeList);
+  }
+
+  if (snapshot.openQuestions && snapshot.openQuestions.length > 0) {
+    const questionsTitle = document.createElement('h3');
+    questionsTitle.className = 'selection-contents-title';
+    questionsTitle.textContent = 'Åpne spørsmål';
+    const questionList = document.createElement('ul');
+    questionList.className = 'plain-list selection-summary-list';
+    questionList.append(...snapshot.openQuestions.map(createListItem));
+    fragments.push(questionsTitle, questionList);
+  }
+
+  if (message) {
+    const warning = document.createElement('p');
+    warning.className = 'selection-empty';
+    warning.textContent = message;
+    fragments.push(warning);
+  }
+
+  selectionContentsTarget.append(...fragments);
+};
+
 const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
   if (!scan) {
     selectionPanelTarget?.toggleAttribute('hidden', true);
@@ -1121,11 +1217,13 @@ const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
       ['Skannet', formatDate(scan.scannedAt)],
       ['Status', scan.status === 'partial' ? 'Delvis' : 'Fullført'],
       ['Kontekstpakke', contextPackageStatusText(scan)],
+      ['Prosjektsammendrag', projectInfoStatusText(scan)],
       ['Varsler', overviewWarningCount(scan) > 0 ? overviewWarningCount(scan).toString() : 'Ingen'],
       ['Markdown/tekst', scan.summary.artifactTypeCounts['markdown-text'].toString()],
       ['Transkripsjoner', scan.summary.artifactTypeCounts.transcript.toString()],
     ]);
     renderSelectionContents(node);
+    appendProjectSummary(scan);
     appendSelectionWarnings(overviewWarnings(scan));
     return;
   }
@@ -1522,6 +1620,10 @@ const renderContextPackageComplete = (result: ContextPackageResult) => {
   const warningPreview = result.warnings.map((warning) =>
     warning.path ? `${warning.path}: ${warning.message}` : warning.message,
   );
+  const summaryStatus =
+    result.projectSummary.status === 'complete'
+      ? 'Prosjektsammendrag oppdatert'
+      : `Prosjektsammendrag feilet: ${result.projectSummary.message ?? 'Ukjent feil'}`;
 
   setText(contextPackageTitleTarget, 'Kontekstpakke generert');
   setText(
@@ -1545,6 +1647,7 @@ const renderContextPackageComplete = (result: ContextPackageResult) => {
     ['Tokens', result.totalTokens.toString()],
     ['Tegn', result.totalCharacters.toString()],
     ['Størrelse', formatBytes(result.outputBytes)],
+    ['Prosjektsammendrag', summaryStatus],
   ]);
   renderContextPackageList([
     ...warningPreview,
@@ -2306,6 +2409,45 @@ const refreshOverviewContextPackageStatus = async (scan: ProjectFolderScan) => {
   render();
 };
 
+const refreshProjectInfo = async (scan: ProjectFolderScan) => {
+  if (!window.sidekick) {
+    return;
+  }
+
+  const rootPath = scan.rootPath;
+
+  try {
+    const snapshot = await window.sidekick.readProjectInfo(rootPath);
+    const activeScan = getActiveScan();
+
+    if (!activeScan || activeScan.rootPath !== rootPath) {
+      return;
+    }
+
+    projectInfoState = {
+      rootPath,
+      snapshot,
+    };
+  } catch (error) {
+    const activeScan = getActiveScan();
+
+    if (!activeScan || activeScan.rootPath !== rootPath) {
+      return;
+    }
+
+    projectInfoState = {
+      rootPath,
+      snapshot: {
+        status: 'invalid',
+        path: '',
+        message: error instanceof Error ? error.message : 'Kunne ikke lese prosjektsammendrag.',
+      },
+    };
+  }
+
+  render();
+};
+
 const renderNoScanPanels = () => {
   overviewEmptyTarget?.toggleAttribute('hidden', true);
   renderOverviewScanStatus();
@@ -2761,6 +2903,16 @@ const generateContextPackage = async () => {
     expandedPaths = new Set([...expandedPaths, ROOT_PATH]);
     setTranscriptionImportStateForScan(result.scan);
     contextPackageState = { status: 'complete', result };
+    projectInfoState = {
+      rootPath: result.scan.rootPath,
+      snapshot:
+        result.projectSummary.projectInfo ??
+        result.projectSummary.previousProjectInfo ?? {
+          status: 'missing',
+          path: '',
+        },
+      message: result.projectSummary.status === 'failed' ? result.projectSummary.message : undefined,
+    };
     overviewContextPackageStatus = {
       status: 'exists',
       rootPath: result.scan.rootPath,
