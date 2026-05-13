@@ -1,7 +1,7 @@
 # Task: Find Relationships Across Documents
 
 ID: TASK-0029
-Status: Approved
+Status: Ready For Review
 Class: Major
 Owner: Pair
 Created: 2026-05-12
@@ -47,21 +47,21 @@ The first version should produce a traceable relationship report for the selecte
 
 ## Current Phase
 
-Build
+Ready For Review
 
-Specification and planning are complete. Human approval to build was received on 2026-05-13.
+Build and verification are complete. Human approval to build was received on 2026-05-13. The task is waiting for human review.
 
 ## Progress Checklist
 
 - [x] Explore complete
 - [x] Spec complete
 - [x] Plan complete
-- [ ] Worktree created or reused, if required
+- [x] Worktree created or reused, if required
 - [x] Human approval received, if required
-- [ ] Build complete
-- [ ] Verification complete
+- [x] Build complete
+- [x] Verification complete
 - [ ] Review complete
-- [ ] Documentation complete
+- [x] Documentation complete
 - [ ] Closeout complete
 
 ## Backlog Source
@@ -202,18 +202,18 @@ Each relationship should include:
 
 ### Acceptance Criteria
 
-- [ ] User can generate a relationship analysis from a freshly generated full-project context package.
-- [ ] Sidekick runs Codex with a dedicated relationship-analysis prompt.
-- [ ] Output is stored under `.sidekick/`.
-- [ ] Output identifies related documents and explains the relationship in text.
-- [ ] Output includes source scope and context hash metadata.
-- [ ] Output includes uncertainty/low-confidence notes.
-- [ ] Output is Markdown-only in the first version.
-- [ ] GUI can show the latest relationship report without turning the context surface into workflow progress.
-- [ ] The report is not included in future context package input.
-- [ ] Oversized context packages fail with clear no-write feedback before Codex analysis starts.
-- [ ] Tests cover report writing/parsing and Codex failure behavior.
-- [ ] UI smoke coverage covers starting analysis, success, failure, and viewing the latest report.
+- [x] User can generate a relationship analysis from a freshly generated full-project context package.
+- [x] Sidekick runs Codex with a dedicated relationship-analysis prompt.
+- [x] Output is stored under `.sidekick/`.
+- [x] Output identifies related documents and explains the relationship in text.
+- [x] Output includes source scope and context hash metadata.
+- [x] Output includes uncertainty/low-confidence notes.
+- [x] Output is Markdown-only in the first version.
+- [x] GUI can show the latest relationship report without turning the context surface into workflow progress.
+- [x] The report is not included in future context package input.
+- [x] Oversized context packages fail with clear no-write feedback before Codex analysis starts.
+- [x] Tests cover report writing/parsing and Codex failure behavior.
+- [x] UI smoke coverage covers starting analysis, success, failure, and viewing the latest report.
 
 ## Resolved Planning Decisions
 
@@ -407,20 +407,46 @@ Final Ready For Review message should include:
 
 ## Build Log
 
-Not started.
+- 2026-05-13: Created dedicated worktree `../Sidekick-worktrees/TASK-0029-find-relationships-across-documents` on branch `task/TASK-0029-find-relationships-across-documents`.
+- 2026-05-13: Integrated `origin/main` so the branch includes closed `TASK-0034` folder-scoped context-package work. Resolved conflicts by preserving both project-summary generation and folder-scoped context-package generation.
+- 2026-05-13: Added `src/main/document-relationships.ts` and `src/main/prompts/document-relationships.nb.ts`.
+- 2026-05-13: Added report read/write handling for `<project-root>/.sidekick/document-relationships.md`, YAML frontmatter metadata, context-package SHA-256 metadata, section validation, oversized-context guard, and typed missing/invalid/complete states.
+- 2026-05-13: Added narrow IPC/preload APIs: `readDocumentRelationships(rootPath)` and `generateDocumentRelationships(rootPath)`.
+- 2026-05-13: Added renderer workflow in the primary workspace with Norwegian states for missing report, generation, success, failure, and latest-report reading.
+- 2026-05-13: Added project-context status and a `Vis rapport` action without using the right context surface as the progress surface.
+- 2026-05-13: Added Playwright coverage for successful report generation/viewing and failed relationship analysis.
+- Note: Step 1 and Step 2 were committed together in `e4d10b2` because the typed IPC contract was needed to verify the main-process service end to end.
 
 ## Verification Log
 
-Not started.
+- 2026-05-13: Baseline after integrating `origin/main`: `npm run check` passed, `npm test` passed.
+- 2026-05-13: After backend/API implementation: `npm run check` passed, `npm test` passed. Vitest result: 21 files, 93 tests.
+- 2026-05-13: After renderer workflow and UI regression tests: `npm run check` passed, `npm run test:ui` passed. Playwright result: 29 tests passed.
+- 2026-05-13: Final verification before Ready For Review passed:
+  - `npm run check`
+  - `npm test` (21 files, 93 tests)
+  - `npm run test:ui` (29 tests)
 
 ## Review Notes
 
-Not started.
+Waiting for human review.
+
+Suggested GUI review:
+
+- Select a project.
+- Start `Finn sammenhenger`.
+- Confirm the workflow runs in the primary workspace.
+- Confirm the analysis first creates a fresh full-project context package.
+- Confirm `.sidekick/document-relationships.md` is written.
+- Confirm uncertainty and low-confidence sections are visible in the report.
+- Confirm the latest report can be opened again from the project context surface with `Vis rapport`.
+- Confirm an oversized or failed analysis shows clear no-write feedback.
 
 ## Documentation Notes
 
-Not started.
+- Task record updated with build results, verification evidence, and review steps.
+- No architecture decision record was added because this task follows existing persistence and Codex-runner patterns and does not introduce a new durable architecture decision beyond the task specification.
 
 ## Closeout
 
-Not started.
+Not started. Move to `Done` and archive under `docs/tasks/closed/` only after human review and approval.
