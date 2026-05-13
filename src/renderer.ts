@@ -1117,12 +1117,20 @@ const appendSelectionWarnings = (warnings: string[]) => {
   selectionContentsTarget.append(title, list);
 };
 
+const clearSelectionActions = () => {
+  selectionActionsTarget?.replaceChildren();
+};
+
 const renderSelectionActions = (node: FolderTreeNode) => {
-  if (!selectionActionsTarget) {
+  const target = selectionActionsTarget ?? selectionContentsTarget;
+
+  if (!target) {
     return;
   }
 
-  selectionActionsTarget.replaceChildren();
+  if (target === selectionActionsTarget) {
+    target.replaceChildren();
+  }
 
   if (!isFolderNode(node) || node.relativePath === ROOT_PATH) {
     return;
@@ -1141,13 +1149,13 @@ const renderSelectionActions = (node: FolderTreeNode) => {
     openFolderContextPackageWorkflow(node.relativePath);
   });
 
-  selectionActionsTarget.append(actionTitle, button);
+  target.append(actionTitle, button);
 };
 
 const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
   if (!scan) {
     selectionPanelTarget?.toggleAttribute('hidden', true);
-    selectionActionsTarget?.replaceChildren();
+    clearSelectionActions();
     return;
   }
 
@@ -1174,7 +1182,7 @@ const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
       ['Markdown/tekst', scan.summary.artifactTypeCounts['markdown-text'].toString()],
       ['Transkripsjoner', scan.summary.artifactTypeCounts.transcript.toString()],
     ]);
-    selectionActionsTarget?.replaceChildren();
+    clearSelectionActions();
     renderSelectionContents(node);
     appendSelectionWarnings(overviewWarnings(scan));
     return;
@@ -1203,8 +1211,8 @@ const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
     ]);
   }
 
-  renderSelectionActions(node);
   renderSelectionContents(node);
+  renderSelectionActions(node);
   appendSelectionWarnings(
     warnings.map((warning) =>
       warning.path === ROOT_PATH ? warning.message : `${warning.path}: ${warning.message}`,
