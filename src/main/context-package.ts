@@ -20,6 +20,8 @@ export const CONTEXT_PACKAGE_IGNORE_PATTERNS = [
   '*context-package*',
   '**/*context-package*',
   '.git/**',
+  '.sidekick/**',
+  '**/.sidekick/**',
   'node_modules/**',
   'out/**',
   'dist/**',

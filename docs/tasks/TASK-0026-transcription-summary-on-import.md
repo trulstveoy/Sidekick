@@ -1,11 +1,11 @@
 # Task: Transcription Summary On Import
 
 ID: TASK-0026
-Status: Approved
+Status: Ready For Review
 Class: Major
 Owner: Pair
 Created: 2026-05-12
-Updated: 2026-05-12
+Updated: 2026-05-13
 Branch: task/TASK-0026-transcription-summary-on-import
 Worktree: ../Sidekick-worktrees/TASK-0026-transcription-summary-on-import
 Base branch: origin/main
@@ -50,9 +50,9 @@ The first version stays project-local: the imported file is copied into the dete
 
 ## Current Phase
 
-Plan
+Ready For Review
 
-Specification and planning are complete. Human approval is received. Build can start.
+Build and automated verification are complete. Human review is next.
 
 ## Progress Checklist
 
@@ -61,10 +61,10 @@ Specification and planning are complete. Human approval is received. Build can s
 - [x] Plan complete
 - [x] Worktree created or reused, if required
 - [x] Human approval received, if required
-- [ ] Build complete
-- [ ] Verification complete
+- [x] Build complete
+- [x] Verification complete
 - [ ] Review complete
-- [ ] Documentation complete
+- [x] Documentation complete
 - [ ] Closeout complete
 
 ## Resolved Decisions
@@ -398,19 +398,36 @@ Human gates:
 
 ## Build Log
 
-Not started.
+- 2026-05-13: Added project-local transcription summary storage under `.sidekick/transcription-summaries/` with Markdown frontmatter, path-hash lookup, source content hash metadata, stale detection, and safe project-relative path validation.
+- 2026-05-13: Added a Norwegian Codex prompt for imported transcription summaries and a non-streaming `CodexRunner.runExecText` helper for read-only prompt execution.
+- 2026-05-13: Integrated summary generation into `confirmTranscriptionImport` after the file copy succeeds. Import still completes when summary generation fails, and the failure is returned in the import result.
+- 2026-05-13: Added typed IPC/preload support for reading a transcription summary from the selected project without exposing filesystem access to the renderer.
+- 2026-05-13: Added renderer support for showing the generated summary, missing state, invalid state, and stale warning in the selected transcription file context.
+- 2026-05-13: Excluded `.sidekick/` from project scans and context-package generation so Sidekick metadata does not appear as user project content.
+- 2026-05-13: Added unit, integration, and UI smoke coverage for summary storage, Codex exec text output, import fallback, and selected-file summary display.
 
 ## Verification Log
 
-Not started.
+- 2026-05-13: `npm run check` passed.
+- 2026-05-13: `npm test` passed: 17 files, 75 tests.
+- 2026-05-13: `npm run test:ui` passed: 27 UI tests.
 
 ## Review Notes
 
-Not started.
+- Ready for human review.
+- Manual verification should confirm both the happy path and the fallback path:
+  1. Start the app with `npm start`.
+  2. Select a project folder with one transcription folder.
+  3. Import a `.txt`, `.md`, or `.markdown` transcription.
+  4. Confirm that the import result says the file was added and, when Codex is available and logged in, that a samtalesammendrag was created.
+  5. Press `Tilbake` and confirm the imported transcription is selected in the folder tree.
+  6. Confirm the right context panel shows `Samtalesammendrag` for that transcription.
+  7. If Codex is unavailable or logged out, confirm the import still succeeds and the import result explains that the summary could not be created.
 
 ## Documentation Notes
 
-Not started.
+- Task record updated with build log, verification log, and manual review instructions.
+- No standalone design guideline change was needed; the UI follows the existing selected-file context surface pattern.
 
 ## Closeout
 

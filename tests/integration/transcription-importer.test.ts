@@ -63,6 +63,10 @@ describe('transcription import', () => {
     const scannedPaths = collectRelativePaths(result.scan.tree);
 
     expect(result.destinationFileName).toBe('02. downloaded transcription.md');
+    expect(result.summary).toMatchObject({
+      status: 'failed',
+      message: 'Sammendrag ble ikke konfigurert for denne importen.',
+    });
     expect(sourceContent).toBe('Imported transcription content');
     expect(destinationContent).toBe('Imported transcription content');
     expect(scannedPaths).toContain('02-transkripsjoner/02. downloaded transcription.md');
@@ -86,6 +90,26 @@ describe('transcription import', () => {
       'new conflict',
     );
     expect(await readFile(result.destinationPath, 'utf8')).toBe('Imported transcription content');
+  });
+
+  it('keeps the copied import when summary generation fails', async () => {
+    const rootPath = await copyFixtureToTemp();
+    const targetFolder = path.join(rootPath, '02-transkripsjoner');
+    const sourcePath = await createSourceTranscription();
+    const preview = await createTranscriptionImportPreview(rootPath, sourcePath, 'preview-summary');
+
+    const result = await confirmTranscriptionImport(preview, async () => ({
+      status: 'failed',
+      message: 'Codex is not logged in.',
+    }));
+
+    expect(result.summary).toEqual({
+      status: 'failed',
+      message: 'Codex is not logged in.',
+    });
+    await expect(readFile(path.join(targetFolder, result.destinationFileName), 'utf8')).resolves.toBe(
+      'Imported transcription content',
+    );
   });
 
   it('fails when no transcription folder is detected', async () => {

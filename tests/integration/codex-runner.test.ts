@@ -110,6 +110,16 @@ describe('codex runner', () => {
     });
   });
 
+  it('runs a non-streaming read-only exec and returns stdout', async () => {
+    const fake = await createFakeCodex();
+    const runner = new CodexRunner(fake.executablePath);
+
+    const stdout = await runner.runExecText(fake.rootPath, 'summarize this file', 'read-only');
+
+    expect(stdout).toContain('"input":"summarize this file"');
+    expect(stdout).toContain('"--sandbox","read-only"');
+  });
+
   it('enforces one active run and supports cancellation', async () => {
     const fake = await createFakeCodex();
     const runner = new CodexRunner(fake.executablePath);

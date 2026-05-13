@@ -215,7 +215,7 @@ export class CodexRunner extends EventEmitter {
     this.emit('completion', event);
   }
 
-  private runCommand(args: string[], cwd: string): Promise<ProcessResult> {
+  private runCommand(args: string[], cwd: string, stdinText?: string): Promise<ProcessResult> {
     return new Promise((resolve) => {
       const child = spawn(this.executable.command, args, {
         cwd,
@@ -227,6 +227,14 @@ export class CodexRunner extends EventEmitter {
 
       child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
       child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
+      child.stdin.on('error', () => {
+        // Startup failures can close stdin before the prompt is written. The
+        // process error/close handlers below report the real failure.
+      });
+
+      if (stdinText !== undefined) {
+        child.stdin.end(stdinText);
+      }
 
       child.on('error', (error) => {
         resolve({
@@ -319,6 +327,30 @@ export class CodexRunner extends EventEmitter {
     });
 
     return runId;
+  }
+
+  async runExecText(rootPath: string, prompt: string, mode: CodexRunMode) {
+    if (this.activeRun) {
+      throw new Error('A Codex run is already active.');
+    }
+
+    const trimmedPrompt = prompt.trim();
+
+    if (!trimmedPrompt) {
+      throw new Error('Enter a Codex prompt before running.');
+    }
+
+    const result = await this.runCommand(buildCodexExecArgs(rootPath, mode), rootPath, trimmedPrompt);
+
+    if (result.error) {
+      throw result.error;
+    }
+
+    if (result.code !== 0) {
+      throw new Error((result.stderr || result.stdout || 'Codex returned an error.').trim());
+    }
+
+    return result.stdout;
   }
 
   cancel(runId: string) {

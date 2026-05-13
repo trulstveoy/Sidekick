@@ -1467,6 +1467,40 @@ textarea:disabled {
   font-size: 12px;
 }
 
+.transcription-summary {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 10px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.transcription-summary-warning {
+  margin: 0;
+  border-left: 3px solid var(--warning-border);
+  padding-left: 8px;
+  color: var(--warning-text);
+}
+
+.transcription-summary-body {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.transcription-summary-meta {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
 @media (max-width: 1100px) {
   .app-main {
     grid-template-columns: minmax(0, 1fr) var(--context-width-min);

@@ -15,7 +15,7 @@ import type {
 const DEFAULT_SCAN_OPTIONS: ScanOptions = {
   maxDepth: 5,
   maxFiles: 2000,
-  excludedFolderNames: ['.git', 'node_modules', 'out', 'dist', '.vite', '.cache'],
+  excludedFolderNames: ['.git', '.sidekick', 'node_modules', 'out', 'dist', '.vite', '.cache'],
   includeHidden: false,
   followSymlinks: false,
 };
