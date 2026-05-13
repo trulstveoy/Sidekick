@@ -4,11 +4,11 @@ Status: Draft
 
 ## Purpose
 
-This document defines the desktop UI direction for Sidekick. It should guide new UI work and cleanup of existing screens.
+This document defines the desktop UI direction for Sidekick. It should guide new UI work and cleanup of existing screens. It is intended to stand alone as the durable design reference for implementation.
 
 Sidekick should feel like a quiet local workspace for understanding project folders. The interface should reduce visual noise, make folder structure easy to scan, and keep potentially destructive or expensive actions explicit.
 
-The current design direction follows the consultant GUI refresh delivery in `docs/design/sidekick-ui design leveranse.zip` and the implementation analysis in `docs/design/gui-refresh-implementation-analysis.md`.
+The design direction is captured directly in this document so agents and reviewers can apply it without consulting separate design delivery files.
 
 ## Design Thesis
 
@@ -140,7 +140,27 @@ Color roles:
 - error;
 - success.
 
-Use the revised token set from `fase3b-tokens-v2.json` in the consultant package as the source of truth for the GUI refresh. Token names may be adapted to code conventions, but semantic intent should be preserved.
+Use these baseline color tokens for the GUI refresh. Token names may be adapted to code conventions, but semantic intent should be preserved:
+
+| Role | Value |
+| --- | --- |
+| App background | `#f4f3f1` |
+| Panel background | `#ffffff` |
+| Secondary surface | `#f9f8f7` |
+| Primary text | `#1c1917` |
+| Secondary text | `#57534e` |
+| Subtle text | `#a8a29e` |
+| Border/divider | `#e2dfd9` |
+| Strong border | `#c0bcb5` |
+| Primary action/accent | `#2d5fa3` |
+| Accent hover | `#3a72bf` |
+| Accent pressed | `#224a84` |
+| Accent subtle background | `#ebf0fa` |
+| Accent border | `#9dbde8` |
+| Success text/background/border | `#15532d` / `#f0fdf4` / `#86efac` |
+| Warning text/background/border | `#78350f` / `#fffbeb` / `#fcd34d` |
+| Error text/background/border | `#7f1d1d` / `#fef2f2` / `#fca5a5` |
+| Info text/background/border | `#1e3a8a` / `#eff6ff` / `#93c5fd` |
 
 Avoid one-note palettes dominated by a single hue. The current warm neutral direction is acceptable, but it should be quieter: fewer filled surfaces, fewer high-contrast blocks, and fewer competing section treatments.
 
