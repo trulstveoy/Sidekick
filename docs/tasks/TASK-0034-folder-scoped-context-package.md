@@ -1,7 +1,7 @@
 # Task: Folder-Scoped Context Package
 
 ID: TASK-0034
-Status: Specified
+Status: Approved
 Class: Major
 Owner: Pair
 Created: 2026-05-13
@@ -15,6 +15,7 @@ Write scope:
 - `src/main.ts`
 - `src/preload.ts`
 - `src/shared/sidekick-api.ts`
+- `index.html`
 - `src/renderer.ts`
 - `src/index.css`
 - `tests/unit`
@@ -37,17 +38,17 @@ The generated Markdown file should be stored in the selected folder and should i
 
 ## Current Phase
 
-Specify
+Plan
 
-Specification is complete. Planning has not started.
+Specification and planning are complete. Human approval is received. Build can start.
 
 ## Progress Checklist
 
 - [x] Explore complete
 - [x] Spec complete
-- [ ] Plan complete
+- [x] Plan complete
 - [ ] Worktree created or reused, if required
-- [ ] Human approval received, if required
+- [x] Human approval received, if required
 - [ ] Build complete
 - [ ] Verification complete
 - [ ] Review complete
@@ -194,22 +195,127 @@ Final filename rules should be confirmed during planning.
 - [ ] Project tree refreshes after success and shows the generated package.
 - [ ] Tests cover preview, generation, self-ignore, path safety, existing output replacement status, and GUI behavior.
 
-## Open Points
+## Resolved Planning Decisions
 
-- Should folder-scoped generation depend on `TASK-0033` being built first, or can the backend/API work be implemented before the navigation refresh?
-- Should the output filename remove numeric prefixes exactly as transcript import does, or use a separate folder slug rule?
-- Should Norwegian characters be preserved in filenames or normalized to ASCII slugs?
-- Should an existing folder-scoped context package be overwritten after confirmation, or should Sidekick create the next available filename?
-- Should generated context packages be excluded from all future context packages, or only the exact output file for the current operation?
-- Should the selected folder's parent path be included in the package title/metadata so the package is identifiable outside the folder?
-- Should the UI show folder-scoped package status in the right panel after generation?
-- Should users be able to open the generated package from the success state?
-- Should folder-scoped generation be allowed for the project root, or should the global full-project action remain the only root-level path?
-- How should very large selected folders communicate skipped files or partial generation?
+- `TASK-0033` is complete, so this task builds on the revised navigation model where workflows run in the primary workspace and the right context panel stays stable.
+- Folder-scoped generation uses a separate folder filename rule: remove a leading numeric folder prefix, normalize whitespace to hyphens, lowercase the base name, preserve Norwegian letters, replace Windows-unsafe characters with hyphens, trim unsafe trailing characters, and fall back to `folder.context-package.md`.
+- Existing folder-scoped context packages are overwritten after explicit confirmation, matching the current full-project context-package behavior.
+- Generated context packages remain excluded from all context-package generation, not only the exact current output file. This means a folder-scoped package must also ignore context packages already generated in its subfolders. This preserves the current self-ignore safety rule and prevents recursive package growth.
+- The generated Markdown should preserve the Repomix output structure. Do not inject custom parent-path metadata into the Markdown in this task; show scope and relative folder path in the UI preview/result instead.
+- The right context panel should not receive a separate persistent folder-package status in this task. The generated file should appear in the refreshed tree, and the selected folder context should show updated counts.
+- Do not add an open-file action from the success state.
+- Folder-scoped generation is not offered for the project root. The global full-project action remains the root-level path.
+- Large-folder behavior uses the existing skipped-file, warning, token, character, and output-size result details. Do not add a new partial-generation model in this task.
 
 ## Implementation Plan
 
-Not started. Stop after Specify until this task is explicitly approved for planning/build.
+Files or areas:
+
+- `src/main/context-package.ts`
+- `src/main/repomix-runner.ts`
+- `src/main.ts`
+- `src/preload.ts`
+- `src/shared/sidekick-api.ts`
+- `index.html`
+- `src/renderer.ts`
+- `src/index.css`
+- `tests/unit`
+- `tests/integration`
+- `tests/e2e`
+- `docs/tasks/TASK-0034-folder-scoped-context-package.md`
+
+Build setup:
+
+1. Before build, create or reuse `../Sidekick-worktrees/TASK-0034-folder-scoped-context-package` from the latest intended integration base.
+2. Use `origin/main` as the base if it still includes all committed planning work. If local `main` has required unpushed commits, push them first or explicitly record local `main` as the base.
+3. Do not absorb unrelated local changes such as backlog edits or unrelated architecture documents into this task.
+4. Run a baseline check from the task worktree when practical.
+
+Steps:
+
+1. Backend scope model and filename helpers
+   - Add a folder-scoped context-package request model that accepts project root plus selected folder relative path.
+   - Keep the existing full-project preview/generate functions working.
+   - Add helper functions for folder-scoped filenames and output paths.
+   - Add path validation that rejects absolute folder paths, `..` traversal, project-root-as-folder-scope, non-directory targets, and targets outside the selected project root.
+
+2. Repomix generation behavior
+   - Reuse the existing Repomix runner with the selected folder as the pack root.
+   - Write the generated file to the selected folder.
+   - Keep Markdown output, current Repomix security checks, and current generated-package ignore patterns.
+   - Exclude every generated context package below the selected folder, including context packages in nested subfolders.
+   - Scan the full project root after successful generation so the refreshed tree includes the new file.
+
+3. Typed API and IPC
+   - Extend `ContextPackagePreview` and `ContextPackageResult` with scope information needed by the renderer, such as `scope`, target folder path, and target folder relative path.
+   - Add typed preload/main APIs for folder preview and folder generation.
+   - Keep renderer requests narrow: pass project root and selected folder relative path only, never an absolute output path.
+
+4. Context-panel action
+   - Show `Generer kontekstpakke for denne mappen` only when a non-root folder is selected.
+   - Do not show the action for files or project root.
+   - Disable the contextual action while an exclusive workflow is active.
+   - Start the existing context-package workflow in the primary workspace when the contextual action is clicked.
+
+5. Shared workflow rendering
+   - Reuse the current context-package workflow surface for both full-project and folder-scoped packages.
+   - Adapt title, message, details, write warning, generating state, and result copy based on scope.
+   - Preview must show selected folder, output filename, output location, replacement status, and write warning.
+   - Full-project generation must continue to show project-root wording and must still update the full-project context-package status.
+
+6. Refresh and selection behavior
+   - After folder-scoped generation succeeds, update application state with the returned scan.
+   - Preserve the selected folder when it still exists.
+   - Expand the selected folder and its ancestors so the generated file is visible in the tree after success.
+   - Do not change full-project context-package status when only a folder-scoped package was generated.
+
+7. Tests
+   - Add unit tests for folder filename normalization and output path helpers.
+   - Add integration tests for folder preview, overwrite detection, generation, self-ignore, nested context-package exclusion, sibling-folder exclusion, and path safety.
+   - Add UI smoke tests for contextual action visibility, folder preview, folder generation success, tree refresh, action absence for files/root, and full-project regression.
+   - Keep existing full-project context-package tests passing.
+
+8. Documentation and closeout
+   - Update this task record with build notes, verification results, review notes, and closeout.
+   - No new decision record is expected unless implementation reveals a durable architecture/security decision beyond this plan.
+
+Suggested build checkpoints:
+
+1. Commit backend/API helpers and unit/integration tests.
+2. Commit renderer UI and UI smoke tests.
+3. Commit task-record closeout after verification and review.
+
+Verification:
+
+- `npm run check`
+- `npm test`
+- `npm run test:ui`
+- Manual verification with `npm start`:
+  - select a non-root folder;
+  - confirm the right panel shows `Generer kontekstpakke for denne mappen`;
+  - preview the folder-scoped package and verify folder, filename, location, overwrite status, and write warning;
+  - generate the package and verify the Markdown file appears inside the selected folder in the tree;
+  - confirm the global `Generer kontekstpakke` action still generates a package in the project root;
+  - select a file and the project root and confirm the folder-scoped action is not shown.
+
+Security and risk review:
+
+- Validate folder scope in the main process before reading or writing.
+- Do not trust renderer-provided output paths.
+- Keep filesystem writes behind typed preload/main APIs.
+- Confirm path checks work on Windows-style and POSIX-style separators where practical.
+- Preserve Repomix security checks and generated-package ignore behavior.
+- Ensure folder-scoped generation cannot package files outside the selected project root.
+
+Docs:
+
+- `docs/architecture/desktop-design-guidelines.md` already contains the design rule for folder-scoped context packages.
+- This task record is the only documentation expected during build unless behavior changes.
+
+Human gates:
+
+- Required.
+- Approval status: Approved.
 
 ## Build Log
 
