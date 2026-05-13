@@ -1,7 +1,7 @@
 # Task: Revised Navigation Model
 
 ID: TASK-0033
-Status: Ready For Review
+Status: Done
 Class: Major
 Owner: Pair
 Created: 2026-05-13
@@ -38,10 +38,9 @@ The revised model keeps the topbar as project orientation, the middle panel as t
 
 ## Current Phase
 
-Plan
+Done
 
-Specification and planning are complete. Build has not started.
-Open points have been resolved and captured as task decisions.
+Specification, planning, build, verification, review, and closeout are complete.
 
 ## Progress Checklist
 
@@ -49,12 +48,12 @@ Open points have been resolved and captured as task decisions.
 - [x] Spec complete
 - [x] Plan complete
 - [x] Worktree created or reused, if required (not required for this task)
-- [ ] Human approval received, if required
-- [ ] Build complete
-- [ ] Verification complete
-- [ ] Review complete
-- [ ] Documentation complete
-- [ ] Closeout complete
+- [x] Human approval received, if required
+- [x] Build complete
+- [x] Verification complete
+- [x] Review complete
+- [x] Documentation complete
+- [x] Closeout complete
 
 ## Links
 
@@ -581,6 +580,9 @@ Implementation commits:
 
 - `9495dbf feat: revise navigation shell workflows`
 - `520d6bf test: cover revised navigation model`
+- `91a014e docs: mark task 0033 ready for review`
+- `b92c85a fix: reload legacy navigation shell`
+- `88ceb71 fix: refresh tree after context package generation`
 
 ## Verification Log
 
@@ -599,6 +601,10 @@ Implementation commits:
   - `npm run check`
   - `npm run test:ui` - 25 UI tests
   - `npm test` was already green after the same implementation changes; this last stabilization only touched the UI test file.
+- 2026-05-13: Post-review bugfix verification passed:
+  - `npm run check`
+  - `npm test` - 16 files, 62 tests
+  - `npm run test:ui` - 25 UI tests
 
 ## Review Notes
 
@@ -609,6 +615,9 @@ Implementation commits:
   - right-panel context stability;
   - keyboard entry/exit behavior;
   - whether the simplified right panel still exposes enough project/folder/file information.
+- Human review completed:
+  - context-package workflow now opens in the middle panel;
+  - generated context-package files appear in the refreshed file tree after generation.
 
 ## Documentation Notes
 
@@ -616,4 +625,4 @@ Implementation commits:
 
 ## Closeout
 
-Ready for human review. Do not close until the revised GUI has been manually checked from the local review server.
+Closed after human review and post-review fixes. The task record has been moved to `docs/tasks/closed/`.

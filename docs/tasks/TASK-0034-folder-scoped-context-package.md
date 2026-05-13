@@ -25,7 +25,7 @@ Parallel safety: Coordinate
 Depends on:
 - `closed/TASK-0004-context-package-workflow.md`
 - `closed/TASK-0020-context-package-workflow-refresh.md`
-- `TASK-0033-revised-navigation-model.md`
+- `closed/TASK-0033-revised-navigation-model.md`
 Coordinates with:
 - `TASK-0030-generate-thematic-context-packages.md`
 
@@ -62,7 +62,7 @@ Related docs:
 - `../architecture/desktop-design-guidelines.md`
 
 Related tasks:
-- `TASK-0033-revised-navigation-model.md`
+- `closed/TASK-0033-revised-navigation-model.md`
 - `TASK-0030-generate-thematic-context-packages.md`
 
 ## Explore Notes
