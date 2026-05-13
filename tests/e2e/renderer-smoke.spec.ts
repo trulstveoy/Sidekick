@@ -167,6 +167,33 @@ const mockContextPackageResult: ContextPackageResult = {
     { path: '02-transkripsjoner/intervju-01.docx', reason: 'binary-extension' },
   ],
   warnings: [{ path: '03-modeller/model.md', message: 'Suspicious file content detected.' }],
+  scan: {
+    ...mockScan,
+    scannedAt: '2026-05-09T12:10:00.000Z',
+    tree: {
+      ...mockScan.tree,
+      children: [
+        ...(mockScan.tree.children ?? []),
+        {
+          name: 'sidekick-project.context-package.md',
+          relativePath: 'sidekick-project.context-package.md',
+          kind: 'file',
+          artifactType: 'markdown-text',
+          contextHints: [],
+          size: 8192,
+          modifiedAt: '2026-05-09T12:10:00.000Z',
+        },
+      ],
+    },
+    summary: {
+      ...mockScan.summary,
+      fileCount: 4,
+      artifactTypeCounts: {
+        ...mockScan.summary.artifactTypeCounts,
+        'markdown-text': mockScan.summary.artifactTypeCounts['markdown-text'] + 1,
+      },
+    },
+  },
 };
 
 const mockScanAfterTranscriptionImport: ProjectFolderScan = {
@@ -1229,6 +1256,11 @@ test('confirms and displays a generated context package', async ({ page }) => {
   await expect(page.getByText('01-bakgrunn/brief.pdf: binary-extension')).toBeVisible();
   await expect(page.getByText('03-modeller/model.md: Suspicious file content detected.')).toBeVisible();
   await expect(page.locator('[data-selection-details]')).toContainText('Finnes');
+  await page.getByRole('button', { name: 'Tilbake' }).click();
+  await expect(
+    page.getByRole('tree', { name: 'Skannet mappetre' }).getByText('sidekick-project.context-package.md'),
+  ).toBeVisible();
+  await expect(page.locator('[data-overview-stats]')).toContainText('4');
 });
 
 test('shows no-write feedback when context package preview fails', async ({ page }) => {

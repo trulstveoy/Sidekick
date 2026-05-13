@@ -179,6 +179,7 @@ export type ContextPackageResult = {
   processedFiles: string[];
   skippedFiles: ContextPackageSkippedFile[];
   warnings: ContextPackageWarning[];
+  scan: ProjectFolderScan;
 };
 
 export type TranscriptionImportWarning = {

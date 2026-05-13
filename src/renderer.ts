@@ -2749,12 +2749,24 @@ const generateContextPackage = async () => {
 
   try {
     const result = await window.sidekick.generateContextPackage(scan.rootPath);
+    const selectedPathAfterScan = getNodeByPath(result.scan.tree, selectedTreePath)
+      ? selectedTreePath
+      : result.scan.tree.relativePath;
+    state =
+      result.scan.status === 'partial'
+        ? { status: 'partial', scan: result.scan }
+        : { status: 'ready', scan: result.scan };
+    selectedTreePath = selectedPathAfterScan;
+    focusedTreePath = selectedPathAfterScan;
+    expandedPaths = new Set([...expandedPaths, ROOT_PATH]);
+    setTranscriptionImportStateForScan(result.scan);
     contextPackageState = { status: 'complete', result };
     overviewContextPackageStatus = {
       status: 'exists',
-      rootPath: scan.rootPath,
+      rootPath: result.scan.rootPath,
       outputFileName: result.outputFileName,
     };
+    void refreshCodexStatus(result.scan);
   } catch (error) {
     contextPackageState = {
       status: 'error',

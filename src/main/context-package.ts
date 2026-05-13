@@ -6,6 +6,7 @@ import type {
   ContextPackageSkippedFile,
   ContextPackageWarning,
 } from '../shared/sidekick-api';
+import { scanProjectFolder } from './folder-scanner';
 import { runRepomixContextPackage } from './repomix-runner';
 
 export const CONTEXT_PACKAGE_SUFFIX = 'context-package.md';
@@ -125,6 +126,7 @@ export const generateContextPackage = async (
   });
 
   const outputStats = await stat(preview.outputPath);
+  const scan = await scanProjectFolder(rootPath);
 
   return {
     status: 'complete',
@@ -139,5 +141,6 @@ export const generateContextPackage = async (
     processedFiles: packResult.processedFiles.map((file) => file.path).sort(),
     skippedFiles: toSkippedFiles(packResult.skippedFiles),
     warnings: toWarnings(packResult.suspiciousFilesResults),
+    scan,
   };
 };
