@@ -332,9 +332,11 @@ Human gates:
 - Reused the existing context-package workflow surface for both project and folder scopes.
 - Preserved full-project context-package behavior and status handling.
 - Added UI behavior to keep the selected folder visible and expanded after folder-scoped generation.
+- Fixed runtime visibility for the folder contextual action when Electron/Vite serves a stale shell HTML without the dedicated `data-selection-actions` container. The renderer now falls back to rendering the action inside the existing selection content area.
 - Commit checkpoints:
   - `da868c3 feat: add folder-scoped context package backend`
   - `d17b43b feat: add folder-scoped context package UI`
+  - `5feca29 fix: show folder context action with stale shell html`
 
 ## Verification Log
 
@@ -352,6 +354,9 @@ Human gates:
   - First `npm run test:ui` used a stale existing Vite server on port 5173 and failed to see the new HTML.
   - Stopped the stale Vite server and reran UI tests.
   - `npm run test:ui` passed: 27 UI tests.
+- Follow-up fix verification:
+  - `npm run check` passed.
+  - `npm run test:ui -- --grep "folder-scoped context package"` passed: 2 UI tests.
 
 ## Review Notes
 
