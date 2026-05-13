@@ -57,7 +57,6 @@ Specification is complete. Planning has not started.
 ## Links
 
 Related docs:
-- `../architecture/revidert-designdokument.md`
 - `../architecture/revidert-navigasjonsmodell.html`
 - `../architecture/desktop-design-guidelines.md`
 

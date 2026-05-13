@@ -69,16 +69,37 @@ The primary workspace is the main surface. Context surfaces, action bars, and st
 
 The selected project folder must remain visible in the shell whenever a project is active. Long project names and paths must truncate predictably.
 
+Panel responsibility model:
+
+| Area | Responsibility |
+| --- | --- |
+| Topbar | Identifies the app and active project. |
+| Primary workspace | Shows the active work: folder tree, workflow, settings, or assistant run. |
+| Context surface | Explains the selected project, folder, or file. |
+| Action bar | Starts global project actions. |
+| Status bar | Reports compact operational state. |
+
+The short rule is: the primary workspace is the verb, the context surface is the noun, the action bar starts global tools, and the topbar anchors app and project identity.
+
 Workflow responsibility model:
 
 - Project switching belongs in the topbar and should not appear as a routine bottom action.
 - Settings is an app-level view that replaces the primary workspace body while keeping the topbar stable.
 - Project-level actions such as full-project context-package generation, transcript import, and controlled Codex runs start from the action bar and run in the primary workspace.
-- Starting an exclusive workflow should replace the folder tree in the primary workspace, not take over the context surface.
-- The context surface should remain tied to the selected project, folder, or file while workflows run. It should not become the workflow progress panel.
+- The primary workspace has two normal states: folder tree and active workflow. Starting an exclusive workflow replaces the folder tree; the tree and workflow should not compete inside the same surface.
+- The context surface remains tied to the selected project, folder, or file while workflows run. It should not become the workflow progress panel.
+- Back or cancel before confirmation returns to the folder tree without writing. After an import, generation, or edit operation has completed, the action is not silently rolled back.
 - Competing global actions should be disabled while an exclusive workflow is active.
 - Project switching and settings navigation should not silently hide an active workflow. Disable or explicitly guard them while a workflow is in progress.
 - Folder-scoped actions, when introduced, should live near the selected folder context rather than in the global action bar.
+
+Shell anti-patterns:
+
+- Do not put workflow progress, confirmation controls, or generated-output result panels in the context surface.
+- Do not make global actions depend on the selected folder or file.
+- Do not hide the context surface just because a workflow is active.
+- Do not make every action contextual; global project actions belong in the action bar.
+- Do not expose file-opening actions unless a typed and validated main/preload API exists for that operation.
 
 The shell should avoid page-like composition. Do not introduce landing-page sections, hero copy, marketing language, or decorative feature cards inside the app.
 
@@ -117,8 +138,10 @@ Good context content:
 - child counts;
 - relevant warnings;
 - recent activity;
-- context-package preview and result;
-- safe actions that apply to the current selection.
+- context-package availability or generated-file metadata when relevant;
+- safe contextual actions that apply only to the current selection.
+
+The context surface changes when selection changes. It should stay stable during active workflows so the user does not lose orientation.
 
 Avoid turning the context surface into a dashboard. If many unrelated sections appear, group them behind tabs, disclosure controls, or selection-specific views.
 
@@ -187,6 +210,17 @@ Controls should follow desktop expectations.
 - Actions that create files, move files, rename files, or overwrite files must clearly show the target path before execution.
 - Write operations must use a consistent write-operation indicator and confirmation pattern before execution.
 
+Global and contextual action placement:
+
+| Action | Type | Placement |
+| --- | --- | --- |
+| Import transcript | Global | Action bar |
+| Generate context package for the whole project | Global | Action bar |
+| Run Codex | Global | Action bar |
+| Generate context package for the selected folder | Contextual | Context surface |
+
+Global actions are available because a project is active. Contextual actions are available because a specific project object is selected. Do not move global actions into the context surface to save space.
+
 For Electron menus and shortcuts, prefer native menu roles and cross-platform accelerators where possible.
 
 ## Write Operations
@@ -202,6 +236,16 @@ Write-operation requirements:
 - Use calm warning treatment, not alarming destructive styling, unless data loss is possible.
 - Show success with the resulting path or changed object.
 - Rescan or refresh affected project information after successful writes when the operation changes the project folder.
+
+Workflow behavior for write operations:
+
+- Preview and confirmation happen in the primary workspace.
+- The context surface remains unchanged while the workflow runs.
+- Cancel before confirmation writes nothing.
+- Completed writes are not automatically reversed.
+- Success states should make the created, copied, or changed file visible through refreshed project information.
+
+Folder-scoped context packages, when introduced, should be a contextual folder action. The action starts from the selected folder context, opens the shared context-package workflow in the primary workspace, writes the generated Markdown file to the selected folder, and keeps the selected folder visible in the context surface.
 
 Current resolved product constraints:
 

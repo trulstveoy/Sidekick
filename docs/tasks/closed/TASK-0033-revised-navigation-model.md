@@ -58,7 +58,6 @@ Specification, planning, build, verification, review, and closeout are complete.
 ## Links
 
 Related docs:
-- `../architecture/revidert-designdokument.md`
 - `../architecture/revidert-navigasjonsmodell.html`
 - `../architecture/desktop-design-guidelines.md`
 - `../architecture/product-vision.md`
