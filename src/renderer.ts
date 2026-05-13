@@ -20,6 +20,7 @@ import type {
   ScanWarning,
   TranscriptionImportPreview,
   TranscriptionImportResult,
+  TranscriptionSummarySnapshot,
 } from './shared/sidekick-api';
 
 type ViewState =
@@ -106,6 +107,17 @@ type SettingsState =
   | { status: 'saving'; snapshot?: AppSettingsSnapshot; message: string }
   | { status: 'testing'; snapshot?: AppSettingsSnapshot; message: string }
   | { status: 'error'; snapshot?: AppSettingsSnapshot; message: string };
+
+type TranscriptionSummaryState =
+  | { status: 'idle' }
+  | { status: 'loading'; rootPath: string; transcriptionRelativePath: string }
+  | {
+      status: 'loaded';
+      rootPath: string;
+      transcriptionRelativePath: string;
+      summary: TranscriptionSummarySnapshot;
+    }
+  | { status: 'error'; rootPath: string; transcriptionRelativePath: string; message: string };
 
 type ActionTargets = {
   primaryButton: HTMLButtonElement | null;
@@ -313,6 +325,7 @@ let activeWorkflow: ActiveWorkflow = null;
 let settingsState: SettingsState = { status: 'idle', message: '' };
 let projectInfoState: { rootPath: string; snapshot: ProjectInfoSnapshot; message?: string } | null =
   null;
+let transcriptionSummaryState: TranscriptionSummaryState = { status: 'idle' };
 
 if (!workflowHostTarget && legacyWorkflowSurfaceTarget) {
   // Vite HMR can update renderer code while leaving an older index.html DOM in
@@ -555,6 +568,7 @@ const setActiveScan = (scan: ProjectFolderScan) => {
   resetExpandedPaths();
   selectedTreePath = scan.tree.relativePath;
   focusedTreePath = scan.tree.relativePath;
+  transcriptionSummaryState = { status: 'idle' };
   activeWorkflow = null;
   appView = 'workspace';
   resetContextPackageTarget();
@@ -983,6 +997,61 @@ const getFileExtension = (fileName: string) => {
   return extension && extension !== fileName ? `.${extension}` : 'fil';
 };
 
+const hasAllowedTranscriptionExtension = (fileName: string) =>
+  ['.txt', '.md', '.markdown'].includes(getFileExtension(fileName).toLowerCase());
+
+const isTranscriptionFileNode = (node: FolderTreeNode) =>
+  !isFolderNode(node) &&
+  hasAllowedTranscriptionExtension(node.name) &&
+  (node.artifactType === 'transcript' || node.contextHints.includes('transcript'));
+
+const isTranscriptionSummaryStateFor = (
+  rootPath: string,
+  transcriptionRelativePath: string,
+) =>
+  transcriptionSummaryState.status !== 'idle' &&
+  transcriptionSummaryState.rootPath === rootPath &&
+  transcriptionSummaryState.transcriptionRelativePath === transcriptionRelativePath;
+
+const loadTranscriptionSummary = async (scan: ProjectFolderScan, node: FolderTreeNode) => {
+  if (!window.sidekick?.readTranscriptionSummary || !isTranscriptionFileNode(node)) {
+    return;
+  }
+
+  const request = {
+    rootPath: scan.rootPath,
+    transcriptionRelativePath: node.relativePath,
+  };
+
+  try {
+    const summary = await window.sidekick.readTranscriptionSummary(request);
+
+    if (selectedTreePath !== node.relativePath || getActiveScan()?.rootPath !== scan.rootPath) {
+      return;
+    }
+
+    transcriptionSummaryState = {
+      status: 'loaded',
+      rootPath: scan.rootPath,
+      transcriptionRelativePath: node.relativePath,
+      summary,
+    };
+  } catch (error) {
+    if (selectedTreePath !== node.relativePath || getActiveScan()?.rootPath !== scan.rootPath) {
+      return;
+    }
+
+    transcriptionSummaryState = {
+      status: 'error',
+      rootPath: scan.rootPath,
+      transcriptionRelativePath: node.relativePath,
+      message: error instanceof Error ? error.message : 'Sammendraget kunne ikke leses.',
+    };
+  }
+
+  render();
+};
+
 const getNodeWarnings = (scan: ProjectFolderScan, node: FolderTreeNode) =>
   scan.warnings.filter((warning) => {
     if (node.relativePath === ROOT_PATH) {
@@ -1098,6 +1167,69 @@ const renderSelectionContents = (node: FolderTreeNode) => {
   list.className = 'direct-content-list';
   children.forEach((child) => list.append(createDirectContentRow(child)));
   selectionContentsTarget.append(list);
+};
+
+const appendTranscriptionSummary = (scan: ProjectFolderScan, node: FolderTreeNode) => {
+  if (
+    !selectionContentsTarget ||
+    !window.sidekick?.readTranscriptionSummary ||
+    !isTranscriptionFileNode(node)
+  ) {
+    return;
+  }
+
+  if (!isTranscriptionSummaryStateFor(scan.rootPath, node.relativePath)) {
+    transcriptionSummaryState = {
+      status: 'loading',
+      rootPath: scan.rootPath,
+      transcriptionRelativePath: node.relativePath,
+    };
+    void loadTranscriptionSummary(scan, node);
+  }
+
+  const title = document.createElement('p');
+  title.className = 'selection-contents-title';
+  title.textContent = 'Samtalesammendrag';
+
+  const container = document.createElement('div');
+  container.className = 'transcription-summary';
+  container.dataset.transcriptionSummary = transcriptionSummaryState.status;
+
+  if (
+    transcriptionSummaryState.status === 'loading' ||
+    !isTranscriptionSummaryStateFor(scan.rootPath, node.relativePath)
+  ) {
+    container.textContent = 'Laster sammendrag...';
+  } else if (transcriptionSummaryState.status === 'error') {
+    container.textContent = transcriptionSummaryState.message;
+  } else if (transcriptionSummaryState.status === 'loaded') {
+    const { summary } = transcriptionSummaryState;
+
+    if (summary.status === 'complete' || summary.status === 'stale') {
+      if (summary.status === 'stale') {
+        const warning = document.createElement('p');
+        warning.className = 'transcription-summary-warning';
+        warning.textContent = summary.message ?? 'Sammendraget kan være utdatert.';
+        container.append(warning);
+      }
+
+      const summaryText = document.createElement('pre');
+      summaryText.className = 'transcription-summary-body';
+      summaryText.textContent = summary.conversationSummary ?? 'Sammendraget er tomt.';
+      container.append(summaryText);
+
+      if (summary.generatedAt) {
+        const meta = document.createElement('p');
+        meta.className = 'transcription-summary-meta';
+        meta.textContent = `Laget ${formatDate(summary.generatedAt)}`;
+        container.append(meta);
+      }
+    } else {
+      container.textContent = summary.message ?? 'Ingen samtalesammendrag er tilgjengelig.';
+    }
+  }
+
+  selectionContentsTarget.append(title, container);
 };
 
 const appendSelectionWarnings = (warnings: string[]) => {
@@ -1310,6 +1442,7 @@ const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
   }
 
   renderSelectionContents(node);
+  appendTranscriptionSummary(scan, node);
   renderSelectionActions(node);
   appendSelectionWarnings(
     warnings.map((warning) =>
@@ -1885,14 +2018,24 @@ const renderTranscriptionImportImporting = (preview: TranscriptionImportPreview)
 };
 
 const renderTranscriptionImportComplete = (result: TranscriptionImportResult) => {
+  const summaryText =
+    result.summary.status === 'complete'
+      ? 'Samtalesammendrag laget'
+      : 'Import fullført, men sammendrag mangler';
+
   setText(transcriptionImportTitleTarget, 'Transkripsjon importert');
-  setText(transcriptionImportMessageTarget, 'Prosjektet er skannet på nytt med den importerte filen.');
+  setText(
+    transcriptionImportMessageTarget,
+    'Prosjektet er skannet på nytt med den importerte filen.',
+  );
   renderTranscriptionImportStateElements(
     createImportSteps(3),
     createResultBanner(
       'success',
       'Filen er lagt til',
-      'Originalfilen er uendret på kildestedet.',
+      result.summary.status === 'complete'
+        ? 'Originalfilen er uendret, og Sidekick har laget et samtalesammendrag.'
+        : 'Originalfilen er uendret på kildestedet.',
     ),
   );
   renderTranscriptionImportDetails([
@@ -1900,10 +2043,13 @@ const renderTranscriptionImportComplete = (result: TranscriptionImportResult) =>
     ['Kilde', result.sourceFileName],
     ['Størrelse', formatBytes(result.copiedBytes)],
     ['Nummer', result.finalNumber.toString().padStart(2, '0')],
+    ['Sammendrag', summaryText],
     ['Destinasjonssti', result.destinationPath],
     ['Original', 'Uendret'],
   ]);
-  renderTranscriptionImportList([]);
+  renderTranscriptionImportList(
+    result.summary.status === 'failed' ? [result.summary.message] : [],
+  );
   renderTranscriptionImportActions('Importer ny', false, true);
 };
 
@@ -3103,6 +3249,15 @@ const importTranscription = async () => {
     // otherwise keep the user on the target folder that changed.
     selectedTreePath = importedNode ? importedRelativePath : result.targetFolderRelativePath;
     focusedTreePath = selectedTreePath;
+    transcriptionSummaryState =
+      result.summary.status === 'complete'
+        ? {
+            status: 'loaded',
+            rootPath: result.rootPath,
+            transcriptionRelativePath: importedRelativePath,
+            summary: result.summary.summary,
+          }
+        : { status: 'idle' };
     setContextPackageStateForScan(result.scan);
     setOverviewContextPackageStatusForScan(result.scan);
     transcriptionImportState = { status: 'complete', result };

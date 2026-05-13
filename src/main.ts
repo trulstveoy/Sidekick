@@ -9,6 +9,7 @@ import type {
   CodexRunRequest,
   ProjectCreationRequest,
   ProjectInitializationPreview,
+  TranscriptionSummaryReadRequest,
   TranscriptionImportPreview,
 } from './shared/sidekick-api';
 import {
@@ -29,6 +30,10 @@ import {
   confirmTranscriptionImport,
   createTranscriptionImportPreview,
 } from './main/transcription-importer';
+import {
+  generateTranscriptionSummary,
+  readTranscriptionSummary,
+} from './main/transcription-summary';
 import { AppSettingsStore, normalizeCodexPath, validateCodexPath } from './main/settings-store';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -294,10 +299,44 @@ ipcMain.handle('transcription:confirm-import', async (_event, previewId) => {
     // revalidates the root in case the selected project set has changed.
     assertKnownProjectRoot(preview.rootPath);
 
-    return await confirmTranscriptionImport(preview);
+    return await confirmTranscriptionImport(preview, ({ rootPath, transcriptionPath }) =>
+      generateTranscriptionSummary({
+        rootPath,
+        transcriptionPath,
+        codexRunner,
+      }),
+    );
   } finally {
     pendingTranscriptionImports.delete(previewId);
   }
+});
+
+const assertTranscriptionSummaryReadRequest = (
+  request: unknown,
+): TranscriptionSummaryReadRequest => {
+  if (!request || typeof request !== 'object') {
+    throw new Error('A transcription summary request is required.');
+  }
+
+  const { rootPath, transcriptionRelativePath } = request as Partial<TranscriptionSummaryReadRequest>;
+
+  if (typeof transcriptionRelativePath !== 'string') {
+    throw new Error('A project-relative transcription path is required.');
+  }
+
+  return {
+    rootPath: assertKnownProjectRoot(rootPath),
+    transcriptionRelativePath,
+  };
+};
+
+ipcMain.handle('transcription:read-summary', (_event, request) => {
+  const summaryRequest = assertTranscriptionSummaryReadRequest(request);
+
+  return readTranscriptionSummary(
+    summaryRequest.rootPath,
+    summaryRequest.transcriptionRelativePath,
+  );
 });
 
 const assertCodexRunRequest = (request: unknown): CodexRunRequest => {

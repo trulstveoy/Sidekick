@@ -285,6 +285,22 @@ const mockTranscriptionImportResult: TranscriptionImportResult = {
   destinationFileName: '00. new-transcription.md',
   finalNumber: 0,
   copiedBytes: 1024,
+  summary: {
+    status: 'complete',
+    summary: {
+      status: 'complete',
+      rootPath: '/tmp/sidekick-project',
+      transcriptionRelativePath: '02-transkripsjoner/00. new-transcription.md',
+      summaryRelativePath: '.sidekick/transcription-summaries/test.summary.md',
+      summaryPath: '/tmp/sidekick-project/.sidekick/transcription-summaries/test.summary.md',
+      generatedAt: '2026-05-09T12:05:30.000Z',
+      transcriptionSha256: 'old',
+      currentTranscriptionSha256: 'old',
+      summaryLanguage: 'nb',
+      conversationSummary:
+        '## Conversation Summary\n\nSamtalen handler om Sidekick.\n\n- Transkripsjonen ble importert.',
+    },
+  },
   scan: mockScanAfterTranscriptionImport,
 };
 
@@ -1501,6 +1517,7 @@ test('confirms and displays an imported transcription', async ({ page }) => {
         generateContextPackage: async () => contextResult,
         previewTranscriptionImport: async () => importPreview,
         confirmTranscriptionImport: async () => importResult,
+        readTranscriptionSummary: async () => importResult.summary.summary,
       };
     },
     {
@@ -1538,8 +1555,9 @@ test('confirms and displays an imported transcription', async ({ page }) => {
   await page.getByRole('button', { name: 'Importer fil' }).click();
 
   await expect(page.getByRole('heading', { name: 'Transkripsjon importert' })).toBeVisible();
-  await expect(page.getByText('Originalfilen er uendret på kildestedet.')).toBeVisible();
+  await expect(page.getByText(/Sidekick har laget et samtalesammendrag/)).toBeVisible();
   await expect(transcriptionDetails).toContainText('00. new-transcription.md');
+  await expect(transcriptionDetails).toContainText('Samtalesammendrag laget');
   await page.getByRole('button', { name: 'Tilbake' }).click();
   await expect(
     page.getByRole('tree', { name: 'Skannet mappetre' }).getByText('00. new-transcription.md'),
@@ -1547,6 +1565,9 @@ test('confirms and displays an imported transcription', async ({ page }) => {
   await expect(
     page.getByRole('treeitem', { name: '00. new-transcription.md' }),
   ).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('[data-transcription-summary="loaded"]')).toContainText(
+    'Samtalen handler om Sidekick.',
+  );
 });
 
 test('keeps the transcript import ready state when file selection is cancelled', async ({ page }) => {

@@ -243,6 +243,37 @@ export type TranscriptionImportPreview = {
   warnings: TranscriptionImportWarning[];
 };
 
+export type TranscriptionSummaryStatus = 'missing' | 'complete' | 'stale' | 'invalid';
+
+export type TranscriptionSummarySnapshot = {
+  status: TranscriptionSummaryStatus;
+  rootPath: string;
+  transcriptionRelativePath: string;
+  summaryRelativePath: string;
+  summaryPath: string;
+  generatedAt?: string;
+  transcriptionSha256?: string;
+  currentTranscriptionSha256?: string;
+  summaryLanguage?: 'nb';
+  conversationSummary?: string;
+  message?: string;
+};
+
+export type TranscriptionSummaryGenerationResult =
+  | {
+      status: 'complete';
+      summary: TranscriptionSummarySnapshot;
+    }
+  | {
+      status: 'failed';
+      message: string;
+    };
+
+export type TranscriptionSummaryReadRequest = {
+  rootPath: string;
+  transcriptionRelativePath: string;
+};
+
 export type TranscriptionImportResult = {
   status: 'complete';
   rootPath: string;
@@ -254,6 +285,7 @@ export type TranscriptionImportResult = {
   destinationFileName: string;
   finalNumber: number;
   copiedBytes: number;
+  summary: TranscriptionSummaryGenerationResult;
   scan: ProjectFolderScan;
 };
 
@@ -342,6 +374,9 @@ export type SidekickApi = {
   ) => Promise<ContextPackageResult>;
   previewTranscriptionImport: (rootPath: string) => Promise<TranscriptionImportPreview | null>;
   confirmTranscriptionImport: (previewId: string) => Promise<TranscriptionImportResult>;
+  readTranscriptionSummary?: (
+    request: TranscriptionSummaryReadRequest,
+  ) => Promise<TranscriptionSummarySnapshot>;
   getCodexStatus: (rootPath: string) => Promise<CodexStatus>;
   startCodexLogin: (rootPath: string) => Promise<CodexRunStartResult>;
   startCodexRun: (request: CodexRunRequest) => Promise<CodexRunStartResult>;

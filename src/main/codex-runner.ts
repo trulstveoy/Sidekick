@@ -226,7 +226,7 @@ export class CodexRunner extends EventEmitter {
     this.emit('completion', event);
   }
 
-  private runCommand(args: string[], cwd: string): Promise<ProcessResult> {
+  private runCommand(args: string[], cwd: string, stdinText?: string): Promise<ProcessResult> {
     return new Promise((resolve) => {
       const child = spawn(this.executable.command, args, {
         cwd,
@@ -238,6 +238,14 @@ export class CodexRunner extends EventEmitter {
 
       child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
       child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
+      child.stdin.on('error', () => {
+        // Startup failures can close stdin before the prompt is written. The
+        // process error/close handlers below report the real failure.
+      });
+
+      if (stdinText !== undefined) {
+        child.stdin.end(stdinText);
+      }
 
       child.on('error', (error) => {
         resolve({

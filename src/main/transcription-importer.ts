@@ -8,6 +8,7 @@ import type {
   TranscriptionImportNumbering,
   TranscriptionImportPreview,
   TranscriptionImportResult,
+  TranscriptionSummaryGenerationResult,
 } from '../shared/sidekick-api';
 import { scanProjectFolder } from './folder-scanner';
 
@@ -30,6 +31,11 @@ type TranscriptionDestination = {
   finalNumber: number;
   numbering: TranscriptionImportNumbering;
 };
+
+type TranscriptionSummaryGenerator = (request: {
+  rootPath: string;
+  transcriptionPath: string;
+}) => Promise<TranscriptionSummaryGenerationResult>;
 
 const isFolderNode = (node: FolderTreeNode) => node.kind === 'folder';
 
@@ -266,6 +272,7 @@ const copyWithoutOverwrite = async (
 
 export const confirmTranscriptionImport = async (
   preview: TranscriptionImportPreview,
+  generateSummary?: TranscriptionSummaryGenerator,
 ): Promise<TranscriptionImportResult> => {
   await assertAllowedSourceFile(preview.sourcePath);
 
@@ -278,6 +285,15 @@ export const confirmTranscriptionImport = async (
     preview.sourceFileName,
   );
   const copiedStats = await stat(copied.destinationPath);
+  const summary = generateSummary
+    ? await generateSummary({
+        rootPath: preview.rootPath,
+        transcriptionPath: copied.destinationPath,
+      })
+    : {
+        status: 'failed' as const,
+        message: 'Sammendrag ble ikke konfigurert for denne importen.',
+      };
   const scan = await scanProjectFolder(preview.rootPath);
 
   return {
@@ -291,6 +307,7 @@ export const confirmTranscriptionImport = async (
     destinationFileName: copied.destinationFileName,
     finalNumber: copied.finalNumber,
     copiedBytes: copiedStats.size,
+    summary,
     scan,
   };
 };
