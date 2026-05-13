@@ -119,6 +119,7 @@ const contextSurfaceTarget = document.querySelector<HTMLElement>('[data-context-
 const workspaceDefaultTarget = document.querySelector<HTMLElement>('[data-workspace-default]');
 const workflowHostTarget = document.querySelector<HTMLElement>('[data-workflow-host]');
 const workflowPanels = document.querySelectorAll<HTMLElement>('[data-workflow-panel]');
+const legacyWorkflowSurfaceTarget = document.querySelector<HTMLElement>('.surface-section--workflow');
 const summaryStripTarget = document.querySelector<HTMLElement>('[data-summary]');
 const projectEntryTarget = document.querySelector<HTMLElement>('[data-project-entry]');
 const projectEntryErrorTarget = document.querySelector<HTMLElement>('[data-project-entry-error]');
@@ -303,6 +304,14 @@ let codexState: CodexState = { status: 'unavailable', message: 'Choose a folder 
 let appView: AppView = 'workspace';
 let activeWorkflow: ActiveWorkflow = null;
 let settingsState: SettingsState = { status: 'idle', message: '' };
+
+if (!workflowHostTarget && legacyWorkflowSurfaceTarget) {
+  // Vite HMR can update renderer code while leaving an older index.html DOM in
+  // the running Electron window. A full reload is required when the shell
+  // structure changed, otherwise workflow controls keep operating in the old
+  // right-panel layout.
+  window.location.reload();
+}
 
 const setText = (target: Element | null, value: string) => {
   if (target) {
