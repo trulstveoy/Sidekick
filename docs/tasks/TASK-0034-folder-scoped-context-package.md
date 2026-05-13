@@ -1,7 +1,7 @@
 # Task: Folder-Scoped Context Package
 
 ID: TASK-0034
-Status: Approved
+Status: Ready For Review
 Class: Major
 Owner: Pair
 Created: 2026-05-13
@@ -38,21 +38,21 @@ The generated Markdown file should be stored in the selected folder and should i
 
 ## Current Phase
 
-Plan
+Ready For Review
 
-Specification and planning are complete. Human approval is received. Build can start.
+Build and automated verification are complete. Waiting for human review.
 
 ## Progress Checklist
 
 - [x] Explore complete
 - [x] Spec complete
 - [x] Plan complete
-- [ ] Worktree created or reused, if required
+- [x] Worktree created or reused, if required
 - [x] Human approval received, if required
-- [ ] Build complete
-- [ ] Verification complete
+- [x] Build complete
+- [x] Verification complete
 - [ ] Review complete
-- [ ] Documentation complete
+- [x] Documentation complete
 - [ ] Closeout complete
 
 ## Links
@@ -319,20 +319,71 @@ Human gates:
 
 ## Build Log
 
-Not started.
+- Created worktree `../Sidekick-worktrees/TASK-0034-folder-scoped-context-package` from updated `origin/main`.
+- Installed dependencies in the worktree because the new worktree did not have `node_modules`.
+- Added backend support for folder-scoped context-package preview and generation:
+  - validates selected folder relative paths in the main process;
+  - rejects root, absolute paths, traversal, and folders outside the selected project root;
+  - writes folder packages into the selected folder;
+  - scans the full project after generation.
+- Tightened generated-package ignore patterns so both full-project and folder-scoped generation ignore context packages in nested subfolders.
+- Added typed preload/main APIs for folder-scoped preview and generation.
+- Added contextual folder action in the right context panel for non-root folders only.
+- Reused the existing context-package workflow surface for both project and folder scopes.
+- Preserved full-project context-package behavior and status handling.
+- Added UI behavior to keep the selected folder visible and expanded after folder-scoped generation.
+- Commit checkpoints:
+  - `da868c3 feat: add folder-scoped context package backend`
+  - `d17b43b feat: add folder-scoped context package UI`
 
 ## Verification Log
 
-Not started.
+- Baseline:
+  - Initial `npm run check` failed before install because the new worktree lacked `node_modules`.
+  - `npm install` completed in the worktree.
+  - Baseline `npm run check` passed after dependency install.
+- Targeted backend verification:
+  - `npm test -- tests/unit/context-package.test.ts tests/integration/context-package.test.ts` initially failed because nested generated context packages were not ignored.
+  - Added recursive context-package ignore patterns.
+  - `npm test -- tests/unit/context-package.test.ts tests/integration/context-package.test.ts` passed.
+- Full verification:
+  - `npm run check` passed.
+  - `npm test` passed: 16 test files, 69 tests.
+  - First `npm run test:ui` used a stale existing Vite server on port 5173 and failed to see the new HTML.
+  - Stopped the stale Vite server and reran UI tests.
+  - `npm run test:ui` passed: 27 UI tests.
 
 ## Review Notes
 
-Not started.
+Ready for human review.
+
+Suggested manual verification:
+
+1. Start the app from this worktree:
+   ```text
+   cd /home/trutve/code/Sidekick-worktrees/TASK-0034-folder-scoped-context-package
+   npm start
+   ```
+2. Select a project folder that has at least one subfolder with files.
+3. Select a non-root folder in the tree.
+4. Confirm the right panel shows `Generer kontekstpakke for denne mappen`.
+5. Click it and verify the context-package workflow opens in the middle panel while the right panel stays on the selected folder.
+6. Preview the package and verify:
+   - selected folder is shown as scope;
+   - output filename is based on the folder name;
+   - output location is the selected folder;
+   - overwrite status is shown;
+   - write warning is shown.
+7. Generate the package and verify the new `.context-package.md` file appears inside the selected folder in the tree after success.
+8. Generate a package for a parent folder that contains a subfolder with its own `.context-package.md` file. Verify the subfolder package is not included in the generated output.
+9. Select a file and the project root. Confirm the folder-scoped action is not shown.
+10. Use the global `Generer kontekstpakke` action and confirm it still writes to the project root.
 
 ## Documentation Notes
 
-Not started.
+- `docs/architecture/desktop-design-guidelines.md` already contains the design rule for folder-scoped context packages.
+- This task record was updated with build, verification, and review instructions.
 
 ## Closeout
 
-Not started.
+Not started. Close after human review and integration.
