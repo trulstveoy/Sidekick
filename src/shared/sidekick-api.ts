@@ -118,6 +118,62 @@ export type FolderTreeNode = {
   modifiedAt?: string;
 };
 
+export type ContextViewId = 'folders' | 'projects';
+
+export type ContextViewReason =
+  | 'physical-tree-node'
+  | 'project-root-tag'
+  | 'physical-project-file';
+
+export type ContextViewSourceKind =
+  | 'physical-tree'
+  | 'project-root'
+  | 'physical-project-file';
+
+export type ContextViewRow = {
+  id: string;
+  viewId: ContextViewId;
+  artifactRelativePath: string;
+  artifactKind: FolderTreeNode['kind'];
+  artifactType?: ArtifactType;
+  displayLabel: string;
+  displayGroup?: string;
+  contextId?: string;
+  contextLabel?: string;
+  contextType?: FolderContextReference['type'];
+  viewReason: ContextViewReason;
+  sourceKind: ContextViewSourceKind;
+  size?: number;
+  modifiedAt?: string;
+};
+
+export type FolderContextView = {
+  id: 'folders';
+  label: 'Mapper';
+  rows: ContextViewRow[];
+};
+
+export type ProjectContext = {
+  id: string;
+  type: 'project';
+  label: string;
+  rootRelativePath: string;
+  rootRow: ContextViewRow;
+  rows: ContextViewRow[];
+};
+
+export type ProjectContextView = {
+  id: 'projects';
+  label: 'Prosjekter';
+  contexts: ProjectContext[];
+  rows: ContextViewRow[];
+};
+
+export type ContextViewsSnapshot = {
+  folders: FolderContextView;
+  projects: ProjectContextView;
+};
+
 export type ScanSummary = {
   fileCount: number;
   folderCount: number;
@@ -138,6 +194,7 @@ export type WorkspaceScan = {
   tree: FolderTreeNode;
   summary: ScanSummary;
   warnings: ScanWarning[];
+  contextViews: ContextViewsSnapshot;
 };
 
 export type ScanOptions = {

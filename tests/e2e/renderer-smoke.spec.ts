@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
+import { deriveContextViews } from '../../src/shared/context-views';
 import type {
   ArtifactType,
   AppSettingsSnapshot,
@@ -70,7 +71,12 @@ const createFolderSignalCounts = () =>
     thematic: 0,
   }) satisfies Record<FolderSignal, number>;
 
-const mockScan: WorkspaceScan = {
+const withContextViews = (scan: Omit<WorkspaceScan, 'contextViews'>): WorkspaceScan => ({
+  ...scan,
+  contextViews: deriveContextViews(scan.tree),
+});
+
+const mockScan: WorkspaceScan = withContextViews({
   rootPath: '/tmp/sidekick-workspace',
   rootName: 'sidekick-workspace',
   scannedAt: '2026-05-09T12:00:00.000Z',
@@ -144,9 +150,9 @@ const mockScan: WorkspaceScan = {
     },
   },
   warnings: [],
-};
+});
 
-const mockScanWithTextTranscriptions: WorkspaceScan = {
+const mockScanWithTextTranscriptions: WorkspaceScan = withContextViews({
   ...mockScan,
   tree: {
     ...mockScan.tree,
@@ -196,7 +202,47 @@ const mockScanWithTextTranscriptions: WorkspaceScan = {
       transcript: 3,
     },
   },
-};
+});
+
+const mockProjectScan: WorkspaceScan = withContextViews({
+  ...mockScan,
+  tree: {
+    ...mockScan.tree,
+    children: mockScan.tree.children?.map((child) =>
+      child.relativePath === '01-bakgrunn'
+        ? {
+            ...child,
+            name: 'Strategi',
+            relativePath: 'Strategi',
+            metadata: {
+              status: 'valid',
+              markerRelativePath: 'Strategi/.sidekick-folder.json',
+              folderId: 'folder-strategi',
+              tags: [
+                {
+                  label: 'Prosjektmappe',
+                  normalizedLabel: 'prosjektmappe',
+                  kind: 'system',
+                  source: 'explicit',
+                  updatedAt: '2026-05-14T12:00:00.000Z',
+                  systemEffect: 'project-root',
+                  context: {
+                    id: 'project-strategi',
+                    type: 'project',
+                    name: 'Strategi',
+                  },
+                },
+              ],
+            },
+            children: child.children?.map((grandchild) => ({
+              ...grandchild,
+              relativePath: grandchild.relativePath.replace('01-bakgrunn', 'Strategi'),
+            })),
+          }
+        : child,
+    ),
+  },
+});
 
 const mockContextPackagePreview: ContextPackagePreview = {
   scope: 'workspace',
@@ -248,7 +294,7 @@ const mockContextPackageResult: ContextPackageResult = {
     status: 'complete',
     workspaceInfo: mockWorkspaceInfo,
   },
-  scan: {
+  scan: withContextViews({
     ...mockScan,
     scannedAt: '2026-05-09T12:10:00.000Z',
     tree: {
@@ -274,7 +320,7 @@ const mockContextPackageResult: ContextPackageResult = {
         'markdown-text': mockScan.summary.artifactTypeCounts['markdown-text'] + 1,
       },
     },
-  },
+  }),
 };
 
 const mockDocumentRelationships: DocumentRelationshipsSnapshot = {
@@ -318,7 +364,7 @@ const mockDocumentRelationshipsResult: DocumentRelationshipsGenerationResult = {
   },
 };
 
-const mockScanAfterTranscriptionImport: WorkspaceScan = {
+const mockScanAfterTranscriptionImport: WorkspaceScan = withContextViews({
   ...mockScan,
   scannedAt: '2026-05-09T12:05:00.000Z',
   tree: {
@@ -351,7 +397,7 @@ const mockScanAfterTranscriptionImport: WorkspaceScan = {
       transcript: 1,
     },
   },
-};
+});
 
 const mockTranscriptionImportPreview: TranscriptionImportPreview = {
   previewId: 'preview-1',
@@ -504,7 +550,7 @@ const mockWorkspaceCreationResult: WorkspaceCreationResult = {
       status: 'created',
     },
   ],
-  scan: {
+  scan: withContextViews({
     ...mockScan,
     rootPath: '/tmp/new-sidekick-workspace',
     rootName: 'new-sidekick-workspace',
@@ -547,7 +593,7 @@ const mockWorkspaceCreationResult: WorkspaceCreationResult = {
       folderCount: 3,
       recentFiles: [],
     },
-  },
+  }),
 };
 
 const mockWorkspaceInitializationPreview: WorkspaceInitializationPreview = {
@@ -602,7 +648,7 @@ const mockWorkspaceInitializationResult: WorkspaceInitializationResult = {
       status: 'created',
     },
   ],
-  scan: {
+  scan: withContextViews({
     ...mockWorkspaceCreationResult.scan,
     rootPath: '/tmp/existing-sidekick-workspace',
     rootName: 'existing-sidekick-workspace',
@@ -610,10 +656,10 @@ const mockWorkspaceInitializationResult: WorkspaceInitializationResult = {
       ...mockWorkspaceCreationResult.scan.tree,
       name: 'existing-sidekick-workspace',
     },
-  },
+  }),
 };
 
-const mockPartialScan: WorkspaceScan = {
+const mockPartialScan: WorkspaceScan = withContextViews({
   ...mockScan,
   status: 'partial',
   warnings: [
@@ -631,9 +677,9 @@ const mockPartialScan: WorkspaceScan = {
       maxFiles: true,
     },
   },
-};
+});
 
-const mockDeepScan: WorkspaceScan = {
+const mockDeepScan: WorkspaceScan = withContextViews({
   ...mockScan,
   tree: {
     ...mockScan.tree,
@@ -672,9 +718,9 @@ const mockDeepScan: WorkspaceScan = {
     fileCount: 4,
     folderCount: 3,
   },
-};
+});
 
-const mockEmptyScan: WorkspaceScan = {
+const mockEmptyScan: WorkspaceScan = withContextViews({
   ...mockScan,
   rootPath: '/tmp/empty-sidekick-workspace',
   rootName: 'empty-sidekick-workspace',
@@ -711,7 +757,7 @@ const mockEmptyScan: WorkspaceScan = {
     },
   },
   warnings: [],
-};
+});
 
 test('renders the folder inspection empty state', async ({ page }) => {
   await page.goto('/');
@@ -1470,6 +1516,100 @@ test('expands and collapses scanned folders', async ({ page }) => {
   await expect(page.getByText('notes.md')).toHaveCount(0);
 });
 
+test('switches between physical folders and project context views', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan, preview, result }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
+        previewContextPackage: async () => preview,
+        generateContextPackage: async () => result,
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+      };
+    },
+    {
+      scan: mockProjectScan,
+      preview: mockContextPackagePreview,
+      result: mockContextPackageResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
+
+  await expect(page.getByRole('button', { name: 'Mapper', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('tree', { name: 'Skannet mappetre' })).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /Strategi/ })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Prosjekter', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Prosjekter', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  const projectsView = page.getByLabel('Prosjekter');
+  await expect(projectsView.locator('.project-context-group', { hasText: 'Strategi' })).toBeVisible();
+  await expect(page.getByText('Prosjektfiler')).toBeVisible();
+  await expect(projectsView.getByRole('button', { name: /brief.pdf/ })).toBeVisible();
+  await expect(projectsView.getByText('02-transkripsjoner')).toHaveCount(0);
+
+  await projectsView.getByRole('button', { name: /notes.md/ }).click();
+  await expect(page.locator('[data-selection-details]')).toContainText('Fysisk plassering');
+  await expect(page.locator('[data-selection-details]')).toContainText('Strategi/notes.md');
+  await expect(page.locator('[data-selection-details]')).toContainText('Prosjekt');
+  await expect(page.locator('[data-selection-details]')).toContainText('Vises her fordi');
+  await expect(page.locator('[data-selection-details]')).toContainText(
+    'Filen ligger fysisk i en mappe tagget som Prosjektmappe.',
+  );
+
+  await page.getByRole('button', { name: 'Mapper', exact: true }).click();
+  await expect(page.getByRole('tree', { name: 'Skannet mappetre' })).toBeVisible();
+  await expect(page.locator('[data-selection-title]')).toHaveText('notes.md');
+});
+
+test('shows an empty project context view when no folders are tagged', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan, preview, result }) => {
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
+        previewContextPackage: async () => preview,
+        generateContextPackage: async () => result,
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+      };
+    },
+    {
+      scan: mockScan,
+      preview: mockContextPackagePreview,
+      result: mockContextPackageResult,
+    },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
+  await page.getByRole('button', { name: 'Prosjekter', exact: true }).click();
+
+  await expect(page.getByRole('heading', { name: 'Ingen prosjektmapper' })).toBeVisible();
+  await expect(page.getByText('Tagg en mappe med Prosjektmappe')).toBeVisible();
+  await expect(page.getByText('brief.pdf')).toHaveCount(0);
+});
+
 test('edits folder tags from the right panel and shows tree pills', async ({ page }) => {
   await page.addInitScript(
     ({ scan }) => {
@@ -1994,7 +2134,7 @@ test('generates a folder-scoped context package from selected folder context', a
     outputPath: '/tmp/sidekick-workspace/02-transkripsjoner/transkripsjoner.context-package.md',
     outputFileName: 'transkripsjoner.context-package.md',
     overwritten: false,
-    scan: {
+    scan: withContextViews({
       ...mockContextPackageResult.scan,
       tree: {
         ...mockContextPackageResult.scan.tree,
@@ -2018,7 +2158,7 @@ test('generates a folder-scoped context package from selected folder context', a
             : child,
         ),
       },
-    },
+    }),
   };
 
   await page.addInitScript(

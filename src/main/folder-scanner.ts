@@ -11,6 +11,7 @@ import type {
   ScanSummary,
   ScanWarning,
 } from '../shared/sidekick-api';
+import { deriveContextViews } from '../shared/context-views';
 import {
   FOLDER_METADATA_FILE_NAME,
   readFolderMetadataForScan,
@@ -646,5 +647,6 @@ export const scanWorkspaceFolder = async (
     tree: rootNode,
     summary,
     warnings: state.warnings,
+    contextViews: deriveContextViews(rootNode),
   };
 };

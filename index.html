@@ -141,9 +141,20 @@
 
             <section class="search-results" aria-label="Søkeresultater" data-search-results hidden></section>
 
-            <section class="tree-panel" aria-label="Mappestruktur">
+            <nav class="context-view-toggle" aria-label="Visning" data-context-view-toggle hidden>
+              <button class="context-view-toggle__button" type="button" data-context-view-button="folders">
+                Mapper
+              </button>
+              <button class="context-view-toggle__button" type="button" data-context-view-button="projects">
+                Prosjekter
+              </button>
+            </nav>
+
+            <section class="tree-panel" aria-label="Mappestruktur" data-folders-view>
               <ol class="folder-tree" data-folder-tree role="tree" aria-label="Skannet mappetre"></ol>
             </section>
+
+            <section class="project-context-view" aria-label="Prosjekter" data-projects-view hidden></section>
           </div>
 
           <div class="workflow-host" data-workflow-host hidden>

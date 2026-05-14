@@ -9,6 +9,9 @@ import type {
   CodexStatus,
   ContextPackagePreview,
   ContextPackageResult,
+  ContextViewId,
+  ContextViewReason,
+  ContextViewRow,
   DocumentRelationshipsGenerationResult,
   DocumentRelationshipsSnapshot,
   FolderTag,
@@ -260,6 +263,10 @@ const overviewRunCodexButton = document.querySelector<HTMLButtonElement>(
   '[data-overview-action-run-codex]',
 );
 const treeToolbarTarget = document.querySelector<HTMLElement>('[data-tree-toolbar]');
+const contextViewToggleTarget = document.querySelector<HTMLElement>('[data-context-view-toggle]');
+const contextViewButtons = document.querySelectorAll<HTMLButtonElement>('[data-context-view-button]');
+const foldersViewTarget = document.querySelector<HTMLElement>('[data-folders-view]');
+const projectsViewTarget = document.querySelector<HTMLElement>('[data-projects-view]');
 const treeTarget = document.querySelector<HTMLOListElement>('[data-folder-tree]');
 const expandAllButton = document.querySelector<HTMLButtonElement>('[data-expand-all]');
 const collapseAllButton = document.querySelector<HTMLButtonElement>('[data-collapse-all]');
@@ -401,6 +408,7 @@ let state: ViewState = { status: 'empty' };
 let expandedPaths = new Set<string>();
 let selectedTreePath = ROOT_PATH;
 let focusedTreePath = ROOT_PATH;
+let activeContextView: ContextViewId = 'folders';
 let contextPackageState: ContextPackageState = { status: 'unavailable' };
 let contextPackageTarget: ContextPackageTarget = { scope: 'workspace' };
 let overviewContextPackageStatus: OverviewContextPackageStatus = { status: 'unavailable' };
@@ -712,6 +720,7 @@ const setActiveScan = (scan: WorkspaceScan) => {
   resetExpandedPaths();
   selectedTreePath = scan.tree.relativePath;
   focusedTreePath = scan.tree.relativePath;
+  activeContextView = 'folders';
   transcriptionSummaryState = { status: 'idle' };
   activeWorkflow = null;
   appView = 'workspace';
@@ -735,6 +744,45 @@ const getActiveScan = () =>
 
 const isFolderNode = (node: FolderTreeNode) => node.kind === 'folder';
 
+const hasActiveSearchQuery = () => Boolean(searchQueryInput?.value.trim());
+
+const getProjectRows = (scan: WorkspaceScan) => scan.contextViews.projects.rows;
+
+const getSelectedContextViewRow = (
+  scan: WorkspaceScan,
+  relativePath = selectedTreePath,
+): ContextViewRow | undefined => {
+  const rows =
+    activeContextView === 'projects'
+      ? getProjectRows(scan)
+      : scan.contextViews.folders.rows;
+
+  return rows.find((row) => row.artifactRelativePath === relativePath);
+};
+
+const getFirstProjectSelectionPath = (scan: WorkspaceScan) =>
+  scan.contextViews.projects.contexts[0]?.rootRelativePath ?? scan.tree.relativePath;
+
+const selectContextView = (viewId: ContextViewId) => {
+  const scan = getActiveScan();
+
+  activeContextView = viewId;
+
+  if (scan) {
+    if (viewId === 'folders') {
+      selectedTreePath = getNodeByPath(scan.tree, selectedTreePath)
+        ? selectedTreePath
+        : scan.tree.relativePath;
+      focusedTreePath = selectedTreePath;
+    } else if (!getProjectRows(scan).some((row) => row.artifactRelativePath === selectedTreePath)) {
+      selectedTreePath = getFirstProjectSelectionPath(scan);
+      focusedTreePath = selectedTreePath;
+    }
+  }
+
+  render();
+};
+
 const replaceActiveScan = (scan: WorkspaceScan, preferredSelectedPath = selectedTreePath) => {
   const selectedPath = getNodeByPath(scan.tree, preferredSelectedPath)
     ? preferredSelectedPath
@@ -742,6 +790,13 @@ const replaceActiveScan = (scan: WorkspaceScan, preferredSelectedPath = selected
 
   selectedTreePath = selectedPath;
   focusedTreePath = selectedPath;
+  if (
+    activeContextView === 'projects' &&
+    !getProjectRows(scan).some((row) => row.artifactRelativePath === selectedTreePath)
+  ) {
+    selectedTreePath = getFirstProjectSelectionPath(scan);
+    focusedTreePath = selectedTreePath;
+  }
   state = scan.status === 'partial' ? { status: 'partial', scan } : { status: 'ready', scan };
 };
 
@@ -774,6 +829,14 @@ const focusActiveWorkflow = () => {
 const focusSelectedTreeRow = () => {
   window.requestAnimationFrame(() => {
     if (document.activeElement && document.activeElement !== document.body) {
+      return;
+    }
+
+    if (activeContextView === 'projects') {
+      const projectRow = projectsViewTarget?.querySelector<HTMLElement>(
+        `.project-context-row[data-project-path="${CSS.escape(selectedTreePath)}"]`,
+      );
+      projectRow?.focus();
       return;
     }
 
@@ -961,6 +1024,18 @@ const ensureVisibleTreeSelection = (scan: WorkspaceScan) => {
 };
 
 const focusTreeRow = (relativePath: string) => {
+  if (activeContextView === 'projects') {
+    const focusProjectRow = () => {
+      const row = projectsViewTarget?.querySelector<HTMLElement>(
+        `.project-context-row[data-project-path="${CSS.escape(relativePath)}"]`,
+      );
+      row?.focus();
+    };
+    focusProjectRow();
+    window.requestAnimationFrame(focusProjectRow);
+    return;
+  }
+
   const row = treeTarget?.querySelector<HTMLElement>(
     `.tree-row[data-tree-path="${CSS.escape(relativePath)}"]`,
   );
@@ -1958,6 +2033,7 @@ const renderSelectedTreeContext = (scan?: WorkspaceScan) => {
   selectionPanelTarget?.toggleAttribute('hidden', false);
 
   const node = getNodeByPath(scan.tree, selectedTreePath) ?? scan.tree;
+  const contextViewRow = getSelectedContextViewRow(scan, node.relativePath);
   const warnings = getNodeWarnings(scan, node);
   const childFolders = getChildren(node).filter(isFolderNode).length;
   const childFiles = getChildren(node).length - childFolders;
@@ -1969,6 +2045,7 @@ const renderSelectedTreeContext = (scan?: WorkspaceScan) => {
     renderSelectionBreadcrumb(scan, node);
     renderDetails(selectionDetailsTarget, [
       ['Arbeidsområde', scan.rootPath],
+      ['Visning', activeContextView === 'projects' ? 'Prosjekter' : 'Mapper'],
       ['Filer', scan.summary.fileCount.toString()],
       ['Mapper', scan.summary.folderCount.toString()],
       ['Skannet', formatDate(scan.scannedAt)],
@@ -1994,22 +2071,42 @@ const renderSelectedTreeContext = (scan?: WorkspaceScan) => {
   renderSelectionBreadcrumb(scan, node);
 
   if (isFolderNode(node)) {
-    renderDetails(selectionDetailsTarget, [
+    const details: DetailRow[] = [
       ['Relativ sti', node.relativePath],
       ['Direkte innhold', `${childFolders} mapper / ${childFiles} filer`],
       ['Filer totalt', countFilesInNode(node).toString()],
       ['Signal', getFolderSignalLabel(node)],
       ['Sist endret', formatDate(node.modifiedAt) || 'Ukjent'],
       ['Varsler', warnings.length > 0 ? warnings.length.toString() : 'Ingen'],
-    ]);
+    ];
+
+    if (activeContextView === 'projects' && contextViewRow) {
+      details.splice(1, 0, ['Fysisk plassering', contextViewRow.artifactRelativePath]);
+      if (contextViewRow.contextLabel) {
+        details.splice(2, 0, ['Prosjekt', contextViewRow.contextLabel]);
+      }
+      details.push(['Vises her fordi', projectViewReasonLabel(contextViewRow.viewReason)]);
+    }
+
+    renderDetails(selectionDetailsTarget, details);
   } else {
-    renderDetails(selectionDetailsTarget, [
+    const details: DetailRow[] = [
       ['Relativ sti', node.relativePath],
       ['Type', node.artifactType ? artifactLabels[node.artifactType] : 'Fil'],
       ['Størrelse', formatBytes(node.size) || 'Ukjent'],
       ['Sist endret', formatDate(node.modifiedAt) || 'Ukjent'],
       ['Varsler', warnings.length > 0 ? warnings.length.toString() : 'Ingen'],
-    ]);
+    ];
+
+    if (activeContextView === 'projects' && contextViewRow) {
+      details.splice(1, 0, ['Fysisk plassering', contextViewRow.artifactRelativePath]);
+      if (contextViewRow.contextLabel) {
+        details.splice(2, 0, ['Prosjekt', contextViewRow.contextLabel]);
+      }
+      details.push(['Vises her fordi', projectViewReasonLabel(contextViewRow.viewReason)]);
+    }
+
+    renderDetails(selectionDetailsTarget, details);
   }
 
   appendFolderTagsEditor(scan, node);
@@ -3395,12 +3492,24 @@ const renderCodex = (scan?: WorkspaceScan) => {
   }
 };
 
+const renderContextViewToggle = (scan?: WorkspaceScan) => {
+  contextViewToggleTarget?.toggleAttribute('hidden', !scan);
+  contextViewButtons.forEach((button) => {
+    const viewId = button.dataset.contextViewButton as ContextViewId | undefined;
+    const isActive = viewId === activeContextView;
+    button.classList.toggle('context-view-toggle__button--active', isActive);
+    button.setAttribute('aria-pressed', isActive.toString());
+    button.toggleAttribute('disabled', !scan);
+  });
+};
+
 const renderTreeToolbar = (scan?: WorkspaceScan) => {
   const hasScan = Boolean(scan);
+  const isFoldersView = activeContextView === 'folders';
 
-  treeToolbarTarget?.toggleAttribute('hidden', !hasScan);
-  expandAllButton?.toggleAttribute('disabled', !hasScan);
-  collapseAllButton?.toggleAttribute('disabled', !hasScan);
+  treeToolbarTarget?.toggleAttribute('hidden', !hasScan || !isFoldersView);
+  expandAllButton?.toggleAttribute('disabled', !hasScan || !isFoldersView);
+  collapseAllButton?.toggleAttribute('disabled', !hasScan || !isFoldersView);
 };
 
 const createTreeItem = (node: FolderTreeNode, level: number) => {
@@ -3679,12 +3788,122 @@ const renderTree = (scan?: WorkspaceScan) => {
   clear(treeTarget);
   renderTreeToolbar(scan);
 
-  if (!treeTarget || !scan) {
+  foldersViewTarget?.toggleAttribute(
+    'hidden',
+    !scan || activeContextView !== 'folders' || hasActiveSearchQuery(),
+  );
+
+  if (!treeTarget || !scan || activeContextView !== 'folders' || hasActiveSearchQuery()) {
     return;
   }
 
   ensureVisibleTreeSelection(scan);
   treeTarget.append(renderTreeNode(scan.tree));
+};
+
+const projectViewReasonLabel = (reason: ContextViewReason) => {
+  switch (reason) {
+    case 'project-root-tag':
+      return 'Mappen er tagget som Prosjektmappe.';
+    case 'physical-project-file':
+      return 'Filen ligger fysisk i en mappe tagget som Prosjektmappe.';
+    case 'physical-tree-node':
+      return 'Elementet vises i den fysiske mappevisningen.';
+  }
+};
+
+const createProjectContextRow = (row: ContextViewRow) => {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `project-context-row project-context-row--${row.artifactKind}`;
+  button.classList.toggle('project-context-row--selected', row.artifactRelativePath === selectedTreePath);
+  button.dataset.projectPath = row.artifactRelativePath;
+  button.addEventListener('click', () => {
+    selectTreePath(row.artifactRelativePath, true);
+  });
+
+  const badge = document.createElement('span');
+  badge.className = 'artifact-badge';
+  badge.textContent = row.artifactKind === 'folder' ? 'prosjekt' : getFileExtension(row.displayLabel);
+
+  const name = document.createElement('span');
+  name.className = 'project-context-row__name';
+  name.textContent = row.displayLabel;
+
+  const meta = document.createElement('span');
+  meta.className = 'project-context-row__meta';
+  meta.textContent =
+    row.artifactKind === 'folder'
+      ? row.artifactRelativePath
+      : [row.artifactType ? artifactLabels[row.artifactType] : 'Fil', formatBytes(row.size)]
+          .filter(Boolean)
+          .join(' · ');
+
+  button.append(badge, name, meta);
+
+  return button;
+};
+
+const renderProjectsView = (scan?: WorkspaceScan) => {
+  clear(projectsViewTarget);
+  projectsViewTarget?.toggleAttribute(
+    'hidden',
+    !scan || activeContextView !== 'projects' || hasActiveSearchQuery(),
+  );
+
+  if (!projectsViewTarget || !scan || activeContextView !== 'projects' || hasActiveSearchQuery()) {
+    return;
+  }
+
+  if (scan.contextViews.projects.contexts.length === 0) {
+    const empty = document.createElement('section');
+    empty.className = 'project-context-empty';
+    const title = document.createElement('h3');
+    title.textContent = 'Ingen prosjektmapper';
+    const message = document.createElement('p');
+    message.textContent =
+      'Tagg en mappe med Prosjektmappe i Mapper-visningen for å vise den her.';
+    empty.append(title, message);
+    projectsViewTarget.append(empty);
+    return;
+  }
+
+  scan.contextViews.projects.contexts.forEach((context) => {
+    const group = document.createElement('section');
+    group.className = 'project-context-group';
+
+    const header = document.createElement('header');
+    header.className = 'project-context-group__header';
+    const title = document.createElement('h3');
+    title.textContent = context.label;
+    const count = document.createElement('span');
+    count.className = 'project-context-group__count';
+    count.textContent = `${context.rows.length} ${context.rows.length === 1 ? 'fil' : 'filer'}`;
+    header.append(title, count);
+
+    const root = document.createElement('div');
+    root.className = 'project-context-root';
+    root.append(createProjectContextRow(context.rootRow));
+
+    const source = document.createElement('div');
+    source.className = 'project-context-source';
+    const sourceLabel = document.createElement('p');
+    sourceLabel.className = 'project-context-source__label';
+    sourceLabel.textContent = 'Prosjektfiler';
+    source.append(sourceLabel);
+
+    if (context.rows.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'project-context-source__empty';
+      empty.textContent = 'Ingen filer i prosjektmappen.';
+      source.append(empty);
+    } else {
+      context.rows.forEach((row) => source.append(createProjectContextRow(row)));
+    }
+
+    group.append(header, root, source);
+    projectsViewTarget.append(group);
+  });
 };
 
 const searchStatusLabel = (status?: SearchIndexStatus) => {
@@ -3751,6 +3970,7 @@ const renderSearchResults = (scan?: WorkspaceScan) => {
   searchPanelTarget?.toggleAttribute('hidden', !scan);
   searchResultsTarget?.toggleAttribute('hidden', !scan || !hasQuery);
   treeTarget?.parentElement?.toggleAttribute('hidden', Boolean(scan && hasQuery));
+  projectsViewTarget?.toggleAttribute('hidden', Boolean(scan && hasQuery) || activeContextView !== 'projects');
   searchQueryInput?.toggleAttribute('disabled', !scan || !window.sidekick?.searchWorkspace);
 
   if (searchStatusTarget) {
@@ -4138,7 +4358,9 @@ const renderNoScanPanels = () => {
   renderTranscriptionSummaryBatch();
   renderDocumentRelationships();
   renderCodex();
+  renderContextViewToggle();
   renderTree();
+  renderProjectsView();
 };
 
 const renderEmptyState = () => {
@@ -4186,6 +4408,9 @@ const renderErrorState = (message: string) => {
   renderTranscriptionSummaryBatch();
   renderDocumentRelationships();
   renderCodex();
+  renderContextViewToggle();
+  renderTree();
+  renderProjectsView();
   renderWarnings([
     {
       path: '.',
@@ -4240,7 +4465,9 @@ const renderReadyState = (scan: WorkspaceScan, status: 'ready' | 'partial') => {
   renderTranscriptionSummaryBatch(scan);
   renderDocumentRelationships(scan);
   renderCodex(scan);
+  renderContextViewToggle(scan);
   renderTree(scan);
+  renderProjectsView(scan);
 };
 
 const sourceLabel = (snapshot?: AppSettingsSnapshot) => {
@@ -5492,6 +5719,14 @@ createWorkspaceButton?.addEventListener('click', () => {
 
 expandAllButton?.addEventListener('click', expandAllFolders);
 collapseAllButton?.addEventListener('click', collapseAllFolders);
+contextViewButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    const viewId = button.dataset.contextViewButton as ContextViewId | undefined;
+    if (viewId === 'folders' || viewId === 'projects') {
+      selectContextView(viewId);
+    }
+  });
+});
 searchQueryInput?.addEventListener('input', scheduleSearch);
 searchRefreshButton?.addEventListener('click', () => {
   void refreshSearchIndex();

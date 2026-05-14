@@ -71,6 +71,11 @@ describe('folder scanner', () => {
     expect(folder?.metadata?.tags[0].systemEffect).toBe('project-root');
     expect(childNames).toContain('visible.json');
     expect(childNames).not.toContain(FOLDER_METADATA_FILE_NAME);
+    expect(result.contextViews.projects.contexts).toHaveLength(1);
+    expect(result.contextViews.projects.contexts[0].label).toBe('01-bakgrunn');
+    expect(result.contextViews.projects.rows.map((row) => row.artifactRelativePath)).toContain(
+      '01-bakgrunn/visible.json',
+    );
   });
 
   it('keeps folder metadata when a tagged folder is renamed and moved inside the workspace', async () => {
@@ -148,6 +153,8 @@ describe('folder scanner', () => {
     expect(byPath.get('unsupported')?.metadata?.status).toBe('unsupported');
     expect(byPath.get('duplicate-a')?.metadata?.status).toBe('conflict');
     expect(byPath.get('duplicate-b')?.metadata?.status).toBe('conflict');
+    expect(result.contextViews.projects.contexts).toEqual([]);
+    expect(result.contextViews.projects.rows).toEqual([]);
     expect(result.warnings.map((warning) => warning.type)).toEqual(
       expect.arrayContaining([
         'metadata-invalid',
