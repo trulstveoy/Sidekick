@@ -33,6 +33,7 @@ import type {
   TranscriptionSummaryBatchResult,
   TranscriptionSummaryBatchResultItemStatus,
   TranscriptionSummarySnapshot,
+  WorkspaceWatchStatus,
 } from './shared/sidekick-api';
 
 type ViewState =
@@ -435,6 +436,7 @@ let workspaceInfoState: { rootPath: string; snapshot: WorkspaceInfoSnapshot; mes
   null;
 let transcriptionSummaryState: TranscriptionSummaryState = { status: 'idle' };
 let folderTagSaveState: FolderTagSaveState = { status: 'idle' };
+let workspaceWatchStatus: WorkspaceWatchStatus | null = null;
 
 if (!workflowHostTarget && legacyWorkflowSurfaceTarget) {
   // Vite HMR can update renderer code while leaving an older index.html DOM in
@@ -721,6 +723,7 @@ const setActiveScan = (scan: WorkspaceScan) => {
   selectedTreePath = scan.tree.relativePath;
   focusedTreePath = scan.tree.relativePath;
   activeContextView = 'folders';
+  workspaceWatchStatus = null;
   transcriptionSummaryState = { status: 'idle' };
   activeWorkflow = null;
   appView = 'workspace';
@@ -763,6 +766,28 @@ const getSelectedContextViewRow = (
 const getFirstProjectSelectionPath = (scan: WorkspaceScan) =>
   scan.contextViews.projects.contexts[0]?.rootRelativePath ?? scan.tree.relativePath;
 
+const getNearestExistingPath = (scan: WorkspaceScan, relativePath: string) => {
+  const normalized = relativePath.replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/g, '');
+
+  if (!normalized || normalized === ROOT_PATH) {
+    return scan.tree.relativePath;
+  }
+
+  const segments = normalized.split('/');
+
+  while (segments.length > 0) {
+    const candidate = segments.join('/');
+
+    if (getNodeByPath(scan.tree, candidate)) {
+      return candidate;
+    }
+
+    segments.pop();
+  }
+
+  return scan.tree.relativePath;
+};
+
 const selectContextView = (viewId: ContextViewId) => {
   const scan = getActiveScan();
 
@@ -786,7 +811,7 @@ const selectContextView = (viewId: ContextViewId) => {
 const replaceActiveScan = (scan: WorkspaceScan, preferredSelectedPath = selectedTreePath) => {
   const selectedPath = getNodeByPath(scan.tree, preferredSelectedPath)
     ? preferredSelectedPath
-    : scan.tree.relativePath;
+    : getNearestExistingPath(scan, preferredSelectedPath);
 
   selectedTreePath = selectedPath;
   focusedTreePath = selectedPath;
@@ -4225,6 +4250,30 @@ const handleSearchIndexStatus = (status: SearchIndexStatus) => {
   render();
 };
 
+const handleWorkspaceWatchStatus = (status: WorkspaceWatchStatus) => {
+  const scan = getActiveScan();
+
+  if (!scan || scan.rootPath !== status.rootPath) {
+    return;
+  }
+
+  workspaceWatchStatus = status;
+  render();
+};
+
+const handleWorkspaceScanUpdated = (scan: WorkspaceScan) => {
+  const activeScan = getActiveScan();
+
+  if (!activeScan || activeScan.rootPath !== scan.rootPath) {
+    return;
+  }
+
+  replaceActiveScan(scan);
+  render();
+  void refreshWorkspaceInfo(scan);
+  void refreshSearchIndexStatus(scan);
+};
+
 const refreshOverviewContextPackageStatus = async (scan: WorkspaceScan) => {
   if (!window.sidekick) {
     overviewContextPackageStatus = { status: 'unavailable' };
@@ -4424,6 +4473,11 @@ const renderErrorState = (message: string) => {
 const renderReadyState = (scan: WorkspaceScan, status: 'ready' | 'partial') => {
   const newestFile = scan.summary.recentFiles[0];
   const hasWorkspaceContent = getChildren(scan.tree).length > 0;
+  const liveRefreshMessage =
+    workspaceWatchStatus?.rootPath === scan.rootPath &&
+    workspaceWatchStatus.state !== 'watching'
+      ? ` · ${workspaceWatchStatus.message}`
+      : '';
 
   setText(selectedNameTarget, scan.rootName);
   setText(selectedPathTarget, scan.rootPath);
@@ -4431,7 +4485,7 @@ const renderReadyState = (scan: WorkspaceScan, status: 'ready' | 'partial') => {
     statusMessageTarget,
     `${scan.status === 'partial' ? 'Delvis skanning' : 'Skanning fullført'} · ${formatDate(
       scan.scannedAt,
-    )}`,
+    )}${liveRefreshMessage}`,
   );
   setText(stateTitleTarget, status === 'partial' ? 'Delvis oversikt' : 'Arbeidsområdeoversikt');
   setText(
@@ -5778,5 +5832,7 @@ codexSecondaryButton?.addEventListener('click', () => {
 window.sidekick?.onCodexOutput?.(appendCodexOutput);
 window.sidekick?.onCodexCompletion?.(completeCodexRun);
 window.sidekick?.onSearchIndexStatus?.(handleSearchIndexStatus);
+window.sidekick?.onWorkspaceWatchStatus?.(handleWorkspaceWatchStatus);
+window.sidekick?.onWorkspaceScanUpdated?.(handleWorkspaceScanUpdated);
 
 render();

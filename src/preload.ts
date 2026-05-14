@@ -4,6 +4,8 @@ import type {
   CodexOutputEvent,
   SearchIndexStatus,
   SidekickApi,
+  WorkspaceScan,
+  WorkspaceWatchStatus,
 } from './shared/sidekick-api';
 
 // Keep the renderer on a typed, task-specific surface. It never receives raw
@@ -80,6 +82,26 @@ const sidekickApi: SidekickApi = {
 
     return () => {
       ipcRenderer.off('search-index:status', handler);
+    };
+  },
+  onWorkspaceScanUpdated: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, scan: WorkspaceScan) => {
+      listener(scan);
+    };
+    ipcRenderer.on('workspace:scan-updated', handler);
+
+    return () => {
+      ipcRenderer.off('workspace:scan-updated', handler);
+    };
+  },
+  onWorkspaceWatchStatus: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, status: WorkspaceWatchStatus) => {
+      listener(status);
+    };
+    ipcRenderer.on('workspace:watch-status', handler);
+
+    return () => {
+      ipcRenderer.off('workspace:watch-status', handler);
     };
   },
 };

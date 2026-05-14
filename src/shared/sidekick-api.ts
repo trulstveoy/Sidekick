@@ -197,6 +197,13 @@ export type WorkspaceScan = {
   contextViews: ContextViewsSnapshot;
 };
 
+export type WorkspaceWatchStatus = {
+  rootPath: string;
+  state: 'watching' | 'refreshing' | 'updated' | 'error';
+  message: string;
+  createdAt: string;
+};
+
 export type ScanOptions = {
   maxDepth: number;
   maxFiles: number;
@@ -674,6 +681,10 @@ export type SidekickApi = {
   onCodexCompletion: (listener: (event: CodexCompletionEvent) => void) => CodexEventUnsubscribe;
   onSearchIndexStatus?: (
     listener: (event: SearchIndexStatus) => void,
+  ) => CodexEventUnsubscribe;
+  onWorkspaceScanUpdated?: (listener: (scan: WorkspaceScan) => void) => CodexEventUnsubscribe;
+  onWorkspaceWatchStatus?: (
+    listener: (event: WorkspaceWatchStatus) => void,
   ) => CodexEventUnsubscribe;
 };
 

@@ -15,6 +15,7 @@ import type {
   TranscriptionImportPreview,
   SearchWorkspaceRequest,
   FolderTagEditRequest,
+  WorkspaceScan,
 } from './shared/sidekick-api';
 import {
   generateContextPackage,
@@ -55,6 +56,7 @@ import {
 } from './main/transcription-summary-batch';
 import { AppSettingsStore, normalizeCodexPath, validateCodexPath } from './main/settings-store';
 import { SearchIndexManager } from './main/search-index';
+import { WorkspaceWatchManager } from './main/workspace-watch-manager';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -79,12 +81,14 @@ const appIconPath = () =>
 
 const selectedWorkspaceRoots = new Set<string>();
 const selectedWorkspaceParentFolders = new Set<string>();
+let activeWorkspaceRoot: string | undefined;
 const pendingTranscriptionImports = new Map<string, TranscriptionImportPreview>();
 const pendingTranscriptionSummaryBatches = new Map<string, TranscriptionSummaryBatchPreview>();
 const pendingWorkspaceInitializations = new Map<string, WorkspaceInitializationPreview>();
 let settingsStore: AppSettingsStore | undefined;
 const codexRunner = new CodexRunner();
 const searchIndexManager = new SearchIndexManager();
+const workspaceWatchManager = new WorkspaceWatchManager();
 const codexRuns = new Map<
   string,
   {
@@ -130,6 +134,54 @@ searchIndexManager.on('status', (status) => {
   });
 });
 
+workspaceWatchManager.on('status', (status) => {
+  BrowserWindow.getAllWindows().forEach((window) => {
+    if (!window.webContents.isDestroyed()) {
+      window.webContents.send('workspace:watch-status', status);
+    }
+  });
+});
+
+const broadcastWorkspaceScan = (scan: WorkspaceScan) => {
+  BrowserWindow.getAllWindows().forEach((window) => {
+    if (!window.webContents.isDestroyed()) {
+      window.webContents.send('workspace:scan-updated', scan);
+    }
+  });
+};
+
+const activateWorkspaceScan = (scan: WorkspaceScan) => {
+  selectedWorkspaceRoots.add(scan.rootPath);
+  activeWorkspaceRoot = scan.rootPath;
+  workspaceWatchManager.watchWorkspace(scan.rootPath);
+
+  return scan;
+};
+
+workspaceWatchManager.on('refresh', (rootPath) => {
+  void (async () => {
+    if (activeWorkspaceRoot !== rootPath || !selectedWorkspaceRoots.has(rootPath)) {
+      return;
+    }
+
+    try {
+      const scan = await scanWorkspaceFolder(rootPath);
+
+      if (activeWorkspaceRoot !== rootPath) {
+        return;
+      }
+
+      broadcastWorkspaceScan(scan);
+      workspaceWatchManager.notifyUpdated(rootPath);
+    } catch (error) {
+      workspaceWatchManager.notifyRefreshFailed(
+        rootPath,
+        error instanceof Error ? error.message : 'Kunne ikke oppdatere arbeidsområdet.',
+      );
+    }
+  })();
+});
+
 ipcMain.handle('workspace:choose-and-scan', async (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   const dialogOptions: Electron.OpenDialogOptions = {
@@ -144,8 +196,8 @@ ipcMain.handle('workspace:choose-and-scan', async (event) => {
     return null;
   }
 
-  selectedWorkspaceRoots.add(result.filePaths[0]);
   const scan = await scanWorkspaceFolder(result.filePaths[0]);
+  activateWorkspaceScan(scan);
   searchIndexManager.startInitialIndex(scan.rootPath);
 
   return scan;
@@ -182,8 +234,8 @@ ipcMain.handle('workspace:create', async (event, request: WorkspaceCreationReque
     parentPath: request.parentPath,
     request,
   });
-  selectedWorkspaceRoots.add(createdWorkspace.rootPath);
   const scan = await scanWorkspaceFolder(createdWorkspace.rootPath);
+  activateWorkspaceScan(scan);
   searchIndexManager.startInitialIndex(createdWorkspace.rootPath);
 
   return {
@@ -225,8 +277,8 @@ ipcMain.handle('workspace:confirm-initialization', async (_event, previewId) => 
 
   try {
     const initializedWorkspace = await confirmWorkspaceInitialization(preview.rootPath);
-    selectedWorkspaceRoots.add(initializedWorkspace.rootPath);
     const scan = await scanWorkspaceFolder(initializedWorkspace.rootPath);
+    activateWorkspaceScan(scan);
     searchIndexManager.startInitialIndex(initializedWorkspace.rootPath);
 
     return {
@@ -801,6 +853,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   void searchIndexManager.close();
+  workspaceWatchManager.close();
 });
 
 app.on('activate', () => {

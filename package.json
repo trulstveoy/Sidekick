@@ -1,7 +1,7 @@
 {
   "name": "sidekick",
   "productName": "Sidekick",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "Local-first workspace intelligence built with Electron.",
   "main": ".vite/build/main.js",
   "private": true,
