@@ -10,6 +10,7 @@ import type {
   WorkspaceSummaryGenerationResult,
 } from '../shared/sidekick-api';
 import { CodexRunner } from './codex-runner';
+import { FOLDER_METADATA_FILE_NAME } from './context-metadata';
 import { scanWorkspaceFolder } from './folder-scanner';
 import { writeWorkspaceInfo } from './workspace-info';
 import {
@@ -30,6 +31,8 @@ export const CONTEXT_PACKAGE_IGNORE_PATTERNS = [
   '.git/**',
   '.sidekick/**',
   '**/.sidekick/**',
+  FOLDER_METADATA_FILE_NAME,
+  `**/${FOLDER_METADATA_FILE_NAME}`,
   'node_modules/**',
   'out/**',
   'dist/**',

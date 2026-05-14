@@ -120,11 +120,66 @@ Expected behavior:
 - Focus and selection are different states and must be visually distinguishable.
 - Indentation should be consistent and compact.
 - Counts and artifact hints should be aligned so the tree remains scannable.
+- Tagged folders may show compact tag pills after the folder name. Limit inline tree tags to the first three tags and show `+N` for the remaining count.
+- System-effect tags and free-form tags should share the same pill shape. Use color only to indicate system effect: blue for system-effect tags, gray for free-form tags.
 - Long names and paths must truncate or wrap predictably without shifting the layout.
 
 The tree should not show every detail inline. File type, size, modified date, warnings, and generated context-package status can move to the context surface when a row is selected.
 
 Tree behavior must follow accessible tree-view expectations: arrow-key navigation, visible focus, `aria-expanded` for expandable folders, and assistive-technology state that matches the visual state.
+
+## Folder Tagging
+
+Folder tagging is the UI pattern for classifying folders in Sidekick.
+
+Use `docs/architecture/klassifisering-med-tags.html` as the visual reference for the first tagging design.
+
+Core model:
+
+- A tag is a tag. Do not expose separate UI concepts for roles, classifiers, and free-text tags.
+- Folders can have one or more tags.
+- Some tags have system effect in Sidekick. `Prosjektmappe` is the first expected system-effect tag and makes the folder available to the future `Prosjekter` view.
+- Other tags are free-form user labels with no system effect, for example `Follow up` or `Q2`.
+- System-effect tags and free-form tags work the same way for the user. The distinction is visual and behavioral under the hood, not a separate interaction model.
+- System-effect tags use blue pills. Free-form tags use gray pills.
+- Tagging is stored as Sidekick metadata in a small hidden marker file inside the tagged folder: `.sidekick-folder.json`.
+- The marker file is not user content and should be hidden from normal Sidekick content views, context packages, summaries, and search indexes.
+
+Primary interaction:
+
+1. The user selects a folder in the tree.
+2. The context surface shows a `Tagger` section.
+3. Existing tags appear as removable chips.
+4. Clicking the tag field opens a small suggestion dropdown.
+5. Suggestions include system-effect tags and tags the user has used elsewhere in the workspace.
+6. The user chooses a suggestion or types a new tag and presses Enter.
+7. The tag is added immediately as a chip and saved to `.sidekick-folder.json` inside the selected folder.
+8. Clicking `x` on a chip removes the tag and saves the change.
+
+Context surface requirements:
+
+- The `Tagger` section belongs in the context surface for the selected folder.
+- If no folder is selected, show a compact empty state such as `Velg en mappe for å legge til tagger.`
+- If a file is selected, do not show folder-tag editing as an available action.
+- The tag field should behave like a compact token input, not a large form.
+- The dropdown should be small, anchored to the field, and limited to relevant suggestions.
+- The UI should include quiet metadata reassurance, for example `Lagres som skjult Sidekick-metadata i mappen - ikke i dokumentene dine`.
+- Tag write errors should appear near the tag field and should not clear the user's selection or entered text.
+
+Tree display requirements:
+
+- Tagged folders show up to three tag pills directly after the folder name.
+- If there are more than three tags, show a compact `+N` pill.
+- Tree pills must not make rows taller, shift indentation, or overpower the folder name.
+- Long tags should truncate before they make the tree row unstable.
+- Do not show tag editing controls inside the tree row; editing belongs in the context surface.
+
+Extensibility requirements:
+
+- New system-effect tags should be addable without changing the interaction model.
+- The user should not need to know whether a tag has system effect before using it.
+- Future examples may include `Applikasjonsmappe`, `Bibliotek`, `Prosjektcontainer`, or `Applikasjonscontainer`, but the first design should not expose future tags unless they are implemented.
+- Implementation should keep a typed distinction between system-effect tags and free-form tags, even though the UI presents both as tags.
 
 ## Context Surface
 
@@ -135,6 +190,7 @@ Good context content:
 - selected folder or file name;
 - path;
 - artifact type;
+- folder tags when a folder is selected;
 - child counts;
 - relevant warnings;
 - recent activity;
@@ -208,7 +264,7 @@ Controls should follow desktop expectations.
 - Dangerous or broad write actions require explicit confirmation and should not be presented as routine toolbar actions.
 - Long-running actions need disabled states and progress or pending status.
 - Actions that create files, move files, rename files, or overwrite files must clearly show the target path before execution.
-- Write operations must use a consistent write-operation indicator and confirmation pattern before execution.
+- Full workflow write operations must use a consistent write-operation indicator and confirmation pattern before execution. Inline metadata edits such as tagging may autosave after the user's direct add/remove action.
 
 Global and contextual action placement:
 
@@ -227,7 +283,7 @@ For Electron menus and shortcuts, prefer native menu roles and cross-platform ac
 
 Read-only inspection is the default mode. Any action that writes to disk must be visually and verbally explicit.
 
-Write-operation requirements:
+Full workflow write-operation requirements:
 
 - Show that the action writes to disk before the user confirms.
 - Show what will be written, copied, generated, or changed.
@@ -244,6 +300,14 @@ Workflow behavior for write operations:
 - Cancel before confirmation writes nothing.
 - Completed writes are not automatically reversed.
 - Success states should make the created, copied, or changed file visible through refreshed project information.
+
+Inline metadata edits:
+
+- Folder tagging is an inline Sidekick-metadata write, not a full workflow surface.
+- Adding or removing a tag is the explicit user action. It may autosave immediately after the chip is added or removed.
+- Inline metadata edits still need visible saved, saving, and failed states.
+- The UI must make clear that tagging writes `.sidekick-folder.json` as hidden Sidekick metadata in the tagged folder and does not change the user's own documents.
+- Failed tag saves should leave the tag field usable and should not silently discard the attempted change.
 
 Folder-scoped context packages, when introduced, should be a contextual folder action. The action starts from the selected folder context, opens the shared context-package workflow in the primary workspace, writes the generated Markdown file to the selected folder, and keeps the selected folder visible in the context surface.
 
@@ -318,6 +382,7 @@ Use this checklist before merging UI changes:
 - [ ] Repeated information has been removed or moved to selection-specific detail.
 - [ ] Primary and secondary actions are visually distinct.
 - [ ] Write operations use the shared write-operation indicator and show the target path before execution.
+- [ ] Inline metadata edits such as folder tagging show saved/saving/error state and identify `.sidekick-folder.json` as the metadata target.
 - [ ] Long folder names, filenames, and paths behave correctly.
 - [ ] Empty, loading, success, warning, and error states are covered.
 - [ ] Keyboard navigation and focus states work for new controls.

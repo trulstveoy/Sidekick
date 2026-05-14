@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sidekick – Tagging v4</title>
+<style>
+  :root {
+    --surface:   #ffffff;
+    --surface-2: #f9f9f9;
+    --border:    #e0e0e0;
+    --border-s:  #c8c8c8;
+    --text:      #1a1a1a;
+    --text-2:    #555;
+    --text-3:    #888;
+    --primary:   #2563eb;
+    --primary-h: #1d4ed8;
+    --primary-l: #eff6ff;
+    --primary-b: #bfdbfe;
+    --hover:     #f3f4f6;
+    --selected:  #eff6ff;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --mono: "Consolas", "SF Mono", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font); font-size: 13px;
+    background: #d8d8d8;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 32px 24px 48px; gap: 32px; min-height: 100vh;
+  }
+  .page-header { width: 100%; max-width: 960px; }
+  .page-header h1 { font-size: 17px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px; }
+  .page-header p { font-size: 12px; color: #666; }
+
+  .state-nav { width: 100%; max-width: 960px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .state-btn { padding: 7px 14px; border-radius: 20px; border: 1px solid var(--border-s); background: var(--surface); font-family: var(--font); font-size: 12px; color: var(--text-2); cursor: pointer; transition: all .1s; }
+  .state-btn:hover { background: var(--hover); }
+  .state-btn.active { background: var(--primary); border-color: var(--primary); color: white; font-weight: 500; }
+
+  .app-window { width: 100%; max-width: 960px; height: 560px; background: var(--surface); border: 1px solid var(--border-s); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 4px 24px rgba(0,0,0,.12); }
+
+  .topbar { height: 44px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; flex-shrink: 0; }
+  .topbar-logo { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 14px; padding-right: 16px; border-right: 1px solid var(--border); margin-right: 14px; }
+  .logo-icon { width: 20px; height: 20px; background: var(--primary); border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: 800; }
+  .topbar-folder { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+  .topbar-folder:hover { background: var(--hover); }
+  .topbar-folder .fn { color: var(--text); font-weight: 500; }
+  .topbar-spacer { flex: 1; }
+  .topbar-settings { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 4px; cursor: pointer; color: var(--text-3); }
+  .topbar-settings:hover { background: var(--hover); }
+
+  .app-body { flex: 1; display: flex; overflow: hidden; }
+
+  /* Middle */
+  .middle-panel { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; }
+  .panel-tabs { display: flex; padding: 8px 12px 0; gap: 2px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .tab { padding: 5px 12px 7px; font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--text-3); background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer; margin-bottom: -1px; }
+  .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .tree-body { flex: 1; overflow-y: auto; padding: 4px 0; }
+  .tree-row { display: flex; align-items: center; height: 30px; padding: 0 12px; cursor: pointer; transition: background .08s; position: relative; }
+  .tree-row:hover { background: var(--hover); }
+  .tree-row.selected { background: var(--selected); }
+  .tree-toggle { width: 16px; font-size: 10px; color: var(--text-3); text-align: center; flex-shrink: 0; }
+  .tree-icon { font-size: 13px; margin-right: 5px; flex-shrink: 0; }
+  .tree-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 13px; }
+  .tree-row.selected .tree-label { color: var(--primary); font-weight: 500; }
+  .tree-chips { display: flex; gap: 3px; align-items: center; margin-left: 6px; flex-shrink: 0; }
+  .tree-chip { font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 500; white-space: nowrap; }
+  .tree-chip.system { background: var(--primary-l); border: 1px solid var(--primary-b); color: var(--primary); }
+  .tree-chip.free { background: var(--hover); border: 1px solid var(--border-s); color: var(--text-2); }
+
+  /* Right panel */
+  .right-panel { width: 272px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--surface-2); overflow: hidden; }
+  .rp-header { padding: 12px 14px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .rp-type { font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); margin-bottom: 3px; }
+  .rp-name { font-size: 14px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rp-path { font-size: 11px; color: var(--text-3); font-family: var(--mono); margin-top: 2px; }
+  .rp-body { flex: 1; overflow-y: auto; }
+  .rp-section { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .rp-section:last-child { border-bottom: none; }
+  .section-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); margin-bottom: 7px; }
+  .meta-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+  .meta-key { color: var(--text-3); }
+  .meta-val { color: var(--text); font-weight: 500; }
+  .rp-hint { font-size: 12px; color: var(--text-3); line-height: 1.5; font-style: italic; }
+  .meta-note { font-size: 10px; color: var(--text-3); margin-top: 7px; }
+
+  /* ── Tag field ── */
+  .tag-field-wrap { position: relative; }
+
+  .tag-field {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+    padding: 5px 7px; background: var(--surface);
+    border: 1px solid var(--border-s); border-radius: 5px;
+    min-height: 34px; cursor: text;
+    transition: border-color .12s, box-shadow .12s;
+  }
+  .tag-field.focused {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37,99,235,.08);
+  }
+
+  /* chips inside field */
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 500;
+    padding: 2px 8px; border-radius: 10px;
+    white-space: nowrap; user-select: none;
+  }
+  .chip.system {
+    background: var(--primary-l); border: 1px solid var(--primary-b); color: var(--primary);
+  }
+  .chip.free {
+    background: var(--hover); border: 1px solid var(--border-s); color: var(--text-2);
+  }
+  .chip-x {
+    cursor: pointer; color: inherit; opacity: .6; font-size: 11px; line-height: 1;
+    margin-left: 1px;
+  }
+  .chip-x:hover { opacity: 1; }
+
+  .tag-input {
+    border: none; outline: none; font-family: var(--font); font-size: 12px;
+    color: var(--text); background: transparent; min-width: 80px; flex: 1;
+    padding: 1px 0;
+  }
+  .tag-input::placeholder { color: var(--text-3); }
+
+  /* Dropdown */
+  .tag-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--surface); border: 1px solid var(--border-s);
+    border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.10);
+    z-index: 100; overflow: hidden; display: none;
+  }
+  .tag-dropdown.open { display: block; }
+
+  .dropdown-section-label {
+    font-size: 10px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-3);
+    padding: 7px 10px 3px;
+  }
+  .dropdown-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; cursor: pointer; font-size: 12px;
+    color: var(--text-2); transition: background .08s;
+  }
+  .dropdown-item:hover, .dropdown-item.highlighted { background: var(--primary-l); color: var(--text); }
+  .dropdown-item .di-chip {
+    font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 8px;
+  }
+  .dropdown-item .di-chip.system { background: var(--primary-l); border: 1px solid var(--primary-b); color: var(--primary); }
+  .dropdown-item .di-chip.free { background: var(--hover); border: 1px solid var(--border-s); color: var(--text-2); }
+  .dropdown-item .di-label { flex: 1; }
+  .dropdown-item .di-note { font-size: 10px; color: var(--text-3); }
+  .dropdown-sep { height: 1px; background: var(--border); margin: 2px 0; }
+
+  /* Actionbar */
+  .actionbar { height: 52px; background: var(--surface); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 14px; gap: 8px; flex-shrink: 0; }
+  .ab-spacer { flex: 1; }
+  .btn { display: inline-flex; align-items: center; gap: 5px; border-radius: 5px; font-family: var(--font); font-size: 12px; font-weight: 500; cursor: pointer; border: none; padding: 5px 12px; white-space: nowrap; transition: background .1s; }
+  .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border-s); }
+  .btn-secondary:hover { background: var(--hover); }
+  .btn-ghost { background: transparent; color: var(--text-2); border: 1px solid transparent; }
+  .btn-ghost:hover { background: var(--hover); }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Sidekick – Tagging</h1>
+  <p>Designforslag v4 · Mai 2026</p>
+</div>
+
+<div class="state-nav">
+  <button class="state-btn active" onclick="setState(0)">1 · Ingen mappe valgt</button>
+  <button class="state-btn" onclick="setState(1)">2 · Mappe valgt – ingen tagger</button>
+  <button class="state-btn" onclick="setState(2)">3 · Dropdown åpen</button>
+  <button class="state-btn" onclick="setState(3)">4 · Med tagger</button>
+</div>
+
+<div class="app-window">
+  <div class="topbar">
+    <div class="topbar-logo"><div class="logo-icon">S</div>Sidekick</div>
+    <div class="topbar-folder">
+      <span style="color:var(--text-3);">📁</span>
+      <span class="fn">Arbeidsområde</span>
+      <span style="color:var(--text-3);font-size:10px;">▾</span>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-settings">⚙</div>
+  </div>
+
+  <div class="app-body">
+    <div class="middle-panel">
+      <div class="panel-tabs">
+        <button class="tab active">Mapper</button>
+        <button class="tab">Prosjekter</button>
+      </div>
+      <div class="tree-body" id="treeBody"></div>
+    </div>
+    <div class="right-panel" id="rightPanel"></div>
+  </div>
+
+  <div class="actionbar">
+    <button class="btn btn-secondary">Importer transkripsjon</button>
+    <button class="btn btn-secondary">Generer kontekstpakke</button>
+    <button class="btn btn-secondary">Kjør Codex</button>
+    <div class="ab-spacer"></div>
+    <button class="btn btn-ghost">···</button>
+  </div>
+</div>
+
+<script>
+// Shared tag state
+let tags = [];
+
+const SUGGESTIONS = [
+  { label: 'Prosjektmappe', type: 'system' },
+  { label: 'Follow up', type: 'free' },
+  { label: 'Q2', type: 'free' },
+  { label: 'Arkiv', type: 'free' },
+];
+
+// ── Tree ──────────────────────────────────────────────────────────────
+function renderTree(state) {
+  const hasChips = tags.length > 0;
+  const folderSelected = state >= 1;
+  const showChips = hasChips && folderSelected;
+
+  const treeChips = showChips
+    ? `<div class="tree-chips">${tags.slice(0,3).map(t =>
+        `<span class="tree-chip ${t.type}">${t.label}</span>`
+      ).join('')}${tags.length > 3 ? `<span class="tree-chip free">+${tags.length-3}</span>` : ''}</div>`
+    : '';
+
+  return `
+    <div class="tree-row"><span class="tree-toggle">▾</span><span class="tree-icon">📁</span><span class="tree-label">Arbeidsområde/</span></div>
+    <div class="tree-row ${folderSelected ? 'selected' : ''}" style="padding-left:28px;" onclick="setState(${state >= 4 ? 4 : Math.max(state,1)})">
+      <span class="tree-toggle">▾</span><span class="tree-icon">📁</span>
+      <span class="tree-label">Strategi</span>
+      ${treeChips}
+    </div>
+    <div class="tree-row" style="padding-left:44px;">
+      <span class="tree-toggle" style="visibility:hidden;"></span><span class="tree-icon" style="font-size:12px;">📄</span>
+      <span class="tree-label" style="color:var(--text-2);font-size:12px;">2026-05-15 strategiske veivalg.md</span>
+    </div>
+    <div class="tree-row" style="padding-left:28px;"><span class="tree-toggle">▶</span><span class="tree-icon">📁</span><span class="tree-label">Operasjon</span></div>
+    <div class="tree-row" style="padding-left:28px;"><span class="tree-toggle">▾</span><span class="tree-icon">📁</span><span class="tree-label">Bibliotek</span></div>
+    <div class="tree-row" style="padding-left:44px;">
+      <span class="tree-toggle" style="visibility:hidden;"></span><span class="tree-icon">📄</span>
+      <span class="tree-label" style="color:var(--text-2);">2026-05-13 intervju med direktør.md</span>
+    </div>
+  `;
+}
+
+// ── Right panel ───────────────────────────────────────────────────────
+function rpNone() {
+  return `
+    <div class="rp-header">
+      <div class="rp-type">Arbeidsområde</div>
+      <div class="rp-name">Arbeidsområde</div>
+      <div class="rp-path">Ingen mappe valgt</div>
+    </div>
+    <div class="rp-body">
+      <div class="rp-section">
+        <div class="section-label">Tagger</div>
+        <p class="rp-hint">Velg en mappe for å legge til tagger.</p>
+      </div>
+    </div>`;
+}
+
+function rpTagField(showDropdown) {
+  const chipsHtml = tags.map((t, i) =>
+    `<span class="chip ${t.type}">${t.label}<span class="chip-x" onclick="removeTag(${i})">×</span></span>`
+  ).join('');
+
+  const filterText = showDropdown ? '' : '';
+
+  const available = SUGGESTIONS.filter(s => !tags.find(t => t.label === s.label));
+
+  const dropdownHtml = showDropdown ? `
+    <div class="tag-dropdown open" id="tagDropdown">
+      ${available.map(s => `
+        <div class="dropdown-item" onclick="addTagFromDropdown('${s.label}','${s.type}')">
+          <span class="di-chip ${s.type}">${s.label}</span>
+        </div>`).join('')}
+      ${available.length ? `<div class="dropdown-sep"></div>` : ''}
+      <div class="dropdown-item">
+        <span style="color:var(--text-3);font-size:12px;">↵</span>
+        <span class="di-label" style="color:var(--text-3);">Skriv og trykk Enter for ny tag</span>
+      </div>
+    </div>` : '';
+
+  return `
+    <div class="rp-header">
+      <div class="rp-type">Mappe</div>
+      <div class="rp-name">Strategi</div>
+      <div class="rp-path">Arbeidsområde/Strategi</div>
+    </div>
+    <div class="rp-body">
+      <div class="rp-section">
+        <div class="meta-row"><span class="meta-key">Filer</span><span class="meta-val">1</span></div>
+        <div class="meta-row"><span class="meta-key">Endret</span><span class="meta-val">15.05.2026</span></div>
+      </div>
+      <div class="rp-section">
+        <div class="section-label">Tagger</div>
+        <div class="tag-field-wrap">
+          <div class="tag-field ${showDropdown ? 'focused' : ''}" onclick="focusInput()">
+            ${chipsHtml}
+            <input class="tag-input" id="tagInput"
+              placeholder="${tags.length === 0 ? 'Legg til tag…' : ''}"
+              onkeydown="handleKey(event)"
+              oninput="handleInput(event)"
+              onfocus="openDropdown()"
+            >
+          </div>
+          ${dropdownHtml}
+        </div>
+        <div class="meta-note">🔒 Lagres i .sidekick/ – ikke i dine egne filer</div>
+      </div>
+    </div>`;
+}
+
+// ── State machine ─────────────────────────────────────────────────────
+let currentState = 0;
+let dropdownOpen = false;
+
+function setState(idx) {
+  currentState = idx;
+  dropdownOpen = idx === 2;
+
+  if (idx === 3) {
+    tags = [
+      { label: 'Prosjektmappe', type: 'system' },
+      { label: 'Follow up', type: 'free' },
+    ];
+  }
+  if (idx <= 1) tags = [];
+
+  document.querySelectorAll('.state-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
+  document.getElementById('treeBody').innerHTML = renderTree(idx);
+  document.getElementById('rightPanel').innerHTML =
+    idx === 0 ? rpNone() : rpTagField(dropdownOpen);
+
+  if (idx >= 1) {
+    setTimeout(() => {
+      const inp = document.getElementById('tagInput');
+      if (inp && idx === 2) inp.focus();
+    }, 50);
+  }
+}
+
+function focusInput() {
+  const inp = document.getElementById('tagInput');
+  if (inp) { inp.focus(); openDropdown(); }
+}
+
+function openDropdown() {
+  if (currentState < 1) return;
+  dropdownOpen = true;
+  document.getElementById('rightPanel').innerHTML = rpTagField(true);
+  setTimeout(() => {
+    const inp = document.getElementById('tagInput');
+    if (inp) inp.focus();
+  }, 20);
+}
+
+function handleInput(e) {
+  // Keep dropdown open while typing
+  const dd = document.getElementById('tagDropdown');
+  if (dd && !dd.classList.contains('open')) dd.classList.add('open');
+}
+
+function handleKey(e) {
+  const inp = document.getElementById('tagInput');
+  if (e.key === 'Enter') {
+    const val = inp.value.trim();
+    if (val) addTag(val, 'free');
+    else { dropdownOpen = false; rerender(); }
+  }
+  if (e.key === 'Escape') { dropdownOpen = false; rerender(); }
+  if (e.key === 'Backspace' && inp.value === '' && tags.length > 0) {
+    tags.pop(); rerender();
+  }
+}
+
+function addTag(label, type) {
+  if (!tags.find(t => t.label === label)) tags.push({ label, type });
+  rerender();
+}
+
+function addTagFromDropdown(label, type) {
+  addTag(label, type);
+  setTimeout(() => {
+    const inp = document.getElementById('tagInput');
+    if (inp) inp.focus();
+  }, 30);
+}
+
+function removeTag(idx) {
+  tags.splice(idx, 1);
+  rerender();
+}
+
+function rerender() {
+  document.getElementById('treeBody').innerHTML = renderTree(currentState);
+  document.getElementById('rightPanel').innerHTML =
+    currentState === 0 ? rpNone() : rpTagField(dropdownOpen);
+  if (currentState >= 1) {
+    setTimeout(() => {
+      const inp = document.getElementById('tagInput');
+      if (inp) inp.focus();
+    }, 20);
+  }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('mousedown', e => {
+  if (!e.target.closest('.tag-field-wrap')) {
+    dropdownOpen = false;
+    rerender();
+  }
+});
+
+setState(0);
+</script>
+</body>
+</html>

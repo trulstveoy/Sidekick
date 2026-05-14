@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { CodexRunner } from '../../src/main/codex-runner';
+import { FOLDER_METADATA_FILE_NAME } from '../../src/main/context-metadata';
 import {
   generateContextPackage,
   generateFolderContextPackage,
@@ -80,6 +81,7 @@ describe('context package generation', () => {
     await writeFile(outputPath, 'SHOULD_NOT_BE_INCLUDED');
     await mkdir(path.join(rootPath, '.sidekick'), { recursive: true });
     await writeFile(path.join(rootPath, '.sidekick', 'workspace-info.md'), 'SIDEKICK_METADATA_SECRET');
+    await writeFile(path.join(rootPath, '01-bakgrunn', FOLDER_METADATA_FILE_NAME), 'FOLDER_METADATA_SECRET');
 
     const result = await generateContextPackage(rootPath, { codexRunner: fakeCodexRunner });
     const output = await readFile(outputPath, 'utf8');
@@ -114,6 +116,8 @@ describe('context package generation', () => {
     expect(output).toContain('intervju-01.txt');
     expect(output).not.toContain('SHOULD_NOT_BE_INCLUDED');
     expect(output).not.toContain('SIDEKICK_METADATA_SECRET');
+    expect(output).not.toContain('FOLDER_METADATA_SECRET');
+    expect(result.processedFiles).not.toContain(`01-bakgrunn/${FOLDER_METADATA_FILE_NAME}`);
   });
 
   it('previews folder-scoped output path and overwrite status', async () => {

@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { FOLDER_METADATA_FILE_NAME } from '../../src/main/context-metadata';
 import {
   resolveWorkspaceRelativePath,
   SEARCH_INDEX_FILE,
@@ -37,6 +38,7 @@ describe('search index manager', () => {
     await writeWorkspaceFile('notes/brief.md', 'Dette er et notat om lokal søkbar indeks.');
     await writeWorkspaceFile('.sidekick/hidden.md', 'Skal ikke indekseres.');
     await writeWorkspaceFile('generated.context-package.md', 'Skal ikke indekseres.');
+    await writeWorkspaceFile(`notes/${FOLDER_METADATA_FILE_NAME}`, 'FOLDER_METADATA_SECRET');
 
     const status = await manager.refresh(rootPath);
     const indexFile = path.join(rootPath, ...SEARCH_INDEX_FOLDER.split('/'), SEARCH_INDEX_FILE);
@@ -55,10 +57,12 @@ describe('search index manager', () => {
     expect(Object.keys(manifest.files)).toEqual(['notes/brief.md']);
 
     const result = await manager.search({ rootPath, query: 'søkbar indeks' });
+    const metadataResult = await manager.search({ rootPath, query: 'FOLDER_METADATA_SECRET' });
 
     expect(result.results).toHaveLength(1);
     expect(result.results[0].relativePath).toBe('notes/brief.md');
     expect(result.results[0].snippet).toContain('søkbar indeks');
+    expect(metadataResult.results).toHaveLength(0);
   });
 
   it('reports unsupported, binary, and oversized skipped files', async () => {

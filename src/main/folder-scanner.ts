@@ -11,6 +11,11 @@ import type {
   ScanSummary,
   ScanWarning,
 } from '../shared/sidekick-api';
+import {
+  FOLDER_METADATA_FILE_NAME,
+  readFolderMetadataForScan,
+  toFolderMetadataSummary,
+} from './context-metadata';
 
 const DEFAULT_SCAN_OPTIONS: ScanOptions = {
   maxDepth: 5,
@@ -330,6 +335,34 @@ const createFolderNode = ({ name, relativePath, stats }: ScannedPath, contextHin
   modifiedAt: stats.mtime.toISOString(),
 });
 
+const addFolderMetadata = async (
+  context: ScanContext,
+  node: FolderTreeNode,
+  folderPath: string,
+) => {
+  const result = await readFolderMetadataForScan(folderPath);
+
+  if (result.status === 'none') {
+    return;
+  }
+
+  if (result.status === 'valid') {
+    node.metadata = toFolderMetadataSummary('valid', node.relativePath, result.metadata);
+    return;
+  }
+
+  const warningType =
+    result.status === 'unsupported' ? 'metadata-unsupported' : 'metadata-invalid';
+
+  node.metadata = toFolderMetadataSummary(result.status, node.relativePath, undefined, result.message);
+  addWarning(context.state, {
+    path: node.relativePath,
+    type: warningType,
+    severity: 'error',
+    message: result.message,
+  });
+};
+
 const addDepthLimitWarning = (
   { options, state }: ScanContext,
   relativePath: string,
@@ -428,6 +461,7 @@ const scanDirectory = async (
   const ownSignals = getFolderSignals(name);
   const contextHints = [...new Set([...inheritedHints, ...ownSignals])];
   const node = createFolderNode(scannedPath, contextHints);
+  await addFolderMetadata(context, node, entryPath);
 
   if (relativePath !== '.') {
     context.state.folderCount += 1;
@@ -491,6 +525,10 @@ const scanNode = async (
   const name = path.basename(input.entryPath);
   const relativePath = toRelativePath(context.rootPath, input.entryPath);
 
+  if (name === FOLDER_METADATA_FILE_NAME && stats.isFile()) {
+    return null;
+  }
+
   if (stats.isSymbolicLink() && !context.options.followSymlinks) {
     addWarning(context.state, {
       path: relativePath,
@@ -522,6 +560,49 @@ const scanNode = async (
   return scanFile(context, scannedPath);
 };
 
+const walkFolderNodes = (node: FolderTreeNode, visitor: (folder: FolderTreeNode) => void) => {
+  if (node.kind !== 'folder') {
+    return;
+  }
+
+  visitor(node);
+  node.children?.forEach((child) => walkFolderNodes(child, visitor));
+};
+
+const markDuplicateFolderMetadata = (rootNode: FolderTreeNode, state: ScanState) => {
+  const foldersById = new Map<string, FolderTreeNode[]>();
+
+  walkFolderNodes(rootNode, (folder) => {
+    if (folder.metadata?.status === 'valid' && folder.metadata.folderId) {
+      const folders = foldersById.get(folder.metadata.folderId) ?? [];
+      folders.push(folder);
+      foldersById.set(folder.metadata.folderId, folders);
+    }
+  });
+
+  foldersById.forEach((folders, folderId) => {
+    if (folders.length < 2) {
+      return;
+    }
+
+    folders.forEach((folder) => {
+      folder.metadata = {
+        status: 'conflict',
+        tags: [],
+        markerRelativePath: folder.metadata?.markerRelativePath,
+        folderId,
+        message: `Duplicate folder metadata id "${folderId}" found.`,
+      };
+      addWarning(state, {
+        path: folder.relativePath,
+        type: 'metadata-conflict',
+        severity: 'error',
+        message: `Duplicate folder metadata id "${folderId}" found. System effects from this folder were ignored.`,
+      });
+    });
+  });
+};
+
 export const scanWorkspaceFolder = async (
   rootPath: string,
   options: Partial<ScanOptions> = {},
@@ -545,6 +626,8 @@ export const scanWorkspaceFolder = async (
   if (!rootNode) {
     throw new Error('Unable to scan selected folder.');
   }
+
+  markDuplicateFolderMetadata(rootNode, state);
 
   const summary: ScanSummary = {
     fileCount: state.fileCount,

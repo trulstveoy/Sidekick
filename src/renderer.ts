@@ -11,6 +11,7 @@ import type {
   ContextPackageResult,
   DocumentRelationshipsGenerationResult,
   DocumentRelationshipsSnapshot,
+  FolderTag,
   FolderSignal,
   FolderTreeNode,
   AppSettingsSnapshot,
@@ -156,6 +157,12 @@ type TranscriptionSummaryState =
       summary: TranscriptionSummarySnapshot;
     }
   | { status: 'error'; rootPath: string; transcriptionRelativePath: string; message: string };
+
+type FolderTagSaveState =
+  | { status: 'idle' }
+  | { status: 'saving'; relativePath: string }
+  | { status: 'saved'; relativePath: string; message: string }
+  | { status: 'error'; relativePath: string; message: string };
 
 type ActionTargets = {
   primaryButton: HTMLButtonElement | null;
@@ -419,6 +426,7 @@ let settingsState: SettingsState = { status: 'idle', message: '' };
 let workspaceInfoState: { rootPath: string; snapshot: WorkspaceInfoSnapshot; message?: string } | null =
   null;
 let transcriptionSummaryState: TranscriptionSummaryState = { status: 'idle' };
+let folderTagSaveState: FolderTagSaveState = { status: 'idle' };
 
 if (!workflowHostTarget && legacyWorkflowSurfaceTarget) {
   // Vite HMR can update renderer code while leaving an older index.html DOM in
@@ -727,6 +735,16 @@ const getActiveScan = () =>
 
 const isFolderNode = (node: FolderTreeNode) => node.kind === 'folder';
 
+const replaceActiveScan = (scan: WorkspaceScan, preferredSelectedPath = selectedTreePath) => {
+  const selectedPath = getNodeByPath(scan.tree, preferredSelectedPath)
+    ? preferredSelectedPath
+    : scan.tree.relativePath;
+
+  selectedTreePath = selectedPath;
+  focusedTreePath = selectedPath;
+  state = scan.status === 'partial' ? { status: 'partial', scan } : { status: 'ready', scan };
+};
+
 const resetContextPackageTarget = () => {
   contextPackageTarget = { scope: 'workspace' };
 };
@@ -842,6 +860,21 @@ const getChildren = (node: FolderTreeNode) => node.children ?? [];
 
 const hasChildren = (node: FolderTreeNode) => getChildren(node).length > 0;
 
+const getVisibleFolderTags = (node: FolderTreeNode) =>
+  isFolderNode(node) && node.metadata?.status === 'valid' ? node.metadata.tags : [];
+
+const collectWorkspaceTags = (node: FolderTreeNode, tags = new Map<string, FolderTag>()) => {
+  getVisibleFolderTags(node).forEach((tag) => {
+    tags.set(tag.normalizedLabel, tag);
+  });
+
+  getChildren(node).forEach((child) => collectWorkspaceTags(child, tags));
+
+  return [...tags.values()].sort((left, right) =>
+    left.label.localeCompare(right.label, undefined, { sensitivity: 'base' }),
+  );
+};
+
 const getNodeByPath = (node: FolderTreeNode, relativePath: string): FolderTreeNode | undefined => {
   if (node.relativePath === relativePath) {
     return node;
@@ -944,6 +977,9 @@ const focusTreeRow = (relativePath: string) => {
 };
 
 const selectTreePath = (relativePath: string, shouldFocus = false) => {
+  if (relativePath !== selectedTreePath) {
+    folderTagSaveState = { status: 'idle' };
+  }
   selectedTreePath = relativePath;
   focusedTreePath = relativePath;
   render();
@@ -951,6 +987,42 @@ const selectTreePath = (relativePath: string, shouldFocus = false) => {
   if (shouldFocus) {
     focusTreeRow(relativePath);
   }
+};
+
+const saveFolderTag = async (node: FolderTreeNode, label: string, action: 'add' | 'remove') => {
+  const scan = getActiveScan();
+  const api = action === 'add' ? window.sidekick?.addFolderTag : window.sidekick?.removeFolderTag;
+  const normalizedLabel = label.trim().replace(/\s+/g, ' ');
+
+  if (!scan || !isFolderNode(node) || !api || !normalizedLabel || node.relativePath === ROOT_PATH) {
+    return;
+  }
+
+  folderTagSaveState = { status: 'saving', relativePath: node.relativePath };
+  render();
+
+  try {
+    const result = await api({
+      rootPath: scan.rootPath,
+      folderRelativePath: node.relativePath,
+      label: normalizedLabel,
+    });
+
+    replaceActiveScan(result.scan, node.relativePath);
+    folderTagSaveState = {
+      status: 'saved',
+      relativePath: result.folderRelativePath,
+      message: 'Lagret',
+    };
+  } catch (error) {
+    folderTagSaveState = {
+      status: 'error',
+      relativePath: node.relativePath,
+      message: error instanceof Error ? error.message : 'Kunne ikke lagre tagger',
+    };
+  }
+
+  render();
 };
 
 const getDirectChildSummary = (node: FolderTreeNode) => {
@@ -1300,8 +1372,10 @@ const createDirectContentRow = (node: FolderTreeNode) => {
   return row;
 };
 
-const renderSelectionContents = (node: FolderTreeNode) => {
-  clear(selectionContentsTarget);
+const renderSelectionContents = (node: FolderTreeNode, shouldClear = true) => {
+  if (shouldClear) {
+    clear(selectionContentsTarget);
+  }
 
   if (!selectionContentsTarget) {
     return;
@@ -1422,6 +1496,197 @@ const appendSelectionWarnings = (warnings: string[]) => {
   });
 
   selectionContentsTarget.append(title, list);
+};
+
+const createFolderTagChip = (node: FolderTreeNode, tag: FolderTag) => {
+  const chip = document.createElement('span');
+  chip.className = 'folder-tag-chip';
+  chip.dataset.tagKind = tag.kind;
+
+  const label = document.createElement('span');
+  label.textContent = tag.label;
+
+  const removeButton = document.createElement('button');
+  removeButton.type = 'button';
+  removeButton.className = 'folder-tag-remove';
+  removeButton.textContent = 'x';
+  removeButton.setAttribute('aria-label', `Fjern tag ${tag.label}`);
+  removeButton.toggleAttribute('disabled', folderTagSaveState.status === 'saving');
+  removeButton.addEventListener('click', () => {
+    void saveFolderTag(node, tag.label, 'remove');
+  });
+
+  chip.append(label, removeButton);
+
+  return chip;
+};
+
+const getTagSuggestions = (scan: WorkspaceScan, node: FolderTreeNode) => {
+  const existing = new Set(getVisibleFolderTags(node).map((tag) => tag.normalizedLabel));
+  const suggestions = new Map<string, FolderTag>();
+
+  suggestions.set('prosjektmappe', {
+    label: 'Prosjektmappe',
+    normalizedLabel: 'prosjektmappe',
+    kind: 'system',
+    source: 'explicit',
+    updatedAt: scan.scannedAt,
+    systemEffect: 'project-root',
+    context: {
+      id: 'project-suggestion',
+      type: 'project',
+      name: 'Prosjektmappe',
+    },
+  });
+
+  collectWorkspaceTags(scan.tree).forEach((tag) => {
+    suggestions.set(tag.normalizedLabel, tag);
+  });
+
+  return [...suggestions.values()]
+    .filter((tag) => !existing.has(tag.normalizedLabel))
+    .sort((left, right) => left.label.localeCompare(right.label, undefined, { sensitivity: 'base' }));
+};
+
+const appendFolderTagSaveStatus = (container: HTMLElement, node: FolderTreeNode) => {
+  if (folderTagSaveState.status === 'idle' || folderTagSaveState.relativePath !== node.relativePath) {
+    return;
+  }
+
+  const status = document.createElement('p');
+  status.className = 'folder-tag-status';
+
+  if (folderTagSaveState.status === 'saving') {
+    status.dataset.status = 'saving';
+    status.textContent = 'Lagrer...';
+  } else if (folderTagSaveState.status === 'saved') {
+    status.dataset.status = 'saved';
+    status.textContent = folderTagSaveState.message;
+  } else {
+    status.dataset.status = 'error';
+    status.textContent = folderTagSaveState.message || 'Kunne ikke lagre tagger';
+  }
+
+  container.append(status);
+};
+
+const appendFolderTagsEditor = (scan: WorkspaceScan, node: FolderTreeNode) => {
+  if (!selectionContentsTarget) {
+    return;
+  }
+
+  const title = document.createElement('p');
+  title.className = 'selection-contents-title';
+  title.textContent = 'Tagger';
+
+  const container = document.createElement('div');
+  container.className = 'folder-tags-editor';
+
+  if (!isFolderNode(node)) {
+    const empty = document.createElement('p');
+    empty.className = 'selection-empty';
+    empty.textContent = 'Filer kan ikke tagges som mapper i denne versjonen.';
+    selectionContentsTarget.append(title, empty);
+    return;
+  }
+
+  if (node.relativePath === ROOT_PATH) {
+    const empty = document.createElement('p');
+    empty.className = 'selection-empty';
+    empty.textContent = 'Arbeidsområdet kan ikke tagges i denne versjonen.';
+    selectionContentsTarget.append(title, empty);
+    return;
+  }
+
+  if (
+    node.metadata?.status === 'invalid' ||
+    node.metadata?.status === 'unsupported' ||
+    node.metadata?.status === 'conflict'
+  ) {
+    const warning = document.createElement('p');
+    warning.className = 'folder-tags-warning';
+    warning.textContent = node.metadata.message ?? 'Mappemetadata må rettes før tagger kan brukes.';
+    container.append(warning);
+  }
+
+  const tags = getVisibleFolderTags(node);
+  const chips = document.createElement('div');
+  chips.className = 'folder-tag-list';
+  chips.dataset.folderTags = '';
+
+  if (tags.length > 0) {
+    tags.forEach((tag) => chips.append(createFolderTagChip(node, tag)));
+  } else {
+    const empty = document.createElement('span');
+    empty.className = 'folder-tags-empty';
+    empty.textContent = 'Ingen tagger';
+    chips.append(empty);
+  }
+
+  const suggestions = getTagSuggestions(scan, node);
+  const datalistId = `folder-tag-suggestions-${node.relativePath.replace(/[^a-z0-9_-]+/gi, '-')}`;
+  const inputRow = document.createElement('div');
+  inputRow.className = 'folder-tag-input-row';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'folder-tag-input';
+  input.placeholder = 'Legg til tag...';
+  input.setAttribute('aria-label', 'Legg til tag');
+  input.setAttribute('list', datalistId);
+  input.toggleAttribute(
+    'disabled',
+    folderTagSaveState.status === 'saving' || !window.sidekick?.addFolderTag,
+  );
+
+  const datalist = document.createElement('datalist');
+  datalist.id = datalistId;
+  suggestions.forEach((tag) => {
+    const option = document.createElement('option');
+    option.value = tag.label;
+    datalist.append(option);
+  });
+
+  const addButton = document.createElement('button');
+  addButton.type = 'button';
+  addButton.className = 'btn btn-secondary btn-sm';
+  addButton.textContent = 'Legg til';
+  addButton.toggleAttribute(
+    'disabled',
+    folderTagSaveState.status === 'saving' || !window.sidekick?.addFolderTag,
+  );
+
+  const addInputTag = () => {
+    const label = input.value.trim().replace(/\s+/g, ' ');
+    if (!label) {
+      return;
+    }
+    input.value = '';
+    void saveFolderTag(node, label, 'add');
+  };
+
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      addInputTag();
+    }
+  });
+  input.addEventListener('change', () => {
+    if (suggestions.some((tag) => tag.label === input.value)) {
+      addInputTag();
+    }
+  });
+  addButton.addEventListener('click', addInputTag);
+
+  inputRow.append(input, addButton, datalist);
+
+  const note = document.createElement('p');
+  note.className = 'folder-tags-note';
+  note.textContent = 'Lagres som skjult Sidekick-metadata i mappen - ikke i dokumentene dine';
+
+  container.append(chips, inputRow, note);
+  appendFolderTagSaveStatus(container, node);
+  selectionContentsTarget.append(title, container);
 };
 
 const workspaceInfoStatusText = (scan: WorkspaceScan) => {
@@ -1696,6 +1961,7 @@ const renderSelectedTreeContext = (scan?: WorkspaceScan) => {
   const warnings = getNodeWarnings(scan, node);
   const childFolders = getChildren(node).filter(isFolderNode).length;
   const childFiles = getChildren(node).length - childFolders;
+  clear(selectionContentsTarget);
 
   if (node.relativePath === ROOT_PATH) {
     setText(selectionLabelTarget, 'Arbeidsområde');
@@ -1715,7 +1981,8 @@ const renderSelectedTreeContext = (scan?: WorkspaceScan) => {
       ['Transkripsjoner', scan.summary.artifactTypeCounts.transcript.toString()],
     ]);
     clearSelectionActions();
-    renderSelectionContents(node);
+    appendFolderTagsEditor(scan, node);
+    renderSelectionContents(node, false);
     appendWorkspaceSummary(scan);
     appendDocumentRelationshipsSummary(scan);
     appendSelectionWarnings(overviewWarnings(scan));
@@ -1745,7 +2012,8 @@ const renderSelectedTreeContext = (scan?: WorkspaceScan) => {
     ]);
   }
 
-  renderSelectionContents(node);
+  appendFolderTagsEditor(scan, node);
+  renderSelectionContents(node, false);
   appendTranscriptionSummary(scan, node);
   renderSelectionActions(scan, node);
   appendSelectionWarnings(
@@ -3147,7 +3415,32 @@ const createTreeItem = (node: FolderTreeNode, level: number) => {
 const appendTreeNodeName = (row: HTMLDivElement, node: FolderTreeNode) => {
   const name = document.createElement('span');
   name.className = 'tree-name';
-  name.textContent = node.kind === 'folder' ? `${node.name}/` : node.name;
+  const label = document.createElement('span');
+  label.textContent = node.kind === 'folder' ? `${node.name}/` : node.name;
+  name.append(label);
+
+  const tags = getVisibleFolderTags(node);
+  if (tags.length > 0) {
+    const tagList = document.createElement('span');
+    tagList.className = 'tree-tag-list';
+    tags.slice(0, 3).forEach((tag) => {
+      const pill = document.createElement('span');
+      pill.className = 'tree-tag-pill';
+      pill.dataset.tagKind = tag.kind;
+      pill.textContent = tag.label;
+      tagList.append(pill);
+    });
+
+    if (tags.length > 3) {
+      const more = document.createElement('span');
+      more.className = 'tree-tag-pill';
+      more.dataset.tagKind = 'more';
+      more.textContent = `+${tags.length - 3}`;
+      tagList.append(more);
+    }
+
+    name.append(tagList);
+  }
   row.append(name);
 };
 

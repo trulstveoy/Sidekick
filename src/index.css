@@ -856,7 +856,11 @@ textarea:disabled {
 }
 
 .tree-name {
+  display: flex;
   min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
   overflow-wrap: anywhere;
   color: var(--text-1);
   font-size: 14px;
@@ -873,6 +877,48 @@ textarea:disabled {
 
 .tree-node--file .tree-row {
   min-height: 32px;
+}
+
+.tree-tag-list {
+  display: inline-flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.tree-tag-pill,
+.folder-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid var(--border-1);
+  border-radius: 999px;
+  color: var(--text-2);
+  background: var(--surface-2);
+  font-weight: 700;
+}
+
+.tree-tag-pill {
+  overflow: hidden;
+  padding: 1px 6px;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-tag-pill[data-tag-kind='system'],
+.folder-tag-chip[data-tag-kind='system'] {
+  border-color: var(--accent-border);
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.tree-tag-pill[data-tag-kind='free'],
+.folder-tag-chip[data-tag-kind='free'] {
+  border-color: var(--border-2);
+  color: var(--text-2);
+  background: var(--surface-2);
 }
 
 .tree-meta,
@@ -961,6 +1007,71 @@ textarea:disabled {
   color: var(--text-2);
   font-size: 12px;
   line-height: 1.5;
+}
+
+.folder-tags-editor {
+  display: grid;
+  gap: 7px;
+}
+
+.folder-tag-list {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.folder-tag-chip {
+  min-height: 24px;
+  padding: 2px 4px 2px 8px;
+  font-size: 11px;
+}
+
+.folder-tag-remove {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  margin-left: 4px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: inherit;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.folder-tag-remove:hover:not(:disabled),
+.folder-tag-remove:focus-visible {
+  background: rgb(0 0 0 / 8%);
+  outline: none;
+}
+
+.folder-tag-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.folder-tags-empty,
+.folder-tags-note,
+.folder-tag-status,
+.folder-tags-warning {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.folder-tag-status[data-status='saved'] {
+  color: var(--success-text);
+}
+
+.folder-tag-status[data-status='error'],
+.folder-tags-warning {
+  color: var(--error-text);
 }
 
 .selection-summary,

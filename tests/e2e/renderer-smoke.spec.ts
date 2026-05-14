@@ -1470,6 +1470,143 @@ test('expands and collapses scanned folders', async ({ page }) => {
   await expect(page.getByText('notes.md')).toHaveCount(0);
 });
 
+test('edits folder tags from the right panel and shows tree pills', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan }) => {
+      let currentScan = scan;
+      const normalize = (label: string) => label.trim().replace(/\s+/g, ' ');
+      const key = (label: string) => normalize(label).toLocaleLowerCase('nb-NO');
+      const updateNodeTags = (node: WorkspaceScan['tree'], relativePath: string, tags: unknown[]) => {
+        if (node.relativePath === relativePath) {
+          return {
+            ...node,
+            metadata: {
+              status: 'valid',
+              markerRelativePath: `${relativePath}/.sidekick-folder.json`,
+              folderId: 'folder-01-bakgrunn',
+              tags,
+            },
+          };
+        }
+
+        return {
+          ...node,
+          children: node.children?.map((child) => updateNodeTags(child, relativePath, tags)),
+        };
+      };
+      const makeTag = (label: string) => {
+        const normalized = normalize(label);
+        if (key(normalized) === 'prosjektmappe') {
+          return {
+            label: 'Prosjektmappe',
+            normalizedLabel: 'prosjektmappe',
+            kind: 'system',
+            source: 'explicit',
+            updatedAt: '2026-05-14T12:00:00.000Z',
+            systemEffect: 'project-root',
+            context: {
+              id: 'project-01-bakgrunn',
+              type: 'project',
+              name: '01-bakgrunn',
+            },
+          };
+        }
+
+        return {
+          label: normalized,
+          normalizedLabel: key(normalized),
+          kind: 'free',
+          source: 'explicit',
+          updatedAt: '2026-05-14T12:00:00.000Z',
+        };
+      };
+      const editTag = async (request: { folderRelativePath: string; label: string }, action: 'add' | 'remove') => {
+        const node = currentScan.tree.children?.find(
+          (child) => child.relativePath === request.folderRelativePath,
+        );
+        const currentTags = node?.metadata?.status === 'valid' ? node.metadata.tags ?? [] : [];
+        const normalizedLabel = key(request.label);
+        const tags =
+          action === 'add'
+            ? [...currentTags.filter((tag) => tag.normalizedLabel !== normalizedLabel), makeTag(request.label)]
+            : currentTags.filter((tag) => tag.normalizedLabel !== normalizedLabel);
+
+        currentScan = {
+          ...currentScan,
+          tree: updateNodeTags(currentScan.tree, request.folderRelativePath, tags),
+        };
+
+        return {
+          status: 'complete',
+          rootPath: currentScan.rootPath,
+          folderRelativePath: request.folderRelativePath,
+          metadata: currentScan.tree.children?.find(
+            (child) => child.relativePath === request.folderRelativePath,
+          )?.metadata,
+          scan: currentScan,
+        };
+      };
+
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseWorkspaceFolder: async () => currentScan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
+        previewContextPackage: async () => {
+          throw new Error('No context package preview.');
+        },
+        generateContextPackage: async () => {
+          throw new Error('No context package result.');
+        },
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import preview.');
+        },
+        addFolderTag: async (request) => editTag(request, 'add'),
+        removeFolderTag: async (request) => editTag(request, 'remove'),
+        getCodexStatus: async () => ({
+          state: 'ready',
+          available: true,
+          loggedIn: true,
+        }),
+        startCodexLogin: async () => ({ runId: 'login-run' }),
+        startCodexRun: async () => ({ runId: 'codex-run' }),
+        cancelCodexRun: async () => undefined,
+        onCodexOutput: () => () => undefined,
+        onCodexCompletion: () => () => undefined,
+      };
+    },
+    { scan: mockScan },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
+  await page.getByRole('treeitem', { name: /01-bakgrunn/ }).click();
+
+  await expect(page.getByText('Tagger', { exact: true })).toBeVisible();
+  await expect(page.getByText('Ingen tagger')).toBeVisible();
+
+  const tagInput = page.getByLabel('Legg til tag');
+  await tagInput.fill('Prosjektmappe');
+  await tagInput.press('Enter');
+
+  await expect(page.locator('.folder-tag-chip', { hasText: 'Prosjektmappe' })).toBeVisible();
+  await expect(page.locator('.tree-tag-pill', { hasText: 'Prosjektmappe' })).toBeVisible();
+
+  await tagInput.fill('Q2');
+  await tagInput.press('Enter');
+
+  await expect(page.locator('.folder-tag-chip', { hasText: 'Q2' })).toBeVisible();
+  await page.getByRole('button', { name: 'Fjern tag Prosjektmappe' }).click();
+  await expect(page.locator('.folder-tag-chip', { hasText: 'Prosjektmappe' })).toHaveCount(0);
+  await expect(page.locator('.folder-tag-chip', { hasText: 'Q2' })).toBeVisible();
+});
+
 test('expands and collapses all scanned folders', async ({ page }) => {
   await page.addInitScript(
     ({ scan, preview, result }) => {

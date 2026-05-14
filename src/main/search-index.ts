@@ -12,6 +12,7 @@ import type {
   SearchWorkspaceRequest,
   SearchWorkspaceResult,
 } from '../shared/sidekick-api';
+import { FOLDER_METADATA_FILE_NAME } from './context-metadata';
 import { classifyArtifact } from './folder-scanner';
 
 export const SEARCH_INDEX_SCHEMA = 'search-index-manifest.v1';
@@ -218,7 +219,9 @@ const isLikelyBinaryExtension = (fileName: string) => {
 };
 
 const shouldIndexFileName = (fileName: string) =>
-  !isGeneratedContextPackage(fileName.toLowerCase()) && isSupportedExtension(fileName);
+  fileName !== FOLDER_METADATA_FILE_NAME &&
+  !isGeneratedContextPackage(fileName.toLowerCase()) &&
+  isSupportedExtension(fileName);
 
 const createStatus = (
   rootPath: string,
@@ -667,6 +670,10 @@ export class SearchIndexManager extends EventEmitter<SearchIndexEvents> {
         continue;
       }
 
+      if (entryName === FOLDER_METADATA_FILE_NAME) {
+        continue;
+      }
+
       const document = await this.readDocumentForIndex(rootPath, entryPath, relativePath, manifest);
       if (document) {
         documents.push(document);
@@ -948,6 +955,11 @@ export class SearchIndexManager extends EventEmitter<SearchIndexEvents> {
       }
 
       if (!stats.isFile()) {
+        this.removeDocument(state, relativePath);
+        return;
+      }
+
+      if (path.basename(absolutePath) === FOLDER_METADATA_FILE_NAME) {
         this.removeDocument(state, relativePath);
         return;
       }

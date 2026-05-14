@@ -52,6 +52,7 @@ Den kontekstbaserte modellen bør følge disse prinsippene:
 - Sidekick kan legge til metadata, sammendrag, indekser og kontekstpakker, men dette skal være lokalt og transparent.
 - Sidekick bør være forsiktig med å skrive metadata inn i brukerens egne innholdsfiler.
 - Intern organiseringsmetadata bør i første omgang ligge under `.sidekick/`.
+- Metadata som skal følge en mappe ved rename eller flytting kan ligge som en liten skjult Sidekick-markør i selve mappen, for eksempel `.sidekick-folder.json`.
 - Brukeren skal kunne forstå forskjellen mellom hvor en fil fysisk ligger og hvilke kontekster den er koblet til.
 - Modellen må tåle at filer opprettes, leses og redigeres i andre verktøy.
 
@@ -1032,11 +1033,53 @@ Derfor bør `.sidekick/` skille mellom:
 - genererte rapporter;
 - brukerbekreftede koblinger.
 
+### Foldermarkører
+
+Noe metadata bør følge en mappe når brukeren renamer eller flytter mappen.
+
+For mapper som brukeren tagger i Sidekick, for eksempel med `Prosjektmappe`, kan Sidekick skrive en liten skjult marker-fil direkte i mappen:
+
+```text
+Strategi/.sidekick-folder.json
+```
+
+Dette er ikke brukerinnhold. Det er Sidekick-metadata på samme måte som `.sidekick/`, men plassert i mappen fordi identiteten bør følge mappen.
+
+Marker-filen kan inneholde:
+
+```json
+{
+  "sidekickSchema": "folder-metadata.v1",
+  "folderId": "folder-strategy-7f3b",
+  "tags": [
+    {
+      "label": "Prosjektmappe",
+      "kind": "system",
+      "systemEffect": "project-root"
+    }
+  ]
+}
+```
+
+Denne tilnærmingen gjør folder-tagging mindre skjør enn en ren path-basert indeks under `.sidekick/`.
+
+Regler:
+
+- `.sidekick-folder.json` skal skjules fra normal mappevisning, kontekstpakker, sammendrag og søkeindeks.
+- Den skal ikke skrives inn i brukerens Markdown-filer.
+- Den skal kunne skjules i editorer som Obsidian.
+- Hvis marker-filen slettes, mister Sidekick folderens tagger, men brukerens innhold påvirkes ikke.
+- Hvis en mappe kopieres og marker-filen følger med, må Sidekick kunne oppdage duplisert `folderId` og be om avklaring.
+- En workspace-level `content-index` kan senere cache eller referere til foldermarkører, men marker-filen bør være autoritativ for selve foldertaggen.
+
 ## Metadata
 
 ### Anbefalt første retning
 
-Første versjon av den kontekstbaserte modellen bør bruke sentral metadataindeks under `.sidekick/`.
+Første versjon av den kontekstbaserte modellen bør bruke to komplementære metadataformer:
+
+- foldermarkører i taggede mapper når metadata må følge mappen ved rename eller flytting;
+- sentral metadataindeks under `.sidekick/` for arbeidsområdeoversikt, koblinger, cache og metadata som ikke naturlig eies av én mappe.
 
 Anbefalt fil:
 
@@ -1044,7 +1087,7 @@ Anbefalt fil:
 .sidekick/content-index.yml
 ```
 
-Dette gir Sidekick kontrollert metadata uten å skrive i brukerens egne innholdsfiler.
+Dette gir Sidekick kontrollert metadata uten å skrive i brukerens egne innholdsfiler. Foldermarkører er et bevisst unntak: de skriver en skjult Sidekick-metadatafil i den taggede mappen, men ikke i brukerens dokumenter.
 
 ### Eksempel på content-index
 

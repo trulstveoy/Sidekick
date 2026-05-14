@@ -28,6 +28,55 @@ export type FolderSignal =
   | 'architecture'
   | 'thematic';
 
+export type FolderSystemEffect = 'project-root';
+
+export type FolderContextReference = {
+  id: string;
+  type: 'project';
+  name: string;
+};
+
+export type FolderTagKind = 'system' | 'free';
+
+export type FolderTag = {
+  label: string;
+  normalizedLabel: string;
+  kind: FolderTagKind;
+  source: 'explicit';
+  updatedAt: string;
+  systemEffect?: FolderSystemEffect;
+  context?: FolderContextReference;
+};
+
+export type FolderMetadataStatus =
+  | 'none'
+  | 'valid'
+  | 'invalid'
+  | 'unsupported'
+  | 'conflict';
+
+export type FolderMetadataSummary = {
+  status: FolderMetadataStatus;
+  tags: FolderTag[];
+  markerRelativePath?: string;
+  folderId?: string;
+  message?: string;
+};
+
+export type FolderTagEditRequest = {
+  rootPath: string;
+  folderRelativePath: string;
+  label: string;
+};
+
+export type FolderTagEditResult = {
+  status: 'complete';
+  rootPath: string;
+  folderRelativePath: string;
+  metadata: FolderMetadataSummary;
+  scan: WorkspaceScan;
+};
+
 export type ScanStatus = 'complete' | 'partial';
 
 export type ScanWarningSeverity = 'info' | 'warning' | 'error';
@@ -39,7 +88,10 @@ export type ScanWarning = {
     | 'depth-limit'
     | 'file-limit'
     | 'excluded-folder'
-    | 'symlink-skipped';
+    | 'symlink-skipped'
+    | 'metadata-invalid'
+    | 'metadata-unsupported'
+    | 'metadata-conflict';
   message: string;
   severity: ScanWarningSeverity;
 };
@@ -60,6 +112,7 @@ export type FolderTreeNode = {
   children?: FolderTreeNode[];
   artifactType?: ArtifactType;
   folderSignals?: FolderSignal[];
+  metadata?: FolderMetadataSummary;
   contextHints: FolderSignal[];
   size?: number;
   modifiedAt?: string;
@@ -549,6 +602,8 @@ export type SidekickApi = {
   getSearchIndexStatus?: (rootPath: string) => Promise<SearchIndexStatus>;
   refreshSearchIndex?: (rootPath: string) => Promise<SearchIndexStatus>;
   searchWorkspace?: (request: SearchWorkspaceRequest) => Promise<SearchWorkspaceResult>;
+  addFolderTag?: (request: FolderTagEditRequest) => Promise<FolderTagEditResult>;
+  removeFolderTag?: (request: FolderTagEditRequest) => Promise<FolderTagEditResult>;
   getCodexStatus: (rootPath: string) => Promise<CodexStatus>;
   startCodexLogin: (rootPath: string) => Promise<CodexRunStartResult>;
   startCodexRun: (request: CodexRunRequest) => Promise<CodexRunStartResult>;

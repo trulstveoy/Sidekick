@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { lstat } from 'node:fs/promises';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import type {
@@ -13,6 +14,7 @@ import type {
   TranscriptionSummaryReadRequest,
   TranscriptionImportPreview,
   SearchWorkspaceRequest,
+  FolderTagEditRequest,
 } from './shared/sidekick-api';
 import {
   generateContextPackage,
@@ -26,6 +28,13 @@ import {
 } from './main/document-relationships';
 import { CodexRunner } from './main/codex-runner';
 import { scanWorkspaceFolder } from './main/folder-scanner';
+import {
+  FOLDER_METADATA_FILE_NAME,
+  ROOT_RELATIVE_PATH,
+  addFolderTag,
+  removeFolderTag,
+  toFolderMetadataSummary,
+} from './main/context-metadata';
 import { readWorkspaceInfo } from './main/workspace-info';
 import { createWorkspaceFolder } from './main/workspace-creator';
 import {
@@ -244,6 +253,92 @@ const assertKnownWorkspaceRoot = (rootPath: unknown) => {
   return rootPath;
 };
 
+const isPathInside = (parentPath: string, childPath: string) => {
+  const relativePath = path.relative(parentPath, childPath);
+
+  return relativePath === '' || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath));
+};
+
+const normalizeWorkspaceRelativePath = (relativePath: string) => {
+  if (path.isAbsolute(relativePath)) {
+    throw new Error('Selected folder path must be relative to the workspace root.');
+  }
+
+  const normalized = relativePath.replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/g, '');
+
+  if (!normalized || normalized === ROOT_RELATIVE_PATH) {
+    throw new Error('Workspace root cannot be tagged in this version.');
+  }
+
+  const segments = normalized.split('/');
+
+  if (segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
+    throw new Error('Selected folder path must stay inside the workspace root.');
+  }
+
+  if (segments.includes('.sidekick') || segments.includes(FOLDER_METADATA_FILE_NAME)) {
+    throw new Error('Sidekick metadata paths cannot be tagged.');
+  }
+
+  return {
+    normalized,
+    segments,
+  };
+};
+
+const resolveFolderTagRequest = async (request: unknown): Promise<FolderTagEditRequest & { folderPath: string }> => {
+  if (!request || typeof request !== 'object') {
+    throw new Error('A folder tag request is required.');
+  }
+
+  const { rootPath, folderRelativePath, label } = request as Partial<FolderTagEditRequest>;
+
+  if (typeof folderRelativePath !== 'string') {
+    throw new Error('A selected folder path is required.');
+  }
+
+  if (typeof label !== 'string' || label.trim().length === 0) {
+    throw new Error('A tag label is required.');
+  }
+
+  const workspaceRoot = assertKnownWorkspaceRoot(rootPath);
+  const { normalized, segments } = normalizeWorkspaceRelativePath(folderRelativePath);
+  const folderPath = path.resolve(workspaceRoot, ...segments);
+
+  if (!isPathInside(workspaceRoot, folderPath)) {
+    throw new Error('Selected folder must stay inside the workspace root.');
+  }
+
+  const stats = await lstat(folderPath);
+
+  if (!stats.isDirectory()) {
+    throw new Error('Selected path must be a folder.');
+  }
+
+  return {
+    rootPath: workspaceRoot,
+    folderRelativePath: normalized,
+    label,
+    folderPath,
+  };
+};
+
+const createFolderTagEditResult = async (
+  request: FolderTagEditRequest & { folderPath: string },
+  operation: typeof addFolderTag | typeof removeFolderTag,
+) => {
+  const metadata = await operation(request.folderPath, request.label);
+  const scan = await scanWorkspaceFolder(request.rootPath);
+
+  return {
+    status: 'complete' as const,
+    rootPath: request.rootPath,
+    folderRelativePath: request.folderRelativePath,
+    metadata: toFolderMetadataSummary('valid', request.folderRelativePath, metadata),
+    scan,
+  };
+};
+
 ipcMain.handle('context-package:preview', (_event, rootPath) =>
   getContextPackagePreview(assertKnownWorkspaceRoot(rootPath)),
 );
@@ -293,6 +388,14 @@ ipcMain.handle('context-package:preview-folder', (_event, request) =>
 
 ipcMain.handle('context-package:generate-folder', (_event, request) =>
   generateFolderContextPackage(assertFolderContextPackageRequest(request)),
+);
+
+ipcMain.handle('folder-tags:add', async (_event, request) =>
+  createFolderTagEditResult(await resolveFolderTagRequest(request), addFolderTag),
+);
+
+ipcMain.handle('folder-tags:remove', async (_event, request) =>
+  createFolderTagEditResult(await resolveFolderTagRequest(request), removeFolderTag),
 );
 
 const assertSearchWorkspaceRequest = (request: unknown): SearchWorkspaceRequest => {
