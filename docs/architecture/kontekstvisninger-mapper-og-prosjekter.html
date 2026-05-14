@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sidekick – Filvisning og prosjektvisning</title>
+<style>
+  :root {
+    --color-bg:        #f4f4f4;
+    --color-surface:   #ffffff;
+    --color-surface-2: #f9f9f9;
+    --color-border:    #e0e0e0;
+    --color-border-strong: #c8c8c8;
+    --color-text:      #1a1a1a;
+    --color-text-2:    #555555;
+    --color-text-3:    #888888;
+    --color-primary:   #2563eb;
+    --color-primary-hover: #1d4ed8;
+    --color-primary-light: #eff6ff;
+    --color-selected:  #eff6ff;
+    --color-selected-border: #bfdbfe;
+    --color-hover:     #f3f4f6;
+    --color-library:   #f5f3ff;
+    --color-library-border: #ddd6fe;
+    --color-library-text: #5b21b6;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "Consolas", "SF Mono", monospace;
+    --topbar-h: 44px;
+    --actionbar-h: 52px;
+    --right-w: 260px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    font-size: 13px;
+    background: #d8d8d8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 24px 48px;
+    gap: 48px;
+    min-height: 100vh;
+  }
+
+  .page-header {
+    width: 100%;
+    max-width: 960px;
+  }
+  .page-header h1 { font-size: 17px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px; }
+  .page-header p { font-size: 12px; color: #666; }
+
+  /* ─── App window ─── */
+  .app-window {
+    width: 100%;
+    max-width: 960px;
+    height: 580px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 24px rgba(0,0,0,.12), 0 1px 4px rgba(0,0,0,.06);
+  }
+
+  /* ─── Topbar ─── */
+  .topbar {
+    height: var(--topbar-h);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    flex-shrink: 0;
+  }
+  .topbar-logo {
+    display: flex; align-items: center; gap: 7px;
+    font-weight: 700; font-size: 14px; color: var(--color-text);
+    padding-right: 16px; border-right: 1px solid var(--color-border); margin-right: 14px;
+  }
+  .logo-icon {
+    width: 20px; height: 20px; background: var(--color-primary);
+    border-radius: 5px; display: flex; align-items: center;
+    justify-content: center; color: white; font-size: 11px; font-weight: 800;
+  }
+  .topbar-folder {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: var(--radius-sm);
+    cursor: pointer; color: var(--color-text-2); font-size: 13px;
+  }
+  .topbar-folder:hover { background: var(--color-hover); }
+  .topbar-folder .folder-name { color: var(--color-text); font-weight: 500; }
+  .topbar-folder .chevron { color: var(--color-text-3); font-size: 10px; }
+  .topbar-spacer { flex: 1; }
+  .topbar-settings {
+    width: 30px; height: 30px; display: flex; align-items: center;
+    justify-content: center; border-radius: var(--radius-sm);
+    cursor: pointer; color: var(--color-text-3);
+  }
+  .topbar-settings:hover { background: var(--color-hover); color: var(--color-text); }
+
+  /* ─── Body ─── */
+  .app-body { flex: 1; display: flex; overflow: hidden; }
+
+  /* ─── Middle panel ─── */
+  .middle-panel {
+    flex: 1; display: flex; flex-direction: column;
+    border-right: 1px solid var(--color-border);
+    overflow: hidden; background: var(--color-surface);
+  }
+
+  /* View toggle */
+  .view-toggle {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px 0;
+    gap: 2px;
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+  }
+  .toggle-btn {
+    padding: 5px 12px 7px;
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text-3);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    margin-bottom: -1px;
+    transition: color .1s;
+  }
+  .toggle-btn:hover { color: var(--color-text); }
+  .toggle-btn.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+  }
+
+  /* ─── File tree ─── */
+  .tree-header {
+    display: grid; grid-template-columns: 1fr 72px;
+    padding: 8px 12px 6px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--color-text-3);
+  }
+  .tree-body { flex: 1; overflow-y: auto; padding: 4px 0; }
+
+  .tree-row {
+    display: grid; grid-template-columns: 1fr 72px;
+    align-items: center; padding: 0 12px;
+    height: 30px; cursor: pointer; position: relative;
+    transition: background .08s;
+  }
+  .tree-row:hover { background: var(--color-hover); }
+  .tree-row:hover .tree-arrow { opacity: 1; }
+  .tree-row.selected { background: var(--color-selected); }
+  .tree-row.selected .tree-label { color: var(--color-primary); font-weight: 500; }
+
+  .tree-name {
+    display: flex; align-items: center; gap: 5px;
+    overflow: hidden;
+  }
+  .tree-toggle { width: 16px; flex-shrink: 0; color: var(--color-text-3); font-size: 10px; text-align: center; }
+  .tree-icon { font-size: 13px; flex-shrink: 0; }
+  .tree-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text); }
+  .tree-meta { color: var(--color-text-3); font-size: 12px; }
+  .tree-arrow { position: absolute; right: 12px; opacity: 0; color: var(--color-text-3); font-size: 12px; }
+
+  /* ─── Project view ─── */
+  .project-view { flex: 1; overflow-y: auto; padding: 8px 0; }
+
+  .project-group { margin-bottom: 4px; }
+
+  .project-group-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px 5px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .project-group-header:hover { background: var(--color-hover); }
+  .project-group-toggle { color: var(--color-text-3); font-size: 10px; width: 12px; }
+  .project-group-name {
+    font-weight: 600; font-size: 13px; color: var(--color-text);
+  }
+  .project-group-count {
+    font-size: 11px; color: var(--color-text-3);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    padding: 1px 6px; border-radius: 10px;
+  }
+
+  .source-section { padding: 2px 0 4px; }
+
+  .source-label {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase;
+    color: var(--color-text-3);
+    padding: 4px 12px 2px 36px;
+  }
+
+  .project-file-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 12px 5px 36px;
+    cursor: pointer; position: relative;
+    transition: background .08s;
+  }
+  .project-file-row:hover { background: var(--color-hover); }
+  .project-file-row.selected { background: var(--color-selected); }
+  .project-file-row.selected .pf-name { color: var(--color-primary); font-weight: 500; }
+
+  .pf-icon { font-size: 13px; flex-shrink: 0; }
+  .pf-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text); font-size: 13px; }
+  .pf-path { font-size: 11px; color: var(--color-text-3); font-family: var(--font-mono, monospace); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+
+  .library-file-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 12px 5px 36px;
+    cursor: pointer; position: relative;
+    transition: background .08s;
+  }
+  .library-file-row:hover { background: var(--color-library); }
+  .library-file-row.selected { background: var(--color-library); }
+  .library-file-row.selected .pf-name { color: var(--color-library-text); font-weight: 500; }
+
+  .library-tag {
+    font-size: 10px; font-weight: 600;
+    background: var(--color-library);
+    border: 1px solid var(--color-library-border);
+    color: var(--color-library-text);
+    padding: 1px 6px; border-radius: 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ─── Right panel ─── */
+  .right-panel {
+    width: var(--right-w); flex-shrink: 0;
+    display: flex; flex-direction: column;
+    background: var(--color-surface-2); overflow: hidden;
+  }
+  .right-panel-header {
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid var(--color-border); flex-shrink: 0;
+  }
+  .right-panel-type {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: .07em; text-transform: uppercase;
+    color: var(--color-text-3); margin-bottom: 3px;
+  }
+  .right-panel-name {
+    font-size: 14px; font-weight: 600; color: var(--color-text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .right-panel-desc { font-size: 12px; color: var(--color-text-3); margin-top: 2px; }
+
+  .right-panel-body {
+    flex: 1; padding: 12px 14px;
+    overflow-y: auto; display: flex;
+    flex-direction: column; gap: 12px;
+  }
+
+  .meta-section { display: flex; flex-direction: column; gap: 5px; }
+  .meta-section-label {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase;
+    color: var(--color-text-3); margin-bottom: 2px;
+  }
+  .meta-row {
+    display: flex; justify-content: space-between;
+    align-items: baseline; gap: 8px; font-size: 12px;
+  }
+  .meta-key { color: var(--color-text-3); flex-shrink: 0; }
+  .meta-val { color: var(--color-text); font-weight: 500; text-align: right; }
+  .meta-val code {
+    font-family: var(--font-mono, monospace); font-size: 11px;
+    background: var(--color-surface); padding: 1px 5px;
+    border-radius: 3px; border: 1px solid var(--color-border);
+  }
+
+  .context-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; padding: 2px 8px;
+    border-radius: 10px; margin: 2px 2px 0 0;
+  }
+  .context-pill.project {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    border: 1px solid var(--color-selected-border);
+  }
+  .context-pill.library {
+    background: var(--color-library);
+    color: var(--color-library-text);
+    border: 1px solid var(--color-library-border);
+  }
+
+  .divider { height: 1px; background: var(--color-border); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 6px; padding: 7px 14px; border-radius: var(--radius-md);
+    font-family: var(--font); font-size: 13px; font-weight: 500;
+    cursor: pointer; border: none; transition: background .1s;
+    white-space: nowrap;
+  }
+  .btn-secondary {
+    background: var(--color-surface); color: var(--color-text);
+    border: 1px solid var(--color-border-strong);
+  }
+  .btn-secondary:hover { background: var(--color-hover); }
+  .btn-ghost {
+    background: transparent; color: var(--color-text-2);
+    border: 1px solid transparent;
+  }
+  .btn-ghost:hover { background: var(--color-hover); }
+  .btn-full { width: 100%; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  /* ─── Action bar ─── */
+  .actionbar {
+    height: var(--actionbar-h); background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    display: flex; align-items: center;
+    padding: 0 14px; gap: 8px; flex-shrink: 0;
+  }
+  .actionbar-spacer { flex: 1; }
+
+  /* ─── Legend ─── */
+  .legend {
+    width: 100%; max-width: 960px;
+    display: flex; gap: 20px; align-items: center;
+    background: white; border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 12px 16px;
+  }
+  .legend-title { font-size: 11px; font-weight: 600; color: var(--color-text-3); text-transform: uppercase; letter-spacing: .06em; margin-right: 4px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-2); }
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0;
+  }
+  .legend-dot.physical { background: var(--color-surface-2); border: 1px solid var(--color-border-strong); }
+  .legend-dot.linked { background: var(--color-library); border: 1px solid var(--color-library-border); }
+
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Sidekick – Filvisning og prosjektvisning</h1>
+  <p>Kontekstvisninger · Mai 2026</p>
+</div>
+
+<!-- App window -->
+<div class="app-window" id="appWindow">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-logo">
+      <div class="logo-icon">S</div>
+      Sidekick
+    </div>
+    <div class="topbar-folder">
+      <span style="color:var(--color-text-3);">📁</span>
+      <span class="folder-name">Organisasjonsutvikling</span>
+      <span class="chevron">▾</span>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-settings">⚙</div>
+  </div>
+
+  <!-- Body -->
+  <div class="app-body">
+
+    <!-- Middle panel -->
+    <div class="middle-panel">
+
+      <!-- Toggle -->
+      <div class="view-toggle">
+        <button class="toggle-btn active" id="btnFiles" onclick="setView('files')">Mapper</button>
+        <button class="toggle-btn" id="btnProjects" onclick="setView('projects')">Prosjekter</button>
+      </div>
+
+      <!-- File tree view -->
+      <div id="fileView" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
+        <div class="tree-header">
+          <span>Mappe / Fil</span>
+          <span>Størrelse</span>
+        </div>
+        <div class="tree-body">
+
+          <div class="tree-row" onclick="selectItem('workspace')">
+            <span class="tree-name">
+              <span class="tree-toggle">▾</span>
+              <span class="tree-icon">📁</span>
+              <span class="tree-label">Organisasjonsutvikling/</span>
+            </span>
+            <span class="tree-meta"></span>
+          </div>
+
+          <!-- Prosjekter -->
+          <div class="tree-row" onclick="selectItem('prosjekter-folder')" style="padding-left:28px;">
+            <span class="tree-name">
+              <span class="tree-toggle">▾</span>
+              <span class="tree-icon">📁</span>
+              <span class="tree-label">Prosjekter/</span>
+            </span>
+            <span class="tree-meta"></span>
+            <span class="tree-arrow">→</span>
+          </div>
+
+          <div class="tree-row" onclick="selectItem('strategi-folder')" style="padding-left:44px;">
+            <span class="tree-name">
+              <span class="tree-toggle">▾</span>
+              <span class="tree-icon">📁</span>
+              <span class="tree-label">Strategi/</span>
+            </span>
+            <span class="tree-meta"></span>
+            <span class="tree-arrow">→</span>
+          </div>
+
+          <div class="tree-row" onclick="selectItem('strategi-retning')" style="padding-left:60px;">
+            <span class="tree-name">
+              <span class="tree-toggle">▾</span>
+              <span class="tree-icon">📁</span>
+              <span class="tree-label">00. Retning/</span>
+            </span>
+            <span class="tree-meta"></span>
+          </div>
+
+          <div class="tree-row" id="file-strat" onclick="selectItem('strategiske-veivalg')" style="padding-left:76px;">
+            <span class="tree-name">
+              <span class="tree-toggle" style="visibility:hidden;">▶</span>
+              <span class="tree-icon">📄</span>
+              <span class="tree-label">2026-05-15 strategiske veivalg.md</span>
+            </span>
+            <span class="tree-meta">18 KB</span>
+          </div>
+
+          <div class="tree-row" onclick="selectItem('operasjon-folder')" style="padding-left:44px;">
+            <span class="tree-name">
+              <span class="tree-toggle">▾</span>
+              <span class="tree-icon">📁</span>
+              <span class="tree-label">Operasjon/</span>
+            </span>
+            <span class="tree-meta"></span>
+            <span class="tree-arrow">→</span>
+          </div>
+
+          <div class="tree-row" onclick="selectItem('operasjon-leveranse')" style="padding-left:60px;">
+            <span class="tree-name">
+              <span class="tree-toggle">▾</span>
+              <span class="tree-icon">📁</span>
+              <span class="tree-label">00. Leveranse/</span>
+            </span>
+            <span class="tree-meta"></span>
+          </div>
+
+          <div class="tree-row" id="file-ops" onclick="selectItem('operasjonsmodell')" style="padding-left:76px;">
+            <span class="tree-name">
+              <span class="tree-toggle" style="visibility:hidden;">▶</span>
+              <span class="tree-icon">📄</span>
+              <span class="tree-label">2026-05-14 operasjonsmodell.md</span>
+            </span>
+            <span class="tree-meta">24 KB</span>
+          </div>
+
+          <!-- Bibliotek -->
+          <div class="tree-row" onclick="selectItem('bibliotek-folder')" style="padding-left:28px;">
+            <span class="tree-name">
+              <span class="tree-toggle">▾</span>
+              <span class="tree-icon">📁</span>
+              <span class="tree-label">Bibliotek/</span>
+            </span>
+            <span class="tree-meta"></span>
+            <span class="tree-arrow">→</span>
+          </div>
+
+          <div class="tree-row" onclick="selectItem('bibliotek-trans')" style="padding-left:44px;">
+            <span class="tree-name">
+              <span class="tree-toggle">▾</span>
+              <span class="tree-icon">📁</span>
+              <span class="tree-label">Transkripsjoner/</span>
+            </span>
+            <span class="tree-meta"></span>
+          </div>
+
+          <div class="tree-row" id="file-trans" onclick="selectItem('intervju-direktor')" style="padding-left:60px;">
+            <span class="tree-name">
+              <span class="tree-toggle" style="visibility:hidden;">▶</span>
+              <span class="tree-icon">📄</span>
+              <span class="tree-label">2026-05-13 intervju med direktør.md</span>
+            </span>
+            <span class="tree-meta">72 KB</span>
+          </div>
+
+          <!-- Innboks -->
+          <div class="tree-row" onclick="selectItem('innboks')" style="padding-left:28px;">
+            <span class="tree-name">
+              <span class="tree-toggle">▶</span>
+              <span class="tree-icon">📁</span>
+              <span class="tree-label">00. Innboks/</span>
+            </span>
+            <span class="tree-meta" style="color:var(--color-text-3); font-style:italic;">Tom</span>
+          </div>
+
+          <!-- .sidekick -->
+          <div class="tree-row" style="padding-left:28px; opacity:.5;">
+            <span class="tree-name">
+              <span class="tree-toggle">▶</span>
+              <span class="tree-icon">🔒</span>
+              <span class="tree-label" style="color:var(--color-text-3);">.sidekick/</span>
+            </span>
+            <span class="tree-meta"></span>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Project view -->
+      <div id="projectView" style="display:none; flex:1; overflow:hidden;">
+        <div class="project-view" id="projectViewBody">
+
+          <!-- Strategi -->
+          <div class="project-group">
+            <div class="project-group-header" onclick="toggleGroup('strategi')">
+              <span class="project-group-toggle" id="toggle-strategi">▾</span>
+              <span class="project-group-name">Strategi</span>
+              <span class="project-group-count">2 filer</span>
+            </div>
+            <div id="group-strategi">
+              <div class="source-section">
+                <div class="source-label">Prosjektfiler</div>
+                <div class="project-file-row" onclick="selectItem('strategiske-veivalg')">
+                  <span class="pf-icon">📄</span>
+                  <span class="pf-name">2026-05-15 strategiske veivalg.md</span>
+                  <span class="pf-path">Prosjekter/Strategi/</span>
+                </div>
+              </div>
+              <div class="source-section">
+                <div class="source-label">Fra bibliotek</div>
+                <div class="library-file-row" onclick="selectItem('intervju-direktor')">
+                  <span class="pf-icon">📄</span>
+                  <span class="pf-name">2026-05-13 intervju med direktør.md</span>
+                  <span class="library-tag">Bibliotek</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Operasjon -->
+          <div class="project-group">
+            <div class="project-group-header" onclick="toggleGroup('operasjon')">
+              <span class="project-group-toggle" id="toggle-operasjon">▾</span>
+              <span class="project-group-name">Operasjon</span>
+              <span class="project-group-count">2 filer</span>
+            </div>
+            <div id="group-operasjon">
+              <div class="source-section">
+                <div class="source-label">Prosjektfiler</div>
+                <div class="project-file-row" onclick="selectItem('operasjonsmodell')">
+                  <span class="pf-icon">📄</span>
+                  <span class="pf-name">2026-05-14 operasjonsmodell.md</span>
+                  <span class="pf-path">Prosjekter/Operasjon/</span>
+                </div>
+              </div>
+              <div class="source-section">
+                <div class="source-label">Fra bibliotek</div>
+                <div class="library-file-row" onclick="selectItem('intervju-direktor')">
+                  <span class="pf-icon">📄</span>
+                  <span class="pf-name">2026-05-13 intervju med direktør.md</span>
+                  <span class="library-tag">Bibliotek</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right panel -->
+    <div class="right-panel" id="rightPanel">
+      <div class="right-panel-header">
+        <div class="right-panel-type">Arbeidsområde</div>
+        <div class="right-panel-name">Organisasjonsutvikling</div>
+        <div class="right-panel-desc">Ingen fil valgt</div>
+      </div>
+      <div class="right-panel-body">
+        <div class="meta-section">
+          <div class="meta-row"><span class="meta-key">Prosjekter</span><span class="meta-val">2</span></div>
+          <div class="meta-row"><span class="meta-key">Bibliotekfiler</span><span class="meta-val">1</span></div>
+          <div class="meta-row"><span class="meta-key">Filer totalt</span><span class="meta-val">3</span></div>
+        </div>
+        <div class="divider"></div>
+        <p style="font-size:12px; color:var(--color-text-3); line-height:1.6;">Klikk på en fil for å se detaljer og tilgjengelige handlinger.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Action bar -->
+  <div class="actionbar">
+    <button class="btn btn-secondary btn-sm">Importer transkripsjon</button>
+    <button class="btn btn-secondary btn-sm">Generer kontekstpakke</button>
+    <button class="btn btn-secondary btn-sm">Kjør Codex</button>
+    <div class="actionbar-spacer"></div>
+    <button class="btn btn-ghost btn-sm">···</button>
+  </div>
+
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <span class="legend-title">Forklaring</span>
+  <div class="legend-item">
+    <div class="legend-dot physical"></div>
+    Prosjektfil – fysisk i prosjektmappen
+  </div>
+  <div class="legend-item">
+    <div class="legend-dot linked"></div>
+    Bibliotekfil – koblet til prosjektet, ligger i Bibliotek/
+  </div>
+</div>
+
+<script>
+const items = {
+  'strategiske-veivalg': {
+    type: 'Fil',
+    name: '2026-05-15 strategiske veivalg.md',
+    desc: '.md · 18 KB',
+    meta: [
+      { key: 'Type', val: 'Dokument' },
+      { key: 'Størrelse', val: '18 KB' },
+      { key: 'Endret', val: '15.05.2026' },
+    ],
+    path: 'Prosjekter/Strategi/00. Retning/',
+    contexts: [{ label: 'Strategi', type: 'project' }],
+    source: 'physical',
+    actions: ['Åpne fil', 'Generer kontekstpakke for Strategi'],
+  },
+  'operasjonsmodell': {
+    type: 'Fil',
+    name: '2026-05-14 operasjonsmodell.md',
+    desc: '.md · 24 KB',
+    meta: [
+      { key: 'Type', val: 'Dokument' },
+      { key: 'Størrelse', val: '24 KB' },
+      { key: 'Endret', val: '14.05.2026' },
+    ],
+    path: 'Prosjekter/Operasjon/00. Leveranse/',
+    contexts: [{ label: 'Operasjon', type: 'project' }],
+    source: 'physical',
+    actions: ['Åpne fil', 'Generer kontekstpakke for Operasjon'],
+  },
+  'intervju-direktor': {
+    type: 'Fil',
+    name: '2026-05-13 intervju med direktør.md',
+    desc: '.md · 72 KB · Transkripsjon',
+    meta: [
+      { key: 'Type', val: 'Transkripsjon' },
+      { key: 'Størrelse', val: '72 KB' },
+      { key: 'Dato', val: '13.05.2026' },
+      { key: 'Deltakere', val: 'Direktør' },
+    ],
+    path: 'Bibliotek/Transkripsjoner/',
+    contexts: [
+      { label: 'Strategi', type: 'project' },
+      { label: 'Operasjon', type: 'project' },
+    ],
+    source: 'library',
+    actions: ['Åpne fil'],
+  },
+};
+
+let currentView = 'files';
+
+function setView(view) {
+  currentView = view;
+  document.getElementById('fileView').style.display = view === 'files' ? 'flex' : 'none';
+  document.getElementById('projectView').style.display = view === 'projects' ? 'flex' : 'none';
+  document.getElementById('btnFiles').classList.toggle('active', view === 'files');
+  document.getElementById('btnProjects').classList.toggle('active', view === 'projects');
+
+  // Clear selection highlights
+  document.querySelectorAll('.tree-row, .project-file-row, .library-file-row').forEach(el => el.classList.remove('selected'));
+  showDefaultRight();
+}
+
+function toggleGroup(id) {
+  const group = document.getElementById('group-' + id);
+  const toggle = document.getElementById('toggle-' + id);
+  const isOpen = group.style.display !== 'none';
+  group.style.display = isOpen ? 'none' : 'block';
+  toggle.textContent = isOpen ? '▶' : '▾';
+}
+
+function selectItem(id) {
+  // Clear all selections
+  document.querySelectorAll('.tree-row, .project-file-row, .library-file-row').forEach(el => el.classList.remove('selected'));
+
+  // Highlight in file tree
+  const fileEl = document.getElementById('file-' + (id === 'strategiske-veivalg' ? 'strat' : id === 'operasjonsmodell' ? 'ops' : 'trans'));
+  if (fileEl) fileEl.classList.add('selected');
+
+  const item = items[id];
+  if (!item) { showDefaultRight(); return; }
+
+  // Highlight in project view (all matching rows)
+  document.querySelectorAll('.project-file-row, .library-file-row').forEach(el => {
+    const nameEl = el.querySelector('.pf-name');
+    if (nameEl && nameEl.textContent.trim() === item.name) el.classList.add('selected');
+  });
+
+  // Update right panel
+  const rp = document.getElementById('rightPanel');
+  const sourceNote = item.source === 'library'
+    ? `<div style="margin-top:4px;"><span class="library-tag" style="font-size:10px;">Bibliotekfil</span></div>`
+    : '';
+
+  const metaRows = item.meta.map(m => `
+    <div class="meta-row"><span class="meta-key">${m.key}</span><span class="meta-val">${m.val}</span></div>
+  `).join('');
+
+  const contextPills = item.contexts.map(c =>
+    `<span class="context-pill ${c.type}">${c.label}</span>`
+  ).join('');
+
+  const actionBtns = item.actions.map((a, i) =>
+    `<button class="btn btn-secondary btn-full btn-sm" style="margin-top:${i>0?4:0}px;">${a}</button>`
+  ).join('');
+
+  const pathNote = item.source === 'library'
+    ? `<div class="meta-row"><span class="meta-key">Plassering</span><span class="meta-val" style="font-size:11px;font-family:monospace;">${item.path}</span></div>`
+    : `<div class="meta-row"><span class="meta-key">Mappe</span><span class="meta-val" style="font-size:11px;font-family:monospace;">${item.path}</span></div>`;
+
+  rp.innerHTML = `
+    <div class="right-panel-header">
+      <div class="right-panel-type">${item.type}</div>
+      <div class="right-panel-name">${item.name}</div>
+      <div class="right-panel-desc">${item.desc}</div>
+      ${sourceNote}
+    </div>
+    <div class="right-panel-body">
+      <div class="meta-section">
+        <div class="meta-section-label">Detaljer</div>
+        ${metaRows}
+        ${pathNote}
+      </div>
+      <div class="divider"></div>
+      <div class="meta-section">
+        <div class="meta-section-label">Koblet til</div>
+        <div style="margin-top:2px;">${contextPills}</div>
+      </div>
+      <div class="divider"></div>
+      <div>
+        <div class="meta-section-label" style="margin-bottom:6px;">Handlinger</div>
+        ${actionBtns}
+      </div>
+    </div>
+  `;
+}
+
+function showDefaultRight() {
+  document.getElementById('rightPanel').innerHTML = `
+    <div class="right-panel-header">
+      <div class="right-panel-type">Arbeidsområde</div>
+      <div class="right-panel-name">Organisasjonsutvikling</div>
+      <div class="right-panel-desc">Ingen fil valgt</div>
+    </div>
+    <div class="right-panel-body">
+      <div class="meta-section">
+        <div class="meta-row"><span class="meta-key">Prosjekter</span><span class="meta-val">2</span></div>
+        <div class="meta-row"><span class="meta-key">Bibliotekfiler</span><span class="meta-val">1</span></div>
+        <div class="meta-row"><span class="meta-key">Filer totalt</span><span class="meta-val">3</span></div>
+      </div>
+      <div class="divider"></div>
+      <p style="font-size:12px; color:var(--color-text-3); line-height:1.6;">Klikk på en fil for å se detaljer og tilgjengelige handlinger.</p>
+    </div>
+  `;
+}
+</script>
+</body>
+</html>

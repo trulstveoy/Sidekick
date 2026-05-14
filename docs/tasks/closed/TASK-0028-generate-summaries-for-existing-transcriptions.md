@@ -1,11 +1,11 @@
 # Task: Generate Summaries For Existing Transcriptions
 
 ID: TASK-0028
-Status: Ready For Review
+Status: Done
 Class: Major
 Owner: Pair
 Created: 2026-05-12
-Updated: 2026-05-13
+Updated: 2026-05-14
 Branch: task/TASK-0028-generate-summaries-for-existing-transcriptions
 Worktree: ../Sidekick-worktrees/TASK-0028-generate-summaries-for-existing-transcriptions
 Base branch: local main at `931c22b`
@@ -41,9 +41,9 @@ This extends the imported-transcription summary contract from `TASK-0026` so old
 
 ## Current Phase
 
-Ready For Review
+Close
 
-Build and automated verification are complete. Human review is next.
+Build, verification, and human review are complete.
 
 ## Progress Checklist
 
@@ -54,9 +54,9 @@ Build and automated verification are complete. Human review is next.
 - [x] Human approval received, if required
 - [x] Build complete
 - [x] Verification complete
-- [ ] Review complete
+- [x] Review complete
 - [x] Documentation complete
-- [ ] Closeout complete
+- [x] Closeout complete
 
 ## Backlog Source
 
@@ -329,7 +329,9 @@ After build, verify from `main` or the task worktree with `npm start`:
 
 ## Review Notes
 
-Ready for human review.
+Human review complete.
+
+- 2026-05-14: Human confirmed the workflow works as expected.
 
 Manual check:
 
@@ -348,4 +350,20 @@ Task record updated with build and verification status.
 
 ## Closeout
 
-Not started.
+TASK-0028 is done.
+
+Delivered:
+- Existing project-local transcriptions can be previewed for missing, invalid, complete, and stale summaries.
+- Missing and invalid summaries can be generated through the main-process Codex workflow.
+- Valid summaries are preserved, stale summaries are detected but not regenerated, and per-file failures do not stop the batch.
+- The renderer uses typed IPC/preload APIs and does not send file lists or summary paths.
+- The primary workspace shows preview, progress, and result states while the selected-folder context remains separate.
+
+Verified:
+- `npm run check` passed during build verification and again on `main` after merge.
+- `npm test` passed during build verification.
+- `npm run test:ui` passed during build verification.
+- Human manual review confirmed the workflow works.
+
+Follow-up:
+- Stale-summary regeneration, per-file selection, and cancelable long-running batches remain deferred future work.

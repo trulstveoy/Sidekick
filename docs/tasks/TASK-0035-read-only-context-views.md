@@ -1,7 +1,7 @@
 # Task: Read-Only Context Views
 
 ID: TASK-0035
-Status: Specified
+Status: Blocked
 Class: Major
 Owner: Pair
 Created: 2026-05-14
@@ -27,6 +27,7 @@ Depends on:
 - `closed/TASK-0018-folder-hierarchy-artifact-detail.md`
 - `closed/TASK-0033-revised-navigation-model.md`
 - `closed/TASK-0036-create-workspace-instead-of-project.md`
+- `TASK-0037-folder-context-tagging.md`
 Coordinates with:
 - `TASK-0031-local-searchable-project-index.md`
 - `BACKLOG.md` (`BL-0008`)
@@ -44,9 +45,9 @@ This task should prove the context-view model in the product without implementin
 
 ## Current Phase
 
-Specify
+Blocked after Specify
 
-Specification is complete. Planning is paused until the human resumes this task.
+Specification is complete, but planning must wait.
 
 This task was blocked because Sidekick project creation did not create a workspace structure. `closed/TASK-0036-create-workspace-instead-of-project.md` resolved the first concrete blocker by changing creation from project folder to workspace and updating the first required workspace folders:
 
@@ -58,6 +59,10 @@ This task was blocked because Sidekick project creation did not create a workspa
 ```
 
 Planning should revisit this specification against the closed workspace-creation decision before implementation starts.
+
+This task has a new blocker: Sidekick needs a way to explicitly tag or classify folders as project folders before the `Prosjekter` view can be derived reliably. `TASK-0037-folder-context-tagging.md` should define and build the first folder metadata editor and persistence model before TASK-0035 is planned.
+
+Do not plan or build this task until `TASK-0037-folder-context-tagging.md` is planned, built, and closed or explicitly superseded.
 
 ## Progress Checklist
 
@@ -84,6 +89,7 @@ Related tasks:
 - `closed/TASK-0018-folder-hierarchy-artifact-detail.md`
 - `closed/TASK-0033-revised-navigation-model.md`
 - `closed/TASK-0036-create-workspace-instead-of-project.md`
+- `TASK-0037-folder-context-tagging.md`
 - `TASK-0031-local-searchable-project-index.md`
 
 ## Backlog Source
@@ -105,6 +111,7 @@ Current baseline:
   - `Prosjekter` for project membership.
 - The first implementation originally aimed to prove the read model and UI concept before adding editable metadata or full workspace setup.
 - That scope was deferred until Sidekick's workspace creation model was clarified. Planning should now revisit the specification before build.
+- A second blocker was identified after TASK-0036: a project context view cannot rely only on folder-name guessing. Sidekick needs explicit folder classification metadata and a GUI editor for tagging a folder as `Prosjektmappe`.
 
 ## Task Spec
 
@@ -244,6 +251,7 @@ If these rules prove too ambiguous during planning, planning should narrow the f
 - Should workspace creation introduce `Prosjekter/`, `Bibliotek/`, `.sidekick/`, and later `Applikasjoner/` as first-class physical areas?
 - Should this task be respecified after the workspace task, rather than planned from the current provisional scope?
 - What exact first-version folder rules should derive multiple project contexts?
+- Should `Prosjekter` derive only from folders tagged by TASK-0037, or also from fallback folder heuristics when metadata is missing?
 - Should first build support only a workspace-like root, only a selected-project root, or both?
 - How should the UI represent a single selected-project root in `Prosjekter`?
 - Which existing scanner signals are reliable enough for shared/library rows in the first build?

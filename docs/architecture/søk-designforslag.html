@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sidekick – Søk</title>
+<style>
+  :root {
+    --color-bg:        #f4f4f4;
+    --color-surface:   #ffffff;
+    --color-surface-2: #f9f9f9;
+    --color-border:    #e0e0e0;
+    --color-border-strong: #c8c8c8;
+    --color-text:      #1a1a1a;
+    --color-text-2:    #555555;
+    --color-text-3:    #888888;
+    --color-primary:   #2563eb;
+    --color-primary-hover: #1d4ed8;
+    --color-primary-light: #eff6ff;
+    --color-selected:  #eff6ff;
+    --color-hover:     #f3f4f6;
+    --color-highlight: #fef08a;
+    --color-warning-bg: #fffbeb;
+    --color-warning-border: #fbbf24;
+    --color-warning-text: #92400e;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "Consolas", "SF Mono", monospace;
+    --topbar-h: 44px;
+    --actionbar-h: 52px;
+    --right-w: 260px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font); font-size: 13px;
+    background: #d8d8d8;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 32px 24px 48px; gap: 48px; min-height: 100vh;
+  }
+  .page-header { width: 100%; max-width: 960px; }
+  .page-header h1 { font-size: 17px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px; }
+  .page-header p { font-size: 12px; color: #666; }
+
+  .state-nav { width: 100%; max-width: 960px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .state-btn {
+    padding: 7px 14px; border-radius: 20px;
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-surface);
+    font-family: var(--font); font-size: 12px;
+    color: var(--color-text-2); cursor: pointer; transition: all .1s;
+  }
+  .state-btn:hover { background: var(--color-hover); color: var(--color-text); }
+  .state-btn.active { background: var(--color-primary); border-color: var(--color-primary); color: white; font-weight: 500; }
+
+  .app-window {
+    width: 100%; max-width: 960px; height: 580px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-lg); overflow: hidden;
+    display: flex; flex-direction: column;
+    box-shadow: 0 4px 24px rgba(0,0,0,.12), 0 1px 4px rgba(0,0,0,.06);
+  }
+
+  /* Topbar */
+  .topbar {
+    height: var(--topbar-h); background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    display: flex; align-items: center; padding: 0 16px; flex-shrink: 0;
+  }
+  .topbar-logo {
+    display: flex; align-items: center; gap: 7px;
+    font-weight: 700; font-size: 14px; color: var(--color-text);
+    padding-right: 16px; border-right: 1px solid var(--color-border); margin-right: 14px;
+  }
+  .logo-icon {
+    width: 20px; height: 20px; background: var(--color-primary);
+    border-radius: 5px; display: flex; align-items: center;
+    justify-content: center; color: white; font-size: 11px; font-weight: 800;
+  }
+  .topbar-folder {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: var(--radius-sm); cursor: pointer; color: var(--color-text-2);
+  }
+  .topbar-folder:hover { background: var(--color-hover); }
+  .topbar-folder .folder-name { color: var(--color-text); font-weight: 500; }
+  .topbar-spacer { flex: 1; }
+  .topbar-settings { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); cursor: pointer; color: var(--color-text-3); }
+  .topbar-settings:hover { background: var(--color-hover); }
+
+  .app-body { flex: 1; display: flex; overflow: hidden; }
+
+  /* Middle panel */
+  .middle-panel {
+    flex: 1; display: flex; flex-direction: column;
+    border-right: 1px solid var(--color-border); overflow: hidden;
+  }
+
+  /* Search bar area */
+  .search-bar-wrap {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+  }
+  .search-input-row {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    padding: 6px 10px;
+    transition: border-color .1s, box-shadow .1s;
+  }
+  .search-input-row.focused {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+    background: white;
+  }
+  .search-icon { color: var(--color-text-3); font-size: 13px; flex-shrink: 0; }
+  .search-input {
+    flex: 1; border: none; background: transparent;
+    font-family: var(--font); font-size: 13px; color: var(--color-text);
+    outline: none;
+  }
+  .search-input::placeholder { color: var(--color-text-3); }
+  .search-clear {
+    color: var(--color-text-3); font-size: 12px; cursor: pointer;
+    padding: 2px 4px; border-radius: 3px;
+  }
+  .search-clear:hover { background: var(--color-hover); color: var(--color-text); }
+
+  /* View toggle (shown when search inactive) */
+  .view-toggle {
+    display: flex; align-items: center;
+    padding: 8px 12px 0; gap: 2px;
+    border-bottom: 1px solid var(--color-border); flex-shrink: 0;
+  }
+  .toggle-btn {
+    padding: 5px 12px 7px; font-family: var(--font); font-size: 12px;
+    font-weight: 500; color: var(--color-text-3); background: transparent;
+    border: none; border-bottom: 2px solid transparent; cursor: pointer; margin-bottom: -1px;
+  }
+  .toggle-btn:hover { color: var(--color-text); }
+  .toggle-btn.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+
+  /* File tree (placeholder) */
+  .tree-placeholder { flex: 1; overflow-y: auto; padding: 4px 0; }
+  .tree-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 12px; height: 30px; color: var(--color-text-2);
+    font-size: 13px;
+  }
+
+  /* Search results */
+  .search-meta-bar {
+    padding: 6px 12px; border-bottom: 1px solid var(--color-border);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .search-meta-text { font-size: 11px; color: var(--color-text-3); }
+  .search-meta-text strong { color: var(--color-text-2); }
+  .search-skip-note {
+    font-size: 11px; color: var(--color-text-3);
+    display: flex; align-items: center; gap: 4px;
+  }
+
+  .results-list { flex: 1; overflow-y: auto; }
+
+  .result-item {
+    padding: 10px 12px; cursor: pointer;
+    border-bottom: 1px solid var(--color-border);
+    transition: background .08s;
+  }
+  .result-item:hover { background: var(--color-hover); }
+  .result-item.selected { background: var(--color-selected); }
+  .result-item:last-child { border-bottom: none; }
+
+  .result-header {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+  }
+  .result-icon { font-size: 13px; flex-shrink: 0; }
+  .result-name { font-weight: 600; font-size: 13px; color: var(--color-text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .result-score {
+    font-size: 10px; color: var(--color-text-3);
+    background: var(--color-surface-2); border: 1px solid var(--color-border);
+    padding: 1px 6px; border-radius: 10px; flex-shrink: 0;
+  }
+  .result-path {
+    font-size: 11px; color: var(--color-text-3);
+    font-family: var(--font-mono); margin-bottom: 5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .result-snippet {
+    font-size: 12px; color: var(--color-text-2);
+    line-height: 1.5; display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .result-snippet mark {
+    background: var(--color-highlight); color: var(--color-text);
+    border-radius: 2px; padding: 0 1px; font-style: normal;
+  }
+
+  /* Empty states */
+  .empty-state {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 32px 24px; gap: 8px; text-align: center;
+  }
+  .empty-icon { font-size: 28px; margin-bottom: 4px; }
+  .empty-title { font-size: 14px; font-weight: 600; color: var(--color-text); }
+  .empty-desc { font-size: 12px; color: var(--color-text-3); line-height: 1.6; max-width: 260px; }
+
+  /* Workflow (index build) */
+  .workflow-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 12px; height: 40px;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface-2); flex-shrink: 0;
+  }
+  .workflow-back {
+    display: flex; align-items: center; gap: 5px;
+    color: var(--color-primary); cursor: pointer; font-size: 12px;
+    padding: 4px 8px; border-radius: var(--radius-sm);
+  }
+  .workflow-back:hover { background: var(--color-primary-light); }
+  .workflow-title { font-weight: 600; font-size: 13px; color: var(--color-text); }
+  .workflow-body { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+  .workflow-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 20px; border-top: 1px solid var(--color-border);
+    background: var(--color-surface-2); flex-shrink: 0;
+  }
+
+  .workflow-row { display: grid; grid-template-columns: 110px 1fr; gap: 8px; font-size: 13px; }
+  .workflow-row .key { color: var(--color-text-3); }
+  .workflow-row .val { color: var(--color-text); font-weight: 500; }
+  .workflow-row .val code {
+    font-family: var(--font-mono); font-size: 12px;
+    background: var(--color-surface-2); padding: 1px 5px;
+    border-radius: 3px; border: 1px solid var(--color-border);
+  }
+
+  .progress-bar-wrap { height: 4px; background: var(--color-border); border-radius: 2px; overflow: hidden; }
+  .progress-bar-fill {
+    height: 100%; background: var(--color-primary); border-radius: 2px;
+    animation: progress-indeterminate 1.4s ease-in-out infinite; width: 40%;
+  }
+  @keyframes progress-indeterminate {
+    0% { transform: translateX(-100%); width: 50%; }
+    50% { width: 70%; }
+    100% { transform: translateX(260%); width: 50%; }
+  }
+  .progress-label { font-size: 12px; color: var(--color-text-2); margin-top: 6px; }
+
+  /* Right panel */
+  .right-panel {
+    width: var(--right-w); flex-shrink: 0;
+    display: flex; flex-direction: column;
+    background: var(--color-surface-2); overflow: hidden;
+  }
+  .right-panel-header {
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid var(--color-border); flex-shrink: 0;
+  }
+  .right-panel-type { font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--color-text-3); margin-bottom: 3px; }
+  .right-panel-name { font-size: 14px; font-weight: 600; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .right-panel-desc { font-size: 12px; color: var(--color-text-3); margin-top: 2px; }
+  .right-panel-body { flex: 1; padding: 12px 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+
+  .meta-section { display: flex; flex-direction: column; gap: 5px; }
+  .meta-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-3); margin-bottom: 2px; }
+  .meta-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12px; }
+  .meta-key { color: var(--color-text-3); flex-shrink: 0; }
+  .meta-val { color: var(--color-text); font-weight: 500; text-align: right; }
+  .divider { height: 1px; background: var(--color-border); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 6px; padding: 7px 14px; border-radius: var(--radius-md);
+    font-family: var(--font); font-size: 13px; font-weight: 500;
+    cursor: pointer; border: none; white-space: nowrap; transition: background .1s;
+  }
+  .btn-primary { background: var(--color-primary); color: white; }
+  .btn-primary:hover { background: var(--color-primary-hover); }
+  .btn-secondary { background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border-strong); }
+  .btn-secondary:hover { background: var(--color-hover); }
+  .btn-ghost { background: transparent; color: var(--color-text-2); border: 1px solid transparent; }
+  .btn-ghost:hover { background: var(--color-hover); }
+  .btn-full { width: 100%; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  .actionbar {
+    height: var(--actionbar-h); background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    display: flex; align-items: center; padding: 0 14px; gap: 8px; flex-shrink: 0;
+  }
+  .actionbar-spacer { flex: 1; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Sidekick – Søk</h1>
+  <p>Designforslag · Mai 2026</p>
+</div>
+
+<div class="state-nav" id="stateNav">
+  <button class="state-btn active" onclick="setState('idle')">1 · Ingen søk</button>
+  <button class="state-btn" onclick="setState('results')">2 · Søkeresultater</button>
+  <button class="state-btn" onclick="setState('selected')">3 · Resultat valgt</button>
+  <button class="state-btn" onclick="setState('empty')">4 · Ingen treff</button>
+  <button class="state-btn" onclick="setState('no-index')">5 · Indeks mangler</button>
+  <button class="state-btn" onclick="setState('building')">6 · Bygger indeks</button>
+  <button class="state-btn" onclick="setState('build-done')">7 · Indeks klar</button>
+</div>
+
+<div class="app-window">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-logo"><div class="logo-icon">S</div>Sidekick</div>
+    <div class="topbar-folder">
+      <span style="color:var(--color-text-3);">📁</span>
+      <span class="folder-name">MyNewProject</span>
+      <span style="color:var(--color-text-3);font-size:10px;">▾</span>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-settings">⚙</div>
+  </div>
+
+  <div class="app-body">
+
+    <!-- Middle panel -->
+    <div class="middle-panel" id="middlePanel">
+      <!-- Populated by JS -->
+    </div>
+
+    <!-- Right panel -->
+    <div class="right-panel" id="rightPanel">
+      <!-- Populated by JS -->
+    </div>
+
+  </div>
+
+  <!-- Action bar -->
+  <div class="actionbar">
+    <button class="btn btn-secondary btn-sm">Importer transkripsjon</button>
+    <button class="btn btn-secondary btn-sm">Generer kontekstpakke</button>
+    <button class="btn btn-secondary btn-sm">Kjør Codex</button>
+    <div class="actionbar-spacer"></div>
+    <button class="btn btn-ghost btn-sm" title="Flere handlinger">···</button>
+  </div>
+
+</div>
+
+<script>
+function setState(id) {
+  document.querySelectorAll('.state-btn').forEach((btn, i) => {
+    const keys = ['idle','results','selected','empty','no-index','building','build-done'];
+    btn.classList.toggle('active', keys[i] === id);
+  });
+  renderMiddle(id);
+  renderRight(id);
+}
+
+function renderMiddle(id) {
+  const mp = document.getElementById('middlePanel');
+
+  const searchBarFocused = ['results','selected','empty'].includes(id);
+  const searchQuery = searchBarFocused ? 'styringsmodell' : '';
+  const showWorkflow = ['building','build-done'].includes(id);
+  const showNoIndex = id === 'no-index';
+
+  if (showWorkflow) {
+    mp.innerHTML = workflowView(id);
+    return;
+  }
+
+  const searchBar = `
+    <div class="search-bar-wrap">
+      <div class="search-input-row ${searchBarFocused ? 'focused' : ''}">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" placeholder="Søk i prosjektet…" value="${searchQuery}" readonly>
+        ${searchBarFocused ? `<span class="search-clear" onclick="setState('idle')">✕</span>` : ''}
+      </div>
+    </div>
+  `;
+
+  if (id === 'idle') {
+    mp.innerHTML = searchBar + `
+      <div class="view-toggle">
+        <button class="toggle-btn active">Mapper</button>
+        <button class="toggle-btn">Prosjekter</button>
+      </div>
+      <div class="tree-placeholder">
+        <div class="tree-row" style="padding-left:12px;">▾ 📁 <span style="color:var(--color-text);">MyNewProject/</span></div>
+        <div class="tree-row" style="padding-left:28px;">▾ 📁 <span style="color:var(--color-text);">00. Forutsetninger/</span></div>
+        <div class="tree-row" style="padding-left:44px; color:var(--color-text-3); font-style:italic; font-size:12px;">Tom</div>
+        <div class="tree-row" style="padding-left:28px;">▾ 📁 <span style="color:var(--color-text);">01. Transkripsjoner/</span></div>
+        <div class="tree-row" style="padding-left:44px;">📄 <span style="color:var(--color-text);">00. Oppfølgingsmøte mars.md</span></div>
+        <div class="tree-row" style="padding-left:28px;">▶ 📁 <span style="color:var(--color-text);">02. Analyse/</span></div>
+      </div>
+    `;
+    return;
+  }
+
+  if (showNoIndex) {
+    mp.innerHTML = searchBar + `
+      <div class="empty-state">
+        <div class="empty-icon">🗂️</div>
+        <div class="empty-title">Indeks ikke bygget</div>
+        <div class="empty-desc">Søk krever en lokal indeks. Bygg indeksen for å søke i prosjektets filer.</div>
+        <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="setState('building')">Bygg indeks</button>
+      </div>
+    `;
+    return;
+  }
+
+  if (id === 'empty') {
+    mp.innerHTML = searchBar + `
+      <div class="search-meta-bar">
+        <span class="search-meta-text">Ingen treff for <strong>«styringsmodell»</strong></span>
+      </div>
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-title">Ingen treff</div>
+        <div class="empty-desc">Ingen filer i prosjektet inneholder «styringsmodell». Prøv et annet søkeord, eller oppdater indeksen hvis nye filer er lagt til.</div>
+      </div>
+    `;
+    return;
+  }
+
+  // results or selected
+  mp.innerHTML = searchBar + `
+    <div class="search-meta-bar">
+      <span class="search-meta-text"><strong>4 treff</strong> for «styringsmodell»</span>
+      <span class="search-skip-note">3 filer hoppet over</span>
+    </div>
+    <div class="results-list">
+      ${result('r1', '00. Oppfølgingsmøte mars.md', '01. Transkripsjoner/', '…vi diskuterte <mark>styringsmodellen</mark> i detalj og kom frem til at…', '#1', id === 'selected')}
+      ${result('r2', 'prosjektnotat-april.md', '02. Analyse/', '…<mark>styringsmodell</mark> basert på matriseorganisering ble vurdert som…', '#2', false)}
+      ${result('r3', 'beslutningslogg.md', '00. Forutsetninger/', '…valgt <mark>styringsmodell</mark> skal dokumenteres i dette avsnittet…', '#3', false)}
+      ${result('r4', 'README.md', '', '…prosjektets <mark>styringsmodell</mark> og ansvarsfordeling…', '#4', false)}
+    </div>
+  `;
+}
+
+function result(id, name, path, snippet, score, selected) {
+  return `
+    <div class="result-item ${selected ? 'selected' : ''}" onclick="selectResult('${id}')">
+      <div class="result-header">
+        <span class="result-icon">📄</span>
+        <span class="result-name">${name}</span>
+        <span class="result-score">${score}</span>
+      </div>
+      <div class="result-path">${path}${name}</div>
+      <div class="result-snippet">${snippet}</div>
+    </div>
+  `;
+}
+
+function selectResult(id) {
+  setState('selected');
+}
+
+function workflowView(id) {
+  if (id === 'building') {
+    return `
+      <div class="workflow-header">
+        <span class="workflow-title" style="color:var(--color-text-3);">Bygger søkeindeks</span>
+        <span style="margin-left:auto;font-size:12px;color:var(--color-text-3);">Indekserer…</span>
+      </div>
+      <div class="workflow-body">
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="workflow-row"><span class="key">Scope</span><span class="val">MyNewProject/</span></div>
+          <div class="workflow-row"><span class="key">Indeks lagres i</span><span class="val"><code>.sidekick/search-index/</code></span></div>
+        </div>
+        <div>
+          <div class="progress-bar-wrap"><div class="progress-bar-fill"></div></div>
+          <div class="progress-label">Indekserer 01. Transkripsjoner/00. Oppfølgingsmøte mars.md…</div>
+        </div>
+        <div style="font-size:12px;color:var(--color-text-3);">3 filer indeksert · 1 hoppet over (binær)</div>
+      </div>
+      <div class="workflow-footer">
+        <button class="btn btn-ghost btn-sm" style="color:var(--color-text-3);">Avbryt</button>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="workflow-header">
+      <span class="workflow-back" onclick="setState('idle')">← Tilbake</span>
+      <span class="workflow-title">Bygger søkeindeks</span>
+      <span style="margin-left:auto;font-size:12px;color:#16a34a;font-weight:600;">✓ Ferdig</span>
+    </div>
+    <div class="workflow-body">
+      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:var(--radius-md);padding:12px 14px;">
+        <div style="font-weight:600;color:#166534;font-size:12px;margin-bottom:3px;">Søkeindeks klar</div>
+        <div style="font-size:12px;color:#166534;">7 filer indeksert · 3 hoppet over</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div class="workflow-row"><span class="key">Indeksert</span><span class="val">7 filer</span></div>
+        <div class="workflow-row"><span class="key">Hoppet over</span><span class="val">3 filer (binær/PDF)</span></div>
+        <div class="workflow-row"><span class="key">Lagret i</span><span class="val"><code>.sidekick/search-index/</code></span></div>
+        <div class="workflow-row"><span class="key">Tid brukt</span><span class="val">0,8 sek</span></div>
+      </div>
+    </div>
+    <div class="workflow-footer">
+      <button class="btn btn-ghost btn-sm" onclick="setState('idle')">← Tilbake til treet</button>
+      <button class="btn btn-primary btn-sm" onclick="setState('results')">Søk nå</button>
+    </div>
+  `;
+}
+
+function renderRight(id) {
+  const rp = document.getElementById('rightPanel');
+
+  if (id === 'selected') {
+    rp.innerHTML = `
+      <div class="right-panel-header">
+        <div class="right-panel-type">Fil · Søkresultat</div>
+        <div class="right-panel-name">00. Oppfølgingsmøte mars.md</div>
+        <div class="right-panel-desc">.md · 72 KB</div>
+      </div>
+      <div class="right-panel-body">
+        <div class="meta-section">
+          <div class="meta-label">Detaljer</div>
+          <div class="meta-row"><span class="meta-key">Type</span><span class="meta-val">Markdown</span></div>
+          <div class="meta-row"><span class="meta-key">Størrelse</span><span class="meta-val">72 KB</span></div>
+          <div class="meta-row"><span class="meta-key">Endret</span><span class="meta-val">12.05.2026</span></div>
+          <div class="meta-row"><span class="meta-key">Mappe</span><span class="meta-val" style="font-size:11px;font-family:monospace;">01. Transkripsjoner/</span></div>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <div class="meta-label" style="margin-bottom:6px;">Handlinger</div>
+          <button class="btn btn-secondary btn-full btn-sm">Åpne fil</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  if (['building','build-done'].includes(id)) {
+    rp.innerHTML = `
+      <div class="right-panel-header">
+        <div class="right-panel-type">Prosjekt</div>
+        <div class="right-panel-name">MyNewProject</div>
+        <div class="right-panel-desc">Prosjektmappe</div>
+      </div>
+      <div class="right-panel-body">
+        <div class="meta-section">
+          <div class="meta-row"><span class="meta-key">Filer</span><span class="meta-val">7</span></div>
+          <div class="meta-row"><span class="meta-key">Mapper</span><span class="meta-val">3</span></div>
+          <div class="meta-row"><span class="meta-key">Skannet</span><span class="meta-val">nå</span></div>
+        </div>
+        <div class="divider"></div>
+        <p style="font-size:12px;color:var(--color-text-3);line-height:1.6;">Høyre panel er uendret mens indeksen bygges.</p>
+      </div>
+    `;
+    return;
+  }
+
+  rp.innerHTML = `
+    <div class="right-panel-header">
+      <div class="right-panel-type">Prosjekt</div>
+      <div class="right-panel-name">MyNewProject</div>
+      <div class="right-panel-desc">Prosjektmappe</div>
+    </div>
+    <div class="right-panel-body">
+      <div class="meta-section">
+        <div class="meta-row"><span class="meta-key">Filer</span><span class="meta-val">7</span></div>
+        <div class="meta-row"><span class="meta-key">Mapper</span><span class="meta-val">3</span></div>
+        <div class="meta-row"><span class="meta-key">Skannet</span><span class="meta-val">nå</span></div>
+      </div>
+      <div class="divider"></div>
+      <p style="font-size:12px;color:var(--color-text-3);line-height:1.6;">Klikk på en fil for å se detaljer og tilgjengelige handlinger.</p>
+    </div>
+  `;
+}
+
+setState('idle');
+</script>
+</body>
+</html>
