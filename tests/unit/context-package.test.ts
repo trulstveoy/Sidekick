@@ -9,21 +9,21 @@ import {
 } from '../../src/main/context-package';
 
 describe('context package helpers', () => {
-  it('creates a context package filename from the project folder name', () => {
-    expect(createContextPackageFileName(path.join('/tmp', 'My Project'))).toBe(
-      'My Project.context-package.md',
+  it('creates a context package filename from the workspace name', () => {
+    expect(createContextPackageFileName(path.join('/tmp', 'My Workspace'))).toBe(
+      'My Workspace.context-package.md',
     );
   });
 
   it('sanitizes characters that are unsafe in filenames', () => {
-    expect(createContextPackageFileName(path.join('/tmp', 'Bad<Name>|Project'))).toBe(
-      'Bad-Name--Project.context-package.md',
+    expect(createContextPackageFileName(path.join('/tmp', 'Bad<Name>|Workspace'))).toBe(
+      'Bad-Name--Workspace.context-package.md',
     );
   });
 
   it('builds the output path inside the selected folder root', () => {
-    expect(getContextPackageOutputPath(path.join('/tmp', 'sidekick-project'))).toBe(
-      path.join('/tmp', 'sidekick-project', 'sidekick-project.context-package.md'),
+    expect(getContextPackageOutputPath(path.join('/tmp', 'sidekick-workspace'))).toBe(
+      path.join('/tmp', 'sidekick-workspace', 'sidekick-workspace.context-package.md'),
     );
   });
 
@@ -44,8 +44,8 @@ describe('context package helpers', () => {
   });
 
   it('builds the folder-scoped output path inside the selected folder', () => {
-    expect(getFolderContextPackageOutputPath(path.join('/tmp', 'project', '01. Transkripsjoner'))).toBe(
-      path.join('/tmp', 'project', '01. Transkripsjoner', 'transkripsjoner.context-package.md'),
+    expect(getFolderContextPackageOutputPath(path.join('/tmp', 'workspace', '01. Transkripsjoner'))).toBe(
+      path.join('/tmp', 'workspace', '01. Transkripsjoner', 'transkripsjoner.context-package.md'),
     );
   });
 

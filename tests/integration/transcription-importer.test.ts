@@ -8,7 +8,7 @@ import {
   createTranscriptionImportPreview,
 } from '../../src/main/transcription-importer';
 
-const fixturePath = path.resolve(__dirname, '../fixtures/project-folder-basic');
+const fixturePath = path.resolve(__dirname, '../fixtures/workspace-basic');
 const temporaryRoots: string[] = [];
 
 const copyFixtureToTemp = async () => {

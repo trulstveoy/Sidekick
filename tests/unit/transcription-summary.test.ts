@@ -11,14 +11,14 @@ import {
 
 const tempRoots: string[] = [];
 
-const createProjectWithTranscription = async () => {
+const createWorkspaceWithTranscription = async () => {
   const rootPath = await mkdtemp(path.join(os.tmpdir(), 'sidekick-summary-'));
   tempRoots.push(rootPath);
   const folderPath = path.join(rootPath, '01. Transkripsjoner');
   const transcriptionPath = path.join(folderPath, '00. interview.md');
 
   await mkdir(folderPath, { recursive: true });
-  await writeFile(transcriptionPath, 'Intervjuet handler om prosjektstruktur.', 'utf8');
+  await writeFile(transcriptionPath, 'Intervjuet handler om arbeidsområdestruktur.', 'utf8');
 
   return {
     rootPath,
@@ -34,11 +34,11 @@ describe('transcription summary metadata', () => {
     );
   });
 
-  it('writes and reads a project-local summary outside the visible project scan', async () => {
-    const project = await createProjectWithTranscription();
+  it('writes and reads a workspace-local summary outside the visible workspace scan', async () => {
+    const workspace = await createWorkspaceWithTranscription();
     const summary = await writeTranscriptionSummary({
-      rootPath: project.rootPath,
-      transcriptionPath: project.transcriptionPath,
+      rootPath: workspace.rootPath,
+      transcriptionPath: workspace.transcriptionPath,
       summaryMarkdown: '## Conversation Summary\n\nKort sammendrag.\n\n- Første punkt.',
     });
 
@@ -51,26 +51,26 @@ describe('transcription summary metadata', () => {
   });
 
   it('marks a summary stale when the source transcription changes', async () => {
-    const project = await createProjectWithTranscription();
+    const workspace = await createWorkspaceWithTranscription();
     await writeTranscriptionSummary({
-      rootPath: project.rootPath,
-      transcriptionPath: project.transcriptionPath,
+      rootPath: workspace.rootPath,
+      transcriptionPath: workspace.transcriptionPath,
       summaryMarkdown: '## Conversation Summary\n\nKort sammendrag.',
     });
 
-    await writeFile(project.transcriptionPath, 'Oppdatert transkripsjon.', 'utf8');
+    await writeFile(workspace.transcriptionPath, 'Oppdatert transkripsjon.', 'utf8');
 
     await expect(
-      readTranscriptionSummary(project.rootPath, project.transcriptionRelativePath),
+      readTranscriptionSummary(workspace.rootPath, workspace.transcriptionRelativePath),
     ).resolves.toMatchObject({
       status: 'stale',
       message: 'Sammendraget er laget for en eldre versjon av transkripsjonen.',
     });
   });
 
-  it('rejects summary paths outside the selected project', () => {
+  it('rejects summary paths outside the selected workspace', () => {
     expect(() => relativeTranscriptionSummaryPath('../outside.md')).toThrow(
-      'must stay inside the selected project',
+      'must stay inside the selected workspace',
     );
   });
 

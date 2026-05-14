@@ -14,11 +14,11 @@ import type {
   FolderSignal,
   FolderTreeNode,
   AppSettingsSnapshot,
-  ProjectCreationResult,
-  ProjectFolderScan,
-  ProjectInfoSnapshot,
-  ProjectInitializationPreview,
-  ProjectInitializationResult,
+  WorkspaceCreationResult,
+  WorkspaceScan,
+  WorkspaceInfoSnapshot,
+  WorkspaceInitializationPreview,
+  WorkspaceInitializationResult,
   ScanWarning,
   TranscriptionImportPreview,
   TranscriptionImportResult,
@@ -32,8 +32,8 @@ import type {
 type ViewState =
   | { status: 'empty' }
   | { status: 'loading' }
-  | { status: 'ready'; scan: ProjectFolderScan }
-  | { status: 'partial'; scan: ProjectFolderScan }
+  | { status: 'ready'; scan: WorkspaceScan }
+  | { status: 'partial'; scan: WorkspaceScan }
   | { status: 'error'; message: string };
 
 // Renderer state is modeled as explicit unions so each write-capable workflow
@@ -66,7 +66,7 @@ type TranscriptionSummaryBatchState =
   | { status: 'complete'; result: TranscriptionSummaryBatchResult }
   | { status: 'error'; message: string; phase: 'preview' | 'generation' };
 
-type ProjectCreationState =
+type WorkspaceCreationState =
   | { status: 'closed'; message: string; parentPath: string | null }
   | { status: 'editing'; message: string; parentPath: string | null }
   | { status: 'selecting-parent'; message: string; parentPath: string | null }
@@ -74,13 +74,13 @@ type ProjectCreationState =
   | { status: 'complete'; message: string; parentPath: string | null }
   | { status: 'error'; message: string; parentPath: string | null };
 
-type ProjectInitializationState =
+type WorkspaceInitializationState =
   | { status: 'idle'; message: string }
   | { status: 'choosing'; message: string }
-  | { status: 'preview'; message: string; preview: ProjectInitializationPreview }
-  | { status: 'initializing'; message: string; preview: ProjectInitializationPreview }
-  | { status: 'complete'; message: string; result: ProjectInitializationResult }
-  | { status: 'error'; message: string; preview?: ProjectInitializationPreview };
+  | { status: 'preview'; message: string; preview: WorkspaceInitializationPreview }
+  | { status: 'initializing'; message: string; preview: WorkspaceInitializationPreview }
+  | { status: 'complete'; message: string; result: WorkspaceInitializationResult }
+  | { status: 'error'; message: string; preview?: WorkspaceInitializationPreview };
 
 type OverviewContextPackageStatus =
   | { status: 'unavailable' }
@@ -118,7 +118,7 @@ type VisibleTreeEntry = {
 };
 
 type ContextPackageTarget =
-  | { scope: 'project' }
+  | { scope: 'workspace' }
   | { scope: 'folder'; folderRelativePath: string };
 
 type AppView = 'workspace' | 'settings';
@@ -167,48 +167,48 @@ const workflowHostTarget = document.querySelector<HTMLElement>('[data-workflow-h
 const workflowPanels = document.querySelectorAll<HTMLElement>('[data-workflow-panel]');
 const legacyWorkflowSurfaceTarget = document.querySelector<HTMLElement>('.surface-section--workflow');
 const summaryStripTarget = document.querySelector<HTMLElement>('[data-summary]');
-const projectEntryTarget = document.querySelector<HTMLElement>('[data-project-entry]');
-const projectEntryErrorTarget = document.querySelector<HTMLElement>('[data-project-entry-error]');
+const workspaceEntryTarget = document.querySelector<HTMLElement>('[data-workspace-entry]');
+const workspaceEntryErrorTarget = document.querySelector<HTMLElement>('[data-workspace-entry-error]');
 const chooseFolderButtons = document.querySelectorAll<HTMLButtonElement>('[data-choose-folder]');
-const initializeProjectButton = document.querySelector<HTMLButtonElement>('[data-initialize-project]');
-const projectInitializationPanelTarget = document.querySelector<HTMLElement>(
-  '[data-project-initialization-panel]',
+const initializeWorkspaceButton = document.querySelector<HTMLButtonElement>('[data-initialize-workspace]');
+const workspaceInitializationPanelTarget = document.querySelector<HTMLElement>(
+  '[data-workspace-initialization-panel]',
 );
-const projectInitializationTitleTarget = document.querySelector<HTMLElement>(
-  '[data-project-initialization-title]',
+const workspaceInitializationTitleTarget = document.querySelector<HTMLElement>(
+  '[data-workspace-initialization-title]',
 );
-const projectInitializationMessageTarget = document.querySelector<HTMLElement>(
-  '[data-project-initialization-message]',
+const workspaceInitializationMessageTarget = document.querySelector<HTMLElement>(
+  '[data-workspace-initialization-message]',
 );
-const projectInitializationDetailsTarget = document.querySelector<HTMLElement>(
-  '[data-project-initialization-details]',
+const workspaceInitializationDetailsTarget = document.querySelector<HTMLElement>(
+  '[data-workspace-initialization-details]',
 );
-const projectInitializationWarningsTarget = document.querySelector<HTMLUListElement>(
-  '[data-project-initialization-warnings]',
+const workspaceInitializationWarningsTarget = document.querySelector<HTMLUListElement>(
+  '[data-workspace-initialization-warnings]',
 );
-const projectInitializationConfirmButton = document.querySelector<HTMLButtonElement>(
-  '[data-project-initialization-confirm]',
+const workspaceInitializationConfirmButton = document.querySelector<HTMLButtonElement>(
+  '[data-workspace-initialization-confirm]',
 );
-const projectInitializationCancelButton = document.querySelector<HTMLButtonElement>(
-  '[data-project-initialization-cancel]',
+const workspaceInitializationCancelButton = document.querySelector<HTMLButtonElement>(
+  '[data-workspace-initialization-cancel]',
 );
-const openCreateProjectButton = document.querySelector<HTMLButtonElement>('[data-open-create-project]');
-const projectCreateDialogTarget = document.querySelector<HTMLElement>('[data-project-create-dialog]');
-const projectCreateCancelButtons = document.querySelectorAll<HTMLButtonElement>(
-  '[data-project-create-cancel]',
+const openCreateWorkspaceButton = document.querySelector<HTMLButtonElement>('[data-open-create-workspace]');
+const workspaceCreateDialogTarget = document.querySelector<HTMLElement>('[data-workspace-create-dialog]');
+const workspaceCreateCancelButtons = document.querySelectorAll<HTMLButtonElement>(
+  '[data-workspace-create-cancel]',
 );
-const projectNameInput = document.querySelector<HTMLInputElement>('[data-project-name]');
-const projectNameMessageTarget = document.querySelector<HTMLElement>('[data-project-name-message]');
-const projectParentPathTarget = document.querySelector<HTMLElement>('[data-project-parent-path]');
-const chooseProjectParentButton = document.querySelector<HTMLButtonElement>(
-  '[data-choose-project-parent]',
+const workspaceNameInput = document.querySelector<HTMLInputElement>('[data-workspace-name]');
+const workspaceNameMessageTarget = document.querySelector<HTMLElement>('[data-workspace-name-message]');
+const workspaceParentPathTarget = document.querySelector<HTMLElement>('[data-workspace-parent-path]');
+const chooseWorkspaceParentButton = document.querySelector<HTMLButtonElement>(
+  '[data-choose-workspace-parent]',
 );
-const projectTargetPreviewTarget = document.querySelector<HTMLElement>(
-  '[data-project-target-preview]',
+const workspaceTargetPreviewTarget = document.querySelector<HTMLElement>(
+  '[data-workspace-target-preview]',
 );
-const createProjectButton = document.querySelector<HTMLButtonElement>('[data-create-project]');
-const createProjectMessageTarget = document.querySelector<HTMLElement>(
-  '[data-create-project-message]',
+const createWorkspaceButton = document.querySelector<HTMLButtonElement>('[data-create-workspace]');
+const createWorkspaceMessageTarget = document.querySelector<HTMLElement>(
+  '[data-create-workspace-message]',
 );
 const selectedNameTarget = document.querySelector<HTMLElement>('[data-selected-name]');
 const selectedPathTarget = document.querySelector<HTMLElement>('[data-selected-path]');
@@ -380,26 +380,26 @@ let expandedPaths = new Set<string>();
 let selectedTreePath = ROOT_PATH;
 let focusedTreePath = ROOT_PATH;
 let contextPackageState: ContextPackageState = { status: 'unavailable' };
-let contextPackageTarget: ContextPackageTarget = { scope: 'project' };
+let contextPackageTarget: ContextPackageTarget = { scope: 'workspace' };
 let overviewContextPackageStatus: OverviewContextPackageStatus = { status: 'unavailable' };
 let transcriptionImportState: TranscriptionImportState = { status: 'unavailable' };
 let transcriptionSummaryBatchState: TranscriptionSummaryBatchState = { status: 'unavailable' };
 let documentRelationshipsState: DocumentRelationshipsState = { status: 'unavailable' };
-let projectCreationState: ProjectCreationState = {
+let workspaceCreationState: WorkspaceCreationState = {
   status: 'closed',
   message: '',
   parentPath: null,
 };
-let projectInitializationState: ProjectInitializationState = {
+let workspaceInitializationState: WorkspaceInitializationState = {
   status: 'idle',
   message: '',
 };
-let projectNameTouched = false;
+let workspaceNameTouched = false;
 let codexState: CodexState = { status: 'unavailable', message: 'Choose a folder first.' };
 let appView: AppView = 'workspace';
 let activeWorkflow: ActiveWorkflow = null;
 let settingsState: SettingsState = { status: 'idle', message: '' };
-let projectInfoState: { rootPath: string; snapshot: ProjectInfoSnapshot; message?: string } | null =
+let workspaceInfoState: { rootPath: string; snapshot: WorkspaceInfoSnapshot; message?: string } | null =
   null;
 let transcriptionSummaryState: TranscriptionSummaryState = { status: 'idle' };
 
@@ -508,12 +508,12 @@ const formatShortDate = (value?: string) => {
   }).format(new Date(value));
 };
 
-const isOverviewContextPackageStatusForScan = (scan: ProjectFolderScan) =>
+const isOverviewContextPackageStatusForScan = (scan: WorkspaceScan) =>
   overviewContextPackageStatus.status !== 'unavailable' &&
   overviewContextPackageStatus.status !== 'unknown' &&
   overviewContextPackageStatus.rootPath === scan.rootPath;
 
-const contextPackageStatusText = (scan?: ProjectFolderScan) => {
+const contextPackageStatusText = (scan?: WorkspaceScan) => {
   if (!scan || !isOverviewContextPackageStatusForScan(scan)) {
     return overviewContextPackageStatus.status === 'unknown' ? 'Ukjent' : 'Ikke sjekket';
   }
@@ -529,7 +529,7 @@ const contextPackageStatusText = (scan?: ProjectFolderScan) => {
   return 'Mangler';
 };
 
-const overviewWarningCount = (scan: ProjectFolderScan) => {
+const overviewWarningCount = (scan: WorkspaceScan) => {
   let count = scan.warnings.length;
 
   if (scan.summary.limitsReached.maxDepth) {
@@ -582,7 +582,7 @@ const findNodesByFolderSignal = (
   return matches;
 };
 
-const getTranscriptionFolderLabel = (scan: ProjectFolderScan) => {
+const getTranscriptionFolderLabel = (scan: WorkspaceScan) => {
   const folders = findNodesByFolderSignal(scan.tree, 'transcript');
 
   if (folders.length === 1) {
@@ -596,7 +596,7 @@ const getTranscriptionFolderLabel = (scan: ProjectFolderScan) => {
   return 'Ingen transkripsjonsmappe funnet';
 };
 
-const isSingleDetectedTranscriptionFolder = (scan: ProjectFolderScan, node: FolderTreeNode) => {
+const isSingleDetectedTranscriptionFolder = (scan: WorkspaceScan, node: FolderTreeNode) => {
   const folders = findNodesByFolderSignal(scan.tree, 'transcript');
 
   return (
@@ -607,7 +607,7 @@ const isSingleDetectedTranscriptionFolder = (scan: ProjectFolderScan, node: Fold
   );
 };
 
-const overviewWarnings = (scan?: ProjectFolderScan) => {
+const overviewWarnings = (scan?: WorkspaceScan) => {
   if (!scan) {
     return [];
   }
@@ -623,47 +623,47 @@ const overviewWarnings = (scan?: ProjectFolderScan) => {
   }
 
   if (scan.status === 'partial' && warnings.length === 0) {
-    warnings.unshift('Skanningen er delvis. Se prosjektmappen manuelt ved behov.');
+    warnings.unshift('Skanningen er delvis. Se arbeidsområdet manuelt ved behov.');
   }
 
   return warnings;
 };
 
-const setContextPackageStateForScan = (scan?: ProjectFolderScan) => {
+const setContextPackageStateForScan = (scan?: WorkspaceScan) => {
   contextPackageState = scan && window.sidekick ? { status: 'ready' } : { status: 'unavailable' };
 };
 
-const setOverviewContextPackageStatusForScan = (scan?: ProjectFolderScan) => {
+const setOverviewContextPackageStatusForScan = (scan?: WorkspaceScan) => {
   overviewContextPackageStatus = scan && window.sidekick
     ? { status: 'checking', rootPath: scan.rootPath }
     : { status: 'unavailable' };
 };
 
-const setTranscriptionImportStateForScan = (scan?: ProjectFolderScan) => {
+const setTranscriptionImportStateForScan = (scan?: WorkspaceScan) => {
   transcriptionImportState =
     scan && window.sidekick ? { status: 'ready' } : { status: 'unavailable' };
 };
 
-const setTranscriptionSummaryBatchStateForScan = (scan?: ProjectFolderScan) => {
+const setTranscriptionSummaryBatchStateForScan = (scan?: WorkspaceScan) => {
   transcriptionSummaryBatchState =
     scan && window.sidekick?.previewTranscriptionSummaryBatch
       ? { status: 'ready' }
       : { status: 'unavailable' };
 };
 
-const setDocumentRelationshipsStateForScan = (scan?: ProjectFolderScan) => {
+const setDocumentRelationshipsStateForScan = (scan?: WorkspaceScan) => {
   documentRelationshipsState =
     scan && window.sidekick ? { status: 'checking', rootPath: scan.rootPath } : { status: 'unavailable' };
 };
 
-const setCodexStateForScan = (scan?: ProjectFolderScan) => {
+const setCodexStateForScan = (scan?: WorkspaceScan) => {
   codexState =
     scan && window.sidekick
       ? { status: 'checking' }
       : { status: 'unavailable', message: 'Choose a folder first.' };
 };
 
-const setActiveScan = (scan: ProjectFolderScan) => {
+const setActiveScan = (scan: WorkspaceScan) => {
   resetExpandedPaths();
   selectedTreePath = scan.tree.relativePath;
   focusedTreePath = scan.tree.relativePath;
@@ -678,8 +678,8 @@ const setActiveScan = (scan: ProjectFolderScan) => {
   setDocumentRelationshipsStateForScan(scan);
   setCodexStateForScan(scan);
   state = scan.status === 'partial' ? { status: 'partial', scan } : { status: 'ready', scan };
-  projectInfoState = null;
-  void refreshProjectInfo(scan);
+  workspaceInfoState = null;
+  void refreshWorkspaceInfo(scan);
   void refreshDocumentRelationships(scan);
 };
 
@@ -689,10 +689,10 @@ const getActiveScan = () =>
 const isFolderNode = (node: FolderTreeNode) => node.kind === 'folder';
 
 const resetContextPackageTarget = () => {
-  contextPackageTarget = { scope: 'project' };
+  contextPackageTarget = { scope: 'workspace' };
 };
 
-const openProjectContextPackageWorkflow = () => {
+const openWorkspaceContextPackageWorkflow = () => {
   resetContextPackageTarget();
   openWorkflow('context-package');
 };
@@ -855,10 +855,10 @@ const getTreeEntryByPath = (
   return undefined;
 };
 
-const getParentPath = (scan: ProjectFolderScan, relativePath: string) =>
+const getParentPath = (scan: WorkspaceScan, relativePath: string) =>
   getTreeEntryByPath(scan.tree, relativePath)?.parentPath;
 
-const getPathAncestors = (scan: ProjectFolderScan, relativePath: string) => {
+const getPathAncestors = (scan: WorkspaceScan, relativePath: string) => {
   const ancestors: FolderTreeNode[] = [];
   let currentPath: string | undefined = relativePath;
 
@@ -875,7 +875,7 @@ const getPathAncestors = (scan: ProjectFolderScan, relativePath: string) => {
   return ancestors;
 };
 
-const ensureVisibleTreeSelection = (scan: ProjectFolderScan) => {
+const ensureVisibleTreeSelection = (scan: WorkspaceScan) => {
   const selectedNode = getNodeByPath(scan.tree, selectedTreePath);
   const focusedNode = getNodeByPath(scan.tree, focusedTreePath);
 
@@ -982,7 +982,7 @@ const collapseAllFolders = () => {
   render();
 };
 
-const renderSummary = (scan?: ProjectFolderScan) => {
+const renderSummary = (scan?: WorkspaceScan) => {
   if (!summaryTarget) {
     return;
   }
@@ -1018,7 +1018,7 @@ const renderSummary = (scan?: ProjectFolderScan) => {
   );
 };
 
-const renderArtifactCounts = (scan?: ProjectFolderScan) => {
+const renderArtifactCounts = (scan?: WorkspaceScan) => {
   clear(artifactCountsTarget);
 
   if (!artifactCountsTarget || !scan) {
@@ -1033,7 +1033,7 @@ const renderArtifactCounts = (scan?: ProjectFolderScan) => {
   artifactCountsTarget.append(...(rows.length ? rows : ['Ingen artefakter funnet']).map(createListItem));
 };
 
-const renderFolderSignals = (scan?: ProjectFolderScan) => {
+const renderFolderSignals = (scan?: WorkspaceScan) => {
   clear(folderSignalsTarget);
 
   if (!folderSignalsTarget || !scan) {
@@ -1050,7 +1050,7 @@ const renderFolderSignals = (scan?: ProjectFolderScan) => {
   );
 };
 
-const renderRecentFiles = (scan?: ProjectFolderScan) => {
+const renderRecentFiles = (scan?: WorkspaceScan) => {
   clear(recentFilesTarget);
 
   if (!recentFilesTarget || !scan || scan.summary.recentFiles.length === 0) {
@@ -1085,7 +1085,7 @@ const renderWarnings = (warnings: ScanWarning[] = []) => {
   );
 };
 
-const renderOverviewWarnings = (scan?: ProjectFolderScan) => {
+const renderOverviewWarnings = (scan?: WorkspaceScan) => {
   clear(warningsTarget);
 
   const warnings = overviewWarnings(scan);
@@ -1098,7 +1098,7 @@ const renderOverviewWarnings = (scan?: ProjectFolderScan) => {
   warningsTarget.append(...warnings.map(createListItem));
 };
 
-const renderOverviewScanStatus = (scan?: ProjectFolderScan) => {
+const renderOverviewScanStatus = (scan?: WorkspaceScan) => {
   if (!scan) {
     renderDetails(overviewScanStatusTarget, []);
     return;
@@ -1112,7 +1112,7 @@ const renderOverviewScanStatus = (scan?: ProjectFolderScan) => {
   ]);
 };
 
-const renderOverviewContextPackageStatus = (scan?: ProjectFolderScan) => {
+const renderOverviewContextPackageStatus = (scan?: WorkspaceScan) => {
   if (!overviewContextPackageStatusTarget) {
     return;
   }
@@ -1144,7 +1144,7 @@ const isTranscriptionSummaryStateFor = (
   transcriptionSummaryState.rootPath === rootPath &&
   transcriptionSummaryState.transcriptionRelativePath === transcriptionRelativePath;
 
-const loadTranscriptionSummary = async (scan: ProjectFolderScan, node: FolderTreeNode) => {
+const loadTranscriptionSummary = async (scan: WorkspaceScan, node: FolderTreeNode) => {
   if (!window.sidekick?.readTranscriptionSummary || !isTranscriptionFileNode(node)) {
     return;
   }
@@ -1183,7 +1183,7 @@ const loadTranscriptionSummary = async (scan: ProjectFolderScan, node: FolderTre
   render();
 };
 
-const getNodeWarnings = (scan: ProjectFolderScan, node: FolderTreeNode) =>
+const getNodeWarnings = (scan: WorkspaceScan, node: FolderTreeNode) =>
   scan.warnings.filter((warning) => {
     if (node.relativePath === ROOT_PATH) {
       return true;
@@ -1192,7 +1192,7 @@ const getNodeWarnings = (scan: ProjectFolderScan, node: FolderTreeNode) =>
     return warning.path === node.relativePath || warning.path.startsWith(`${node.relativePath}/`);
   });
 
-const renderSelectionBreadcrumb = (scan: ProjectFolderScan, node: FolderTreeNode) => {
+const renderSelectionBreadcrumb = (scan: WorkspaceScan, node: FolderTreeNode) => {
   clear(selectionBreadcrumbTarget);
 
   if (!selectionBreadcrumbTarget) {
@@ -1213,7 +1213,7 @@ const renderSelectionBreadcrumb = (scan: ProjectFolderScan, node: FolderTreeNode
     if (isCurrent) {
       const current = document.createElement('span');
       current.className = 'breadcrumb-current';
-      current.textContent = ancestor.relativePath === ROOT_PATH ? 'Prosjektoversikt' : ancestor.name;
+      current.textContent = ancestor.relativePath === ROOT_PATH ? 'Arbeidsområdeoversikt' : ancestor.name;
       selectionBreadcrumbTarget.append(current);
       return;
     }
@@ -1221,7 +1221,7 @@ const renderSelectionBreadcrumb = (scan: ProjectFolderScan, node: FolderTreeNode
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'breadcrumb-button';
-    button.textContent = ancestor.relativePath === ROOT_PATH ? 'Prosjektoversikt' : ancestor.name;
+    button.textContent = ancestor.relativePath === ROOT_PATH ? 'Arbeidsområdeoversikt' : ancestor.name;
     button.addEventListener('click', () => {
       selectTreePath(ancestor.relativePath, true);
     });
@@ -1271,7 +1271,7 @@ const renderSelectionContents = (node: FolderTreeNode) => {
   const title = document.createElement('p');
   title.className = 'selection-contents-title';
   title.textContent = node.relativePath === ROOT_PATH
-    ? 'Prosjektinnhold'
+    ? 'Arbeidsområdeinnhold'
     : isFolderNode(node)
       ? 'Direkte innhold'
       : 'Artefakt';
@@ -1300,7 +1300,7 @@ const renderSelectionContents = (node: FolderTreeNode) => {
   selectionContentsTarget.append(list);
 };
 
-const appendTranscriptionSummary = (scan: ProjectFolderScan, node: FolderTreeNode) => {
+const appendTranscriptionSummary = (scan: WorkspaceScan, node: FolderTreeNode) => {
   if (
     !selectionContentsTarget ||
     !window.sidekick?.readTranscriptionSummary ||
@@ -1385,19 +1385,19 @@ const appendSelectionWarnings = (warnings: string[]) => {
   selectionContentsTarget.append(title, list);
 };
 
-const projectInfoStatusText = (scan: ProjectFolderScan) => {
-  if (!projectInfoState || projectInfoState.rootPath !== scan.rootPath) {
+const workspaceInfoStatusText = (scan: WorkspaceScan) => {
+  if (!workspaceInfoState || workspaceInfoState.rootPath !== scan.rootPath) {
     return 'Sjekker';
   }
 
-  if (projectInfoState.message) {
+  if (workspaceInfoState.message) {
     return 'Feilet';
   }
 
-  switch (projectInfoState.snapshot.status) {
+  switch (workspaceInfoState.snapshot.status) {
     case 'complete':
-      return projectInfoState.snapshot.generatedAt
-        ? `Oppdatert ${formatDate(projectInfoState.snapshot.generatedAt)}`
+      return workspaceInfoState.snapshot.generatedAt
+        ? `Oppdatert ${formatDate(workspaceInfoState.snapshot.generatedAt)}`
         : 'Tilgjengelig';
     case 'invalid':
       return 'Ugyldig';
@@ -1406,15 +1406,15 @@ const projectInfoStatusText = (scan: ProjectFolderScan) => {
   }
 };
 
-const appendProjectSummary = (scan: ProjectFolderScan) => {
-  if (!selectionContentsTarget || !projectInfoState || projectInfoState.rootPath !== scan.rootPath) {
+const appendWorkspaceSummary = (scan: WorkspaceScan) => {
+  if (!selectionContentsTarget || !workspaceInfoState || workspaceInfoState.rootPath !== scan.rootPath) {
     return;
   }
 
-  const { snapshot, message } = projectInfoState;
+  const { snapshot, message } = workspaceInfoState;
   const title = document.createElement('h3');
   title.className = 'selection-contents-title';
-  title.textContent = 'Prosjektsammendrag';
+  title.textContent = 'Arbeidsområdesammendrag';
 
   if (snapshot.status !== 'complete') {
     const empty = document.createElement('p');
@@ -1422,15 +1422,15 @@ const appendProjectSummary = (scan: ProjectFolderScan) => {
     empty.textContent =
       message ??
       (snapshot.status === 'invalid'
-        ? snapshot.message ?? 'Prosjektsammendraget kan ikke leses.'
-        : 'Ingen prosjektsammendrag er generert ennå.');
+        ? snapshot.message ?? 'Arbeidsområdesammendraget kan ikke leses.'
+        : 'Ingen arbeidsområdesammendrag er generert ennå.');
     selectionContentsTarget.append(title, empty);
     return;
   }
 
   const summary = document.createElement('p');
   summary.className = 'selection-summary';
-  summary.textContent = snapshot.projectSummary ?? '';
+  summary.textContent = snapshot.workspaceSummary ?? '';
 
   const details = document.createElement('dl');
   details.className = 'detail-list selection-summary-details';
@@ -1476,7 +1476,7 @@ const appendProjectSummary = (scan: ProjectFolderScan) => {
   selectionContentsTarget.append(...fragments);
 };
 
-const getCurrentDocumentRelationshipsSnapshot = (scan: ProjectFolderScan) => {
+const getCurrentDocumentRelationshipsSnapshot = (scan: WorkspaceScan) => {
   if (documentRelationshipsState.status === 'ready' && documentRelationshipsState.rootPath === scan.rootPath) {
     return documentRelationshipsState.snapshot;
   }
@@ -1505,7 +1505,7 @@ const getCurrentDocumentRelationshipsSnapshot = (scan: ProjectFolderScan) => {
   return undefined;
 };
 
-const documentRelationshipsStatusText = (scan: ProjectFolderScan) => {
+const documentRelationshipsStatusText = (scan: WorkspaceScan) => {
   if (documentRelationshipsState.status === 'unavailable') {
     return 'Ikke tilgjengelig';
   }
@@ -1545,7 +1545,7 @@ const documentRelationshipsStatusText = (scan: ProjectFolderScan) => {
   return 'Sjekker';
 };
 
-const appendDocumentRelationshipsSummary = (scan: ProjectFolderScan) => {
+const appendDocumentRelationshipsSummary = (scan: WorkspaceScan) => {
   if (!selectionContentsTarget) {
     return;
   }
@@ -1595,7 +1595,7 @@ const clearSelectionActions = () => {
   selectionActionsTarget?.replaceChildren();
 };
 
-const renderSelectionActions = (scan: ProjectFolderScan, node: FolderTreeNode) => {
+const renderSelectionActions = (scan: WorkspaceScan, node: FolderTreeNode) => {
   const target = selectionActionsTarget ?? selectionContentsTarget;
 
   if (!target) {
@@ -1643,7 +1643,7 @@ const renderSelectionActions = (scan: ProjectFolderScan, node: FolderTreeNode) =
   target.append(actionTitle, ...buttons);
 };
 
-const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
+const renderSelectedTreeContext = (scan?: WorkspaceScan) => {
   if (!scan) {
     selectionPanelTarget?.toggleAttribute('hidden', true);
     clearSelectionActions();
@@ -1659,17 +1659,17 @@ const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
   const childFiles = getChildren(node).length - childFolders;
 
   if (node.relativePath === ROOT_PATH) {
-    setText(selectionLabelTarget, 'Prosjekt');
+    setText(selectionLabelTarget, 'Arbeidsområde');
     setText(selectionTitleTarget, scan.rootName);
     renderSelectionBreadcrumb(scan, node);
     renderDetails(selectionDetailsTarget, [
-      ['Prosjektmappe', scan.rootPath],
+      ['Arbeidsområde', scan.rootPath],
       ['Filer', scan.summary.fileCount.toString()],
       ['Mapper', scan.summary.folderCount.toString()],
       ['Skannet', formatDate(scan.scannedAt)],
       ['Status', scan.status === 'partial' ? 'Delvis' : 'Fullført'],
       ['Kontekstpakke', contextPackageStatusText(scan)],
-      ['Prosjektsammendrag', projectInfoStatusText(scan)],
+      ['Arbeidsområdesammendrag', workspaceInfoStatusText(scan)],
       ['Sammenhenger', documentRelationshipsStatusText(scan)],
       ['Varsler', overviewWarningCount(scan) > 0 ? overviewWarningCount(scan).toString() : 'Ingen'],
       ['Markdown/tekst', scan.summary.artifactTypeCounts['markdown-text'].toString()],
@@ -1677,7 +1677,7 @@ const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
     ]);
     clearSelectionActions();
     renderSelectionContents(node);
-    appendProjectSummary(scan);
+    appendWorkspaceSummary(scan);
     appendDocumentRelationshipsSummary(scan);
     appendSelectionWarnings(overviewWarnings(scan));
     return;
@@ -1718,11 +1718,11 @@ const renderSelectedTreeContext = (scan?: ProjectFolderScan) => {
 
 const normalizeDisplayPath = (pathValue: string) => pathValue.replace(/[\\/]+$/, '');
 
-const getProjectNameValidationMessage = (projectName: string) => {
-  const trimmedName = projectName.trim();
+const getWorkspaceNameValidationMessage = (workspaceName: string) => {
+  const trimmedName = workspaceName.trim();
 
   if (!trimmedName) {
-    return 'Prosjektnavn er påkrevd.';
+    return 'Arbeidsområdenavn er påkrevd.';
   }
 
   if (
@@ -1733,121 +1733,123 @@ const getProjectNameValidationMessage = (projectName: string) => {
     trimmedName.includes('\0') ||
     /^[a-zA-Z]:/.test(trimmedName)
   ) {
-    return 'Prosjektnavnet må være et mappenavn, ikke en sti.';
+    return 'Arbeidsområdenavnet må være et mappenavn, ikke en sti.';
   }
 
   return '';
 };
 
-const getProjectTargetPath = (parentPath: string, projectName: string) =>
-  `${normalizeDisplayPath(parentPath)}/${projectName.trim()}`;
+const getWorkspaceTargetPath = (parentPath: string, workspaceName: string) =>
+  `${normalizeDisplayPath(parentPath)}/${workspaceName.trim()}`;
 
-const renderProjectCreation = () => {
-  const projectName = projectNameInput?.value ?? '';
-  const validationMessage = getProjectNameValidationMessage(projectName);
-  const isDialogOpen = projectCreationState.status !== 'closed';
-  const isSelectingParent = projectCreationState.status === 'selecting-parent';
-  const isCreating = projectCreationState.status === 'creating';
-  const hasValidRequest = !validationMessage && Boolean(projectCreationState.parentPath);
+const renderWorkspaceCreation = () => {
+  const workspaceName = workspaceNameInput?.value ?? '';
+  const validationMessage = getWorkspaceNameValidationMessage(workspaceName);
+  const isDialogOpen = workspaceCreationState.status !== 'closed';
+  const isSelectingParent = workspaceCreationState.status === 'selecting-parent';
+  const isCreating = workspaceCreationState.status === 'creating';
+  const hasValidRequest = !validationMessage && Boolean(workspaceCreationState.parentPath);
   const shouldShowValidationMessage =
-    isDialogOpen && Boolean(validationMessage) && projectNameTouched;
+    isDialogOpen && Boolean(validationMessage) && workspaceNameTouched;
 
-  projectCreateDialogTarget?.toggleAttribute('hidden', !isDialogOpen);
-  projectNameInput?.toggleAttribute('disabled', isCreating || !window.sidekick);
-  chooseProjectParentButton?.toggleAttribute('disabled', isCreating || isSelectingParent || !window.sidekick);
-  createProjectButton?.toggleAttribute('disabled', isCreating || !hasValidRequest || !window.sidekick);
-  projectCreateCancelButtons.forEach((button) => {
+  workspaceCreateDialogTarget?.toggleAttribute('hidden', !isDialogOpen);
+  workspaceNameInput?.toggleAttribute('disabled', isCreating || !window.sidekick);
+  chooseWorkspaceParentButton?.toggleAttribute('disabled', isCreating || isSelectingParent || !window.sidekick);
+  createWorkspaceButton?.toggleAttribute('disabled', isCreating || !hasValidRequest || !window.sidekick);
+  workspaceCreateCancelButtons.forEach((button) => {
     button.toggleAttribute('disabled', isCreating);
   });
 
-  if (createProjectMessageTarget) {
-    if (projectCreationState.status === 'closed' || projectCreationState.status === 'editing') {
-      createProjectMessageTarget.removeAttribute('data-status');
+  if (createWorkspaceMessageTarget) {
+    if (workspaceCreationState.status === 'closed' || workspaceCreationState.status === 'editing') {
+      createWorkspaceMessageTarget.removeAttribute('data-status');
     } else {
-      createProjectMessageTarget.dataset.status = projectCreationState.status;
+      createWorkspaceMessageTarget.dataset.status = workspaceCreationState.status;
     }
   }
 
-  setText(createProjectMessageTarget, projectCreationState.message);
-  setText(projectNameMessageTarget, shouldShowValidationMessage ? validationMessage : '');
-  setText(projectParentPathTarget, projectCreationState.parentPath ?? 'Ingen plassering valgt.');
+  setText(createWorkspaceMessageTarget, workspaceCreationState.message);
+  setText(workspaceNameMessageTarget, shouldShowValidationMessage ? validationMessage : '');
+  setText(workspaceParentPathTarget, workspaceCreationState.parentPath ?? 'Ingen plassering valgt.');
 
-  if (projectTargetPreviewTarget) {
+  if (workspaceTargetPreviewTarget) {
     const targetText =
-      projectCreationState.parentPath && !validationMessage
-        ? getProjectTargetPath(projectCreationState.parentPath, projectName)
-        : 'Velg prosjektnavn og plassering for å se hva som opprettes.';
+      workspaceCreationState.parentPath && !validationMessage
+        ? getWorkspaceTargetPath(workspaceCreationState.parentPath, workspaceName)
+        : 'Velg arbeidsområdenavn og plassering for å se hva som opprettes.';
 
-    if (projectCreationState.parentPath && !validationMessage) {
+    if (workspaceCreationState.parentPath && !validationMessage) {
       const target = document.createElement('strong');
       const assumptions = document.createElement('span');
+      const notes = document.createElement('span');
       const transcriptions = document.createElement('span');
       target.textContent = targetText;
       assumptions.textContent = '00. Forutsetninger';
-      transcriptions.textContent = '01. Transkripsjoner';
-      projectTargetPreviewTarget.replaceChildren(target, assumptions, transcriptions);
+      notes.textContent = '01. Notater';
+      transcriptions.textContent = '02. Transkripsjoner';
+      workspaceTargetPreviewTarget.replaceChildren(target, assumptions, notes, transcriptions);
     } else {
-      projectTargetPreviewTarget.textContent = targetText;
+      workspaceTargetPreviewTarget.textContent = targetText;
     }
   }
 
-  if (createProjectButton) {
-    createProjectButton.textContent = isCreating ? 'Oppretter...' : 'Opprett mappe';
+  if (createWorkspaceButton) {
+    createWorkspaceButton.textContent = isCreating ? 'Oppretter...' : 'Opprett arbeidsområde';
   }
 
-  if (chooseProjectParentButton) {
-    chooseProjectParentButton.textContent = isSelectingParent ? 'Velger...' : 'Velg...';
+  if (chooseWorkspaceParentButton) {
+    chooseWorkspaceParentButton.textContent = isSelectingParent ? 'Velger...' : 'Velg...';
   }
 };
 
-const renderProjectInitialization = () => {
-  const isChoosing = projectInitializationState.status === 'choosing';
+const renderWorkspaceInitialization = () => {
+  const isChoosing = workspaceInitializationState.status === 'choosing';
   const isPreview =
-    projectInitializationState.status === 'preview' ||
-    projectInitializationState.status === 'initializing' ||
-    projectInitializationState.status === 'error';
-  const isInitializing = projectInitializationState.status === 'initializing';
+    workspaceInitializationState.status === 'preview' ||
+    workspaceInitializationState.status === 'initializing' ||
+    workspaceInitializationState.status === 'error';
+  const isInitializing = workspaceInitializationState.status === 'initializing';
   const preview =
-    projectInitializationState.status === 'preview' ||
-    projectInitializationState.status === 'initializing' ||
-    projectInitializationState.status === 'error'
-      ? projectInitializationState.preview
+    workspaceInitializationState.status === 'preview' ||
+    workspaceInitializationState.status === 'initializing' ||
+    workspaceInitializationState.status === 'error'
+      ? workspaceInitializationState.preview
       : undefined;
   const missingFolders =
     preview?.requiredFolders.filter((folder) => folder.status === 'missing') ?? [];
 
-  initializeProjectButton?.toggleAttribute('disabled', isChoosing || isInitializing || !window.sidekick);
-  projectInitializationPanelTarget?.toggleAttribute(
+  initializeWorkspaceButton?.toggleAttribute('disabled', isChoosing || isInitializing || !window.sidekick);
+  workspaceInitializationPanelTarget?.toggleAttribute(
     'hidden',
-    projectInitializationState.status === 'idle',
+    workspaceInitializationState.status === 'idle',
   );
-  projectInitializationConfirmButton?.toggleAttribute('hidden', !isPreview || !preview);
-  projectInitializationCancelButton?.toggleAttribute('hidden', !isPreview && !isChoosing);
-  projectInitializationConfirmButton?.toggleAttribute('disabled', isInitializing || !preview);
-  projectInitializationCancelButton?.toggleAttribute('disabled', isInitializing);
+  workspaceInitializationConfirmButton?.toggleAttribute('hidden', !isPreview || !preview);
+  workspaceInitializationCancelButton?.toggleAttribute('hidden', !isPreview && !isChoosing);
+  workspaceInitializationConfirmButton?.toggleAttribute('disabled', isInitializing || !preview);
+  workspaceInitializationCancelButton?.toggleAttribute('disabled', isInitializing);
 
-  if (initializeProjectButton) {
-    initializeProjectButton.textContent = isChoosing ? 'Velger...' : 'Initialiser eksisterende mappe...';
+  if (initializeWorkspaceButton) {
+    initializeWorkspaceButton.textContent = isChoosing ? 'Velger...' : 'Initialiser eksisterende arbeidsområde...';
   }
 
-  if (projectInitializationConfirmButton) {
-    projectInitializationConfirmButton.textContent = isInitializing
+  if (workspaceInitializationConfirmButton) {
+    workspaceInitializationConfirmButton.textContent = isInitializing
       ? 'Initialiserer...'
       : missingFolders.length > 0
         ? 'Opprett manglende mapper'
-        : 'Bruk som prosjekt';
+        : 'Bruk som arbeidsområde';
   }
 
-  setText(projectInitializationTitleTarget, 'Initialiser eksisterende mappe');
-  setText(projectInitializationMessageTarget, projectInitializationState.message);
+  setText(workspaceInitializationTitleTarget, 'Initialiser eksisterende arbeidsområde');
+  setText(workspaceInitializationMessageTarget, workspaceInitializationState.message);
 
   if (!preview) {
-    renderDetails(projectInitializationDetailsTarget, []);
-    renderList(projectInitializationWarningsTarget, []);
+    renderDetails(workspaceInitializationDetailsTarget, []);
+    renderList(workspaceInitializationWarningsTarget, []);
     return;
   }
 
-  renderDetails(projectInitializationDetailsTarget, [
+  renderDetails(workspaceInitializationDetailsTarget, [
     ['Mappe', preview.rootPath],
     ['Eksisterende innhold', preview.existingEntryCount.toString()],
     [
@@ -1860,7 +1862,7 @@ const renderProjectInitialization = () => {
     ['Mapper som opprettes', missingFolders.map((folder) => folder.name).join(', ') || 'Ingen'],
   ]);
   renderList(
-    projectInitializationWarningsTarget,
+    workspaceInitializationWarningsTarget,
     preview.warnings.map((warning) => `${warning.path}: ${warning.message}`),
   );
 };
@@ -2029,11 +2031,11 @@ const renderTranscriptionSummaryBatchActions = (
 };
 
 const renderContextPackageUnavailable = () => {
-  setText(contextPackageTitleTarget, 'Ingen prosjektmappe valgt');
+  setText(contextPackageTitleTarget, 'Ingen arbeidsområde valgt');
   setText(
     contextPackageMessageTarget,
     window.sidekick
-      ? 'Velg en prosjektmappe før du lager kontekstpakke.'
+      ? 'Velg et arbeidsområde før du lager kontekstpakke.'
       : 'Åpne appen i Electron for å lage kontekstpakker.',
   );
   renderContextPackageStateElements();
@@ -2042,7 +2044,7 @@ const renderContextPackageUnavailable = () => {
   renderContextPackageActions('Forhåndsvis', true);
 };
 
-const renderContextPackageReady = (scan: ProjectFolderScan) => {
+const renderContextPackageReady = (scan: WorkspaceScan) => {
   const folderNode =
     contextPackageTarget.scope === 'folder'
       ? getNodeByPath(scan.tree, contextPackageTarget.folderRelativePath)
@@ -2058,19 +2060,19 @@ const renderContextPackageReady = (scan: ProjectFolderScan) => {
     contextPackageMessageTarget,
     contextPackageTarget.scope === 'folder'
       ? 'Forbered én Markdown-fil som samler innholdet i den valgte mappen.'
-      : 'Forbered én Markdown-fil som samler prosjektmaterialet for bruk utenfor Sidekick.',
+      : 'Forbered én Markdown-fil som samler arbeidsområdematerialet for bruk utenfor Sidekick.',
   );
   renderContextPackageStateElements(createContextPackageSteps(1));
   renderContextPackageDetails([
-    ['Prosjektmappe', scan.rootName],
+    ['Arbeidsområde', scan.rootName],
     [
       'Omfang',
       contextPackageTarget.scope === 'folder'
         ? `Valgt mappe: ${folderNode?.relativePath ?? contextPackageTarget.folderRelativePath}`
-        : 'Hele valgt prosjektmappe',
+        : 'Hele valgt arbeidsområde',
     ],
     ['Format', 'Markdown'],
-    ['Plassering', contextPackageTarget.scope === 'folder' ? 'Valgt mappe' : 'Prosjektroten'],
+    ['Plassering', contextPackageTarget.scope === 'folder' ? 'Valgt mappe' : 'Arbeidsområderoten'],
   ]);
   renderContextPackageList([]);
   renderContextPackageActions('Forhåndsvis', false, true);
@@ -2093,14 +2095,14 @@ const renderContextPackageConfirming = (preview: ContextPackagePreview) => {
     createWriteOperationBadge(),
     createWriteWarning(
       preview.willOverwrite
-        ? `Sidekick erstatter eksisterende ${preview.outputFileName} i ${preview.scope === 'folder' ? 'valgt mappe' : 'prosjektroten'}.`
-        : `Sidekick skriver én Markdown-fil til ${preview.scope === 'folder' ? 'valgt mappe' : 'prosjektroten'}: ${preview.outputFileName}.`,
+        ? `Sidekick erstatter eksisterende ${preview.outputFileName} i ${preview.scope === 'folder' ? 'valgt mappe' : 'arbeidsområderoten'}.`
+        : `Sidekick skriver én Markdown-fil til ${preview.scope === 'folder' ? 'valgt mappe' : 'arbeidsområderoten'}: ${preview.outputFileName}.`,
     ),
   );
   renderContextPackageDetails([
     ['Filnavn', preview.outputFileName],
-    ['Omfang', preview.scope === 'folder' ? preview.targetRelativePath : 'Hele prosjektet'],
-    ['Plassering', preview.scope === 'folder' ? 'Valgt mappe' : 'Prosjektroten'],
+    ['Omfang', preview.scope === 'folder' ? preview.targetRelativePath : 'Hele arbeidsområdeet'],
+    ['Plassering', preview.scope === 'folder' ? 'Valgt mappe' : 'Arbeidsområderoten'],
     ['Overskriver', preview.willOverwrite ? 'Ja' : 'Nei'],
     ['Filsti', preview.outputPath],
   ]);
@@ -2114,7 +2116,7 @@ const renderContextPackageGenerating = (preview: ContextPackagePreview) => {
     contextPackageMessageTarget,
     preview.scope === 'folder'
       ? 'Sidekick skriver kontekstpakken til den valgte mappen.'
-      : 'Sidekick skriver kontekstpakken til prosjektmappen.',
+      : 'Sidekick skriver kontekstpakken til arbeidsområdet.',
   );
   renderContextPackageStateElements(
     createContextPackageSteps(2),
@@ -2123,7 +2125,7 @@ const renderContextPackageGenerating = (preview: ContextPackagePreview) => {
   );
   renderContextPackageDetails([
     ['Filnavn', preview.outputFileName],
-    ['Omfang', preview.scope === 'folder' ? preview.targetRelativePath : 'Hele prosjektet'],
+    ['Omfang', preview.scope === 'folder' ? preview.targetRelativePath : 'Hele arbeidsområdeet'],
     ['Filsti', preview.outputPath],
   ]);
   renderContextPackageList([]);
@@ -2138,10 +2140,10 @@ const renderContextPackageComplete = (result: ContextPackageResult) => {
     warning.path ? `${warning.path}: ${warning.message}` : warning.message,
   );
   const summaryStatus =
-    result.scope === 'project' && result.projectSummary
-      ? result.projectSummary.status === 'complete'
-        ? 'Prosjektsammendrag oppdatert'
-        : `Prosjektsammendrag feilet: ${result.projectSummary.message ?? 'Ukjent feil'}`
+    result.scope === 'workspace' && result.workspaceSummary
+      ? result.workspaceSummary.status === 'complete'
+        ? 'Arbeidsområdesammendrag oppdatert'
+        : `Arbeidsområdesammendrag feilet: ${result.workspaceSummary.message ?? 'Ukjent feil'}`
       : null;
 
   setText(contextPackageTitleTarget, 'Kontekstpakke generert');
@@ -2155,13 +2157,13 @@ const renderContextPackageComplete = (result: ContextPackageResult) => {
       'success',
       'Kontekstpakken er klar',
       result.overwritten
-        ? `Filen ble skrevet over i ${result.scope === 'folder' ? 'valgt mappe' : 'prosjektroten'}.`
-        : `Filen ble skrevet til ${result.scope === 'folder' ? 'valgt mappe' : 'prosjektroten'}.`,
+        ? `Filen ble skrevet over i ${result.scope === 'folder' ? 'valgt mappe' : 'arbeidsområderoten'}.`
+        : `Filen ble skrevet til ${result.scope === 'folder' ? 'valgt mappe' : 'arbeidsområderoten'}.`,
     ),
   );
   renderContextPackageDetails([
     ['Filnavn', result.outputFileName],
-    ['Omfang', result.scope === 'folder' ? result.targetRelativePath : 'Hele prosjektet'],
+    ['Omfang', result.scope === 'folder' ? result.targetRelativePath : 'Hele arbeidsområdeet'],
     ['Filsti', result.outputPath],
     ['Overskrevet', result.overwritten ? 'Ja' : 'Nei'],
     ['Inkludert', result.totalFiles.toString()],
@@ -2169,7 +2171,7 @@ const renderContextPackageComplete = (result: ContextPackageResult) => {
     ['Tokens', result.totalTokens.toString()],
     ['Tegn', result.totalCharacters.toString()],
     ['Størrelse', formatBytes(result.outputBytes)],
-    ...(summaryStatus ? ([['Prosjektsammendrag', summaryStatus]] satisfies DetailRow[]) : []),
+    ...(summaryStatus ? ([['Arbeidsområdesammendrag', summaryStatus]] satisfies DetailRow[]) : []),
   ]);
   renderContextPackageList([
     ...warningPreview,
@@ -2197,7 +2199,7 @@ const renderContextPackageError = (
       phase === 'preview' ? 'Ingen fil ble skrevet' : 'Kontekstpakken ble ikke fullført',
       phase === 'preview'
         ? 'Rett problemet og prøv forhåndsvisning på nytt.'
-        : 'Kontroller prosjektmappen før du prøver igjen.',
+        : 'Kontroller arbeidsområdet før du prøver igjen.',
     ),
   );
   renderContextPackageDetails([]);
@@ -2205,7 +2207,7 @@ const renderContextPackageError = (
   renderContextPackageActions('Prøv igjen', false, true);
 };
 
-const renderContextPackage = (scan?: ProjectFolderScan) => {
+const renderContextPackage = (scan?: WorkspaceScan) => {
   if (!scan || !window.sidekick || contextPackageState.status === 'unavailable') {
     renderContextPackageUnavailable();
     return;
@@ -2234,11 +2236,11 @@ const renderContextPackage = (scan?: ProjectFolderScan) => {
 };
 
 const renderTranscriptionImportUnavailable = () => {
-  setText(transcriptionImportTitleTarget, 'Ingen prosjektmappe valgt');
+  setText(transcriptionImportTitleTarget, 'Ingen arbeidsområde valgt');
   setText(
     transcriptionImportMessageTarget,
     window.sidekick
-      ? 'Velg en prosjektmappe før du importerer transkripsjoner.'
+      ? 'Velg et arbeidsområde før du importerer transkripsjoner.'
       : 'Åpne appen i Electron for å importere transkripsjoner.',
   );
   renderTranscriptionImportStateElements();
@@ -2247,11 +2249,11 @@ const renderTranscriptionImportUnavailable = () => {
   renderTranscriptionImportActions('Velg fil...', true);
 };
 
-const renderTranscriptionImportReady = (scan: ProjectFolderScan) => {
+const renderTranscriptionImportReady = (scan: WorkspaceScan) => {
   setText(transcriptionImportTitleTarget, 'Importer transkripsjon');
   setText(
     transcriptionImportMessageTarget,
-    'Velg en tekst- eller Markdown-fil som skal kopieres inn i prosjektets transkripsjonsmappe.',
+    'Velg en tekst- eller Markdown-fil som skal kopieres inn i arbeidsområdeets transkripsjonsmappe.',
   );
   renderTranscriptionImportStateElements(createImportSteps(1));
   renderTranscriptionImportDetails([
@@ -2306,11 +2308,11 @@ const renderTranscriptionImportConfirming = (preview: TranscriptionImportPreview
 
 const renderTranscriptionImportImporting = (preview: TranscriptionImportPreview) => {
   setText(transcriptionImportTitleTarget, 'Importerer fil');
-  setText(transcriptionImportMessageTarget, 'Kopierer transkripsjonen inn i prosjektet.');
+  setText(transcriptionImportMessageTarget, 'Kopierer transkripsjonen inn i arbeidsområdeet.');
   renderTranscriptionImportStateElements(
     createImportSteps(2),
     createWriteOperationBadge(),
-    createWriteWarning(`Sidekick skriver ${preview.destinationFileName} til prosjektmappen.`),
+    createWriteWarning(`Sidekick skriver ${preview.destinationFileName} til arbeidsområdet.`),
   );
   renderTranscriptionImportDetails([
     ['Nytt filnavn', preview.destinationFileName],
@@ -2329,7 +2331,7 @@ const renderTranscriptionImportComplete = (result: TranscriptionImportResult) =>
   setText(transcriptionImportTitleTarget, 'Transkripsjon importert');
   setText(
     transcriptionImportMessageTarget,
-    'Prosjektet er skannet på nytt med den importerte filen.',
+    'Arbeidsområdet er skannet på nytt med den importerte filen.',
   );
   renderTranscriptionImportStateElements(
     createImportSteps(3),
@@ -2368,7 +2370,7 @@ const renderTranscriptionImportError = (message: string) => {
   renderTranscriptionImportActions('Prøv igjen', false, true);
 };
 
-const renderTranscriptionImport = (scan?: ProjectFolderScan) => {
+const renderTranscriptionImport = (scan?: WorkspaceScan) => {
   if (!scan || !window.sidekick || transcriptionImportState.status === 'unavailable') {
     renderTranscriptionImportUnavailable();
     return;
@@ -2420,11 +2422,11 @@ const transcriptionSummaryBatchStatusLabel = (
 };
 
 const renderTranscriptionSummaryBatchUnavailable = () => {
-  setText(transcriptionSummaryBatchTitleTarget, 'Ingen prosjektmappe valgt');
+  setText(transcriptionSummaryBatchTitleTarget, 'Ingen arbeidsområde valgt');
   setText(
     transcriptionSummaryBatchMessageTarget,
     window.sidekick
-      ? 'Velg en prosjektmappe før du lager samtalesammendrag.'
+      ? 'Velg et arbeidsområde før du lager samtalesammendrag.'
       : 'Åpne appen i Electron for å lage samtalesammendrag.',
   );
   renderTranscriptionSummaryBatchStateElements();
@@ -2433,7 +2435,7 @@ const renderTranscriptionSummaryBatchUnavailable = () => {
   renderTranscriptionSummaryBatchActions('Forhåndsvis', true);
 };
 
-const renderTranscriptionSummaryBatchReady = (scan: ProjectFolderScan) => {
+const renderTranscriptionSummaryBatchReady = (scan: WorkspaceScan) => {
   setText(transcriptionSummaryBatchTitleTarget, 'Lag manglende sammendrag');
   setText(
     transcriptionSummaryBatchMessageTarget,
@@ -2476,7 +2478,7 @@ const renderTranscriptionSummaryBatchConfirming = (preview: TranscriptionSummary
     createTranscriptionSummaryBatchSteps(2),
     createWriteOperationBadge(),
     createWriteWarning(
-      `Sidekick skriver samtalesammendrag i prosjektets .sidekick-mappe for ${preview.counts.toGenerate} transkripsjoner.`,
+      `Sidekick skriver samtalesammendrag i arbeidsområdeets .sidekick-mappe for ${preview.counts.toGenerate} transkripsjoner.`,
     ),
   );
   renderTranscriptionSummaryBatchDetails([
@@ -2510,7 +2512,7 @@ const renderTranscriptionSummaryBatchGenerating = (preview: TranscriptionSummary
   renderTranscriptionSummaryBatchStateElements(
     createTranscriptionSummaryBatchSteps(2),
     createWriteOperationBadge(),
-    createWriteWarning('Sidekick skriver bare sammendrag i prosjektets .sidekick-mappe.'),
+    createWriteWarning('Sidekick skriver bare sammendrag i arbeidsområdeets .sidekick-mappe.'),
   );
   renderTranscriptionSummaryBatchDetails([
     ['Transkripsjonsmappe', preview.targetFolderRelativePath],
@@ -2584,7 +2586,7 @@ const renderTranscriptionSummaryBatchError = (
   renderTranscriptionSummaryBatchActions('Prøv igjen', false, true);
 };
 
-const renderTranscriptionSummaryBatch = (scan?: ProjectFolderScan) => {
+const renderTranscriptionSummaryBatch = (scan?: WorkspaceScan) => {
   if (
     !scan ||
     !window.sidekick?.previewTranscriptionSummaryBatch ||
@@ -2679,24 +2681,24 @@ const renderDocumentRelationshipsReport = (snapshot?: DocumentRelationshipsSnaps
 };
 
 const documentRelationshipsDetailsRows = (
-  scan: ProjectFolderScan,
+  scan: WorkspaceScan,
   snapshot?: DocumentRelationshipsSnapshot,
 ) =>
   [
-    ['Prosjektmappe', scan.rootName],
-    ['Omfang', 'Hele valgt prosjektmappe'],
-    ['Kildemodell', snapshot?.sourceModel ?? 'Fysisk prosjektmappe'],
+    ['Arbeidsområde', scan.rootName],
+    ['Omfang', 'Hele valgt arbeidsområde'],
+    ['Kildemodell', snapshot?.sourceModel ?? 'Fysisk arbeidsområde'],
     ['Rapportfil', snapshot?.path ?? '.sidekick/document-relationships.md'],
     ['Oppdatert', snapshot?.generatedAt ? formatDate(snapshot.generatedAt) : 'Ikke generert'],
     ['Kontekstpakke', snapshot?.contextPackagePath ?? 'Genereres før analysen'],
   ] satisfies DetailRow[];
 
 const renderDocumentRelationshipsUnavailable = () => {
-  setText(documentRelationshipsTitleTarget, 'Ingen prosjektmappe valgt');
+  setText(documentRelationshipsTitleTarget, 'Ingen arbeidsområde valgt');
   setText(
     documentRelationshipsMessageTarget,
     window.sidekick
-      ? 'Velg en prosjektmappe før du analyserer sammenhenger.'
+      ? 'Velg et arbeidsområde før du analyserer sammenhenger.'
       : 'Åpne appen i Electron for å analysere sammenhenger.',
   );
   renderDocumentRelationshipsStateElements();
@@ -2705,7 +2707,7 @@ const renderDocumentRelationshipsUnavailable = () => {
   renderDocumentRelationshipsActions('Finn sammenhenger', true);
 };
 
-const renderDocumentRelationshipsChecking = (scan: ProjectFolderScan) => {
+const renderDocumentRelationshipsChecking = (scan: WorkspaceScan) => {
   setText(documentRelationshipsTitleTarget, 'Sjekker rapport');
   setText(documentRelationshipsMessageTarget, 'Ser etter eksisterende rapport for dokumentsammenhenger.');
   renderDocumentRelationshipsStateElements(createDocumentRelationshipsSteps(1));
@@ -2715,7 +2717,7 @@ const renderDocumentRelationshipsChecking = (scan: ProjectFolderScan) => {
 };
 
 const renderDocumentRelationshipsReady = (
-  scan: ProjectFolderScan,
+  scan: WorkspaceScan,
   snapshot: DocumentRelationshipsSnapshot,
 ) => {
   if (snapshot.status === 'complete') {
@@ -2747,7 +2749,7 @@ const renderDocumentRelationshipsReady = (
 };
 
 const renderDocumentRelationshipsGenerating = (
-  scan: ProjectFolderScan,
+  scan: WorkspaceScan,
   previousReport?: DocumentRelationshipsSnapshot,
 ) => {
   setText(documentRelationshipsTitleTarget, 'Analyserer sammenhenger');
@@ -2766,7 +2768,7 @@ const renderDocumentRelationshipsGenerating = (
 };
 
 const renderDocumentRelationshipsComplete = (
-  scan: ProjectFolderScan,
+  scan: WorkspaceScan,
   result: DocumentRelationshipsGenerationResult,
 ) => {
   const report = result.report;
@@ -2778,7 +2780,7 @@ const renderDocumentRelationshipsComplete = (
     createResultBanner(
       'success',
       'Rapporten er klar',
-      'Funnene er strukturert som Markdown i prosjektets .sidekick-mappe.',
+      'Funnene er strukturert som Markdown i arbeidsområdeets .sidekick-mappe.',
     ),
   );
   renderDocumentRelationshipsDetails([
@@ -2790,7 +2792,7 @@ const renderDocumentRelationshipsComplete = (
 };
 
 const renderDocumentRelationshipsFailed = (
-  scan: ProjectFolderScan,
+  scan: WorkspaceScan,
   message: string,
   previousReport?: DocumentRelationshipsSnapshot,
 ) => {
@@ -2809,7 +2811,7 @@ const renderDocumentRelationshipsFailed = (
   renderDocumentRelationshipsActions('Prøv igjen', false, true);
 };
 
-const renderDocumentRelationships = (scan?: ProjectFolderScan) => {
+const renderDocumentRelationships = (scan?: WorkspaceScan) => {
   if (!scan || !window.sidekick || documentRelationshipsState.status === 'unavailable') {
     renderDocumentRelationshipsUnavailable();
     return;
@@ -2903,8 +2905,8 @@ const renderCodexModeCopy = () => {
   setText(
     codexModeDescriptionTarget,
     isWriteMode
-      ? 'Codex kan lese og endre filer direkte i prosjektmappen for denne kjøringen.'
-      : 'Codex kan lese prosjektmappen, men ikke endre filer.',
+      ? 'Codex kan lese og endre filer direkte i arbeidsområdet for denne kjøringen.'
+      : 'Codex kan lese arbeidsområdet, men ikke endre filer.',
   );
 };
 
@@ -2930,8 +2932,8 @@ const renderCodexOutput = (output: CodexOutputEvent[] = []) => {
   );
 };
 
-const renderCodexUnavailable = (message = 'Velg en prosjektmappe først.') => {
-  setText(codexTitleTarget, 'Ingen prosjektmappe valgt');
+const renderCodexUnavailable = (message = 'Velg et arbeidsområde først.') => {
+  setText(codexTitleTarget, 'Ingen arbeidsområde valgt');
   setText(codexMessageTarget, window.sidekick ? message : 'Åpne Sidekick i Electron for å bruke Codex.');
   renderCodexStateElements();
   renderCodexDetails([]);
@@ -2968,11 +2970,11 @@ const renderCodexLoggedOut = (codexStatus: CodexStatus) => {
   renderCodexActions('Logg inn', false, true);
 };
 
-const renderCodexReady = (codexStatus: CodexStatus, scan: ProjectFolderScan) => {
+const renderCodexReady = (codexStatus: CodexStatus, scan: WorkspaceScan) => {
   const isWriteMode = Boolean(codexEditModeInput?.checked);
 
   setText(codexTitleTarget, 'Codex er klar');
-  setText(codexMessageTarget, 'Kjør Codex direkte mot valgt prosjektmappe.');
+  setText(codexMessageTarget, 'Kjør Codex direkte mot valgt arbeidsområde.');
   renderCodexStateElements(
     ...(isWriteMode
       ? [
@@ -2982,7 +2984,7 @@ const renderCodexReady = (codexStatus: CodexStatus, scan: ProjectFolderScan) => 
       : [createCodexSteps(1)]),
   );
   renderCodexDetails([
-    ['Prosjektmappe', scan.rootPath],
+    ['Arbeidsområde', scan.rootPath],
     ['Versjon', codexStatus.version ?? 'Ukjent'],
     ['Standard tilgang', 'Lesetilgang'],
   ]);
@@ -2994,13 +2996,13 @@ const renderCodexReady = (codexStatus: CodexStatus, scan: ProjectFolderScan) => 
 
 const renderCodexRunning = (
   run: Extract<CodexState, { status: 'running' }>,
-  scan: ProjectFolderScan,
+  scan: WorkspaceScan,
 ) => {
   setText(codexTitleTarget, run.mode === 'login' ? 'Innlogging kjører' : 'Codex kjører');
   setText(
     codexMessageTarget,
     run.mode === 'workspace-write'
-      ? 'Codex har skrivetilgang til valgt prosjektmappe i denne kjøringen.'
+      ? 'Codex har skrivetilgang til valgt arbeidsområde i denne kjøringen.'
       : 'Sidekick viser kontrollert kjørelogg fra Codex.',
   );
   renderCodexStateElements(
@@ -3014,7 +3016,7 @@ const renderCodexRunning = (
   renderCodexDetails([
     ['Kjøring', run.runId],
     ['Tilgang', codexModeLabel(run.mode)],
-    ['Prosjektmappe', scan.rootPath],
+    ['Arbeidsområde', scan.rootPath],
   ]);
   renderCodexOutput(run.output);
   setCodexInputsDisabled(true);
@@ -3059,7 +3061,7 @@ const renderCodexFinished = (
   renderCodexActions('Kjør igjen', false, true);
 };
 
-const renderCodex = (scan?: ProjectFolderScan) => {
+const renderCodex = (scan?: WorkspaceScan) => {
   if (!scan || !window.sidekick || codexState.status === 'unavailable') {
     renderCodexUnavailable(codexState.status === 'unavailable' ? codexState.message : undefined);
     return;
@@ -3086,7 +3088,7 @@ const renderCodex = (scan?: ProjectFolderScan) => {
   }
 };
 
-const renderTreeToolbar = (scan?: ProjectFolderScan) => {
+const renderTreeToolbar = (scan?: WorkspaceScan) => {
   const hasScan = Boolean(scan);
 
   treeToolbarTarget?.toggleAttribute('hidden', !hasScan);
@@ -3341,7 +3343,7 @@ const renderTreeNode = (node: FolderTreeNode, level = 1) => {
   return item;
 };
 
-const renderTree = (scan?: ProjectFolderScan) => {
+const renderTree = (scan?: WorkspaceScan) => {
   clear(treeTarget);
   renderTreeToolbar(scan);
 
@@ -3353,7 +3355,7 @@ const renderTree = (scan?: ProjectFolderScan) => {
   treeTarget.append(renderTreeNode(scan.tree));
 };
 
-const refreshOverviewContextPackageStatus = async (scan: ProjectFolderScan) => {
+const refreshOverviewContextPackageStatus = async (scan: WorkspaceScan) => {
   if (!window.sidekick) {
     overviewContextPackageStatus = { status: 'unavailable' };
     render();
@@ -3369,7 +3371,7 @@ const refreshOverviewContextPackageStatus = async (scan: ProjectFolderScan) => {
     const activeScan = getActiveScan();
 
     // Async preview results must not update the overview after the user has
-    // selected a different project.
+    // selected a different workspace.
     if (!activeScan || activeScan.rootPath !== rootPath) {
       return;
     }
@@ -3394,7 +3396,7 @@ const refreshOverviewContextPackageStatus = async (scan: ProjectFolderScan) => {
   render();
 };
 
-const refreshProjectInfo = async (scan: ProjectFolderScan) => {
+const refreshWorkspaceInfo = async (scan: WorkspaceScan) => {
   if (!window.sidekick) {
     return;
   }
@@ -3402,14 +3404,14 @@ const refreshProjectInfo = async (scan: ProjectFolderScan) => {
   const rootPath = scan.rootPath;
 
   try {
-    const snapshot = await window.sidekick.readProjectInfo(rootPath);
+    const snapshot = await window.sidekick.readWorkspaceInfo(rootPath);
     const activeScan = getActiveScan();
 
     if (!activeScan || activeScan.rootPath !== rootPath) {
       return;
     }
 
-    projectInfoState = {
+    workspaceInfoState = {
       rootPath,
       snapshot,
     };
@@ -3420,12 +3422,12 @@ const refreshProjectInfo = async (scan: ProjectFolderScan) => {
       return;
     }
 
-    projectInfoState = {
+    workspaceInfoState = {
       rootPath,
       snapshot: {
         status: 'invalid',
         path: '',
-        message: error instanceof Error ? error.message : 'Kunne ikke lese prosjektsammendrag.',
+        message: error instanceof Error ? error.message : 'Kunne ikke lese arbeidsområdesammendrag.',
       },
     };
   }
@@ -3433,7 +3435,7 @@ const refreshProjectInfo = async (scan: ProjectFolderScan) => {
   render();
 };
 
-const refreshDocumentRelationships = async (scan: ProjectFolderScan) => {
+const refreshDocumentRelationships = async (scan: WorkspaceScan) => {
   if (!window.sidekick) {
     documentRelationshipsState = { status: 'unavailable' };
     return;
@@ -3489,18 +3491,18 @@ const renderNoScanPanels = () => {
 };
 
 const renderEmptyState = () => {
-  setText(selectedNameTarget, 'Ingen prosjektmappe valgt');
+  setText(selectedNameTarget, 'Ingen arbeidsområde valgt');
   setText(
     selectedPathTarget,
     window.sidekick ? 'Velg en mappe for å inspisere innholdet.' : 'Åpne i Electron for å inspisere lokale mapper.',
   );
-  setText(statusMessageTarget, 'Ingen prosjektmappe valgt');
-  setText(projectEntryErrorTarget, '');
-  projectEntryErrorTarget?.toggleAttribute('hidden', true);
-  setText(stateTitleTarget, 'Velg en prosjektmappe');
+  setText(statusMessageTarget, 'Ingen arbeidsområde valgt');
+  setText(workspaceEntryErrorTarget, '');
+  workspaceEntryErrorTarget?.toggleAttribute('hidden', true);
+  setText(stateTitleTarget, 'Velg et arbeidsområde');
   setText(stateMessageTarget, 'Sidekick skanner lokale mapper lesebeskyttet.');
   setText(overviewTitleTarget, 'Mappestruktur');
-  setText(overviewSubtitleTarget, 'Velg en mappe for å se prosjektoversikt.');
+  setText(overviewSubtitleTarget, 'Velg en mappe for å se oversikt.');
   renderSummary();
   renderArtifactCounts();
   renderFolderSignals();
@@ -3521,8 +3523,8 @@ const renderLoadingState = () => {
 
 const renderErrorState = (message: string) => {
   setText(statusMessageTarget, 'Feil ved åpning av mappe');
-  setText(projectEntryErrorTarget, message);
-  projectEntryErrorTarget?.toggleAttribute('hidden', false);
+  setText(workspaceEntryErrorTarget, message);
+  workspaceEntryErrorTarget?.toggleAttribute('hidden', false);
   setText(stateTitleTarget, 'Kan ikke åpne mappen');
   setText(stateMessageTarget, message);
   setText(overviewTitleTarget, 'Kan ikke åpne mappen');
@@ -3543,9 +3545,9 @@ const renderErrorState = (message: string) => {
   ]);
 };
 
-const renderReadyState = (scan: ProjectFolderScan, status: 'ready' | 'partial') => {
+const renderReadyState = (scan: WorkspaceScan, status: 'ready' | 'partial') => {
   const newestFile = scan.summary.recentFiles[0];
-  const hasProjectContent = getChildren(scan.tree).length > 0;
+  const hasWorkspaceContent = getChildren(scan.tree).length > 0;
 
   setText(selectedNameTarget, scan.rootName);
   setText(selectedPathTarget, scan.rootPath);
@@ -3555,7 +3557,7 @@ const renderReadyState = (scan: ProjectFolderScan, status: 'ready' | 'partial') 
       scan.scannedAt,
     )}`,
   );
-  setText(stateTitleTarget, status === 'partial' ? 'Delvis prosjektoversikt' : 'Prosjektoversikt');
+  setText(stateTitleTarget, status === 'partial' ? 'Delvis oversikt' : 'Arbeidsområdeoversikt');
   setText(
     stateMessageTarget,
     newestFile
@@ -3564,15 +3566,15 @@ const renderReadyState = (scan: ProjectFolderScan, status: 'ready' | 'partial') 
   );
   setText(
     overviewTitleTarget,
-    status === 'partial' ? 'Prosjektoversikt (delvis)' : 'Prosjektoversikt',
+    status === 'partial' ? 'Arbeidsområdeoversikt (delvis)' : 'Arbeidsområdeoversikt',
   );
   setText(
     overviewSubtitleTarget,
-    hasProjectContent
-      ? 'Nøkkeltall, mappesignaler og nylig aktivitet i valgt prosjektmappe.'
-      : 'Sidekick fant ingen filer eller undermapper i prosjektmappen.',
+    hasWorkspaceContent
+      ? 'Nøkkeltall, mappesignaler og nylig aktivitet i valgt arbeidsområde.'
+      : 'Sidekick fant ingen filer eller undermapper i arbeidsområdet.',
   );
-  overviewEmptyTarget?.toggleAttribute('hidden', hasProjectContent);
+  overviewEmptyTarget?.toggleAttribute('hidden', hasWorkspaceContent);
   renderSummary(scan);
   renderArtifactCounts(scan);
   renderFolderSignals(scan);
@@ -3636,16 +3638,16 @@ const renderSettings = () => {
 };
 
 const render = () => {
-  const hasActiveProject = state.status === 'ready' || state.status === 'partial';
-  if (!hasActiveProject) {
+  const hasActiveWorkspace = state.status === 'ready' || state.status === 'partial';
+  if (!hasActiveWorkspace) {
     activeWorkflow = null;
   }
 
   const isBusy =
     state.status === 'loading' ||
-    projectCreationState.status === 'creating' ||
-    projectInitializationState.status === 'choosing' ||
-    projectInitializationState.status === 'initializing';
+    workspaceCreationState.status === 'creating' ||
+    workspaceInitializationState.status === 'choosing' ||
+    workspaceInitializationState.status === 'initializing';
   const isEntryState = state.status === 'empty' || state.status === 'error';
   const hasActiveWorkflow = activeWorkflow !== null;
   const isNavigationBlocked = isBusy || hasActiveWorkflow || isExclusiveWorkflowActive();
@@ -3654,26 +3656,26 @@ const render = () => {
     button.toggleAttribute('disabled', isNavigationBlocked || !window.sidekick);
   });
   openSettingsButton?.toggleAttribute('disabled', isNavigationBlocked);
-  overviewGenerateContextButton?.toggleAttribute('disabled', !hasActiveProject || isBusy || hasActiveWorkflow);
-  overviewImportTranscriptionButton?.toggleAttribute('disabled', !hasActiveProject || isBusy || hasActiveWorkflow);
+  overviewGenerateContextButton?.toggleAttribute('disabled', !hasActiveWorkspace || isBusy || hasActiveWorkflow);
+  overviewImportTranscriptionButton?.toggleAttribute('disabled', !hasActiveWorkspace || isBusy || hasActiveWorkflow);
   overviewDocumentRelationshipsButton?.toggleAttribute(
     'disabled',
-    !hasActiveProject || isBusy || hasActiveWorkflow,
+    !hasActiveWorkspace || isBusy || hasActiveWorkflow,
   );
-  overviewRunCodexButton?.toggleAttribute('disabled', !hasActiveProject || isBusy || hasActiveWorkflow);
-  appMainTarget?.classList.toggle('app-main--single', !hasActiveProject);
-  contextSurfaceTarget?.toggleAttribute('hidden', !hasActiveProject);
-  actionBarTarget?.toggleAttribute('hidden', !hasActiveProject || appView === 'settings');
+  overviewRunCodexButton?.toggleAttribute('disabled', !hasActiveWorkspace || isBusy || hasActiveWorkflow);
+  appMainTarget?.classList.toggle('app-main--single', !hasActiveWorkspace);
+  contextSurfaceTarget?.toggleAttribute('hidden', !hasActiveWorkspace);
+  actionBarTarget?.toggleAttribute('hidden', !hasActiveWorkspace || appView === 'settings');
   workspaceDefaultTarget?.toggleAttribute('hidden', hasActiveWorkflow);
   workflowHostTarget?.toggleAttribute('hidden', !hasActiveWorkflow);
   workflowPanels.forEach((panel) => {
     panel.toggleAttribute('hidden', panel.dataset.workflowPanel !== activeWorkflow);
   });
-  summaryStripTarget?.toggleAttribute('hidden', !hasActiveProject);
-  projectEntryTarget?.toggleAttribute('hidden', !isEntryState);
-  stateBannerTarget?.toggleAttribute('hidden', isEntryState || hasActiveProject);
-  renderProjectCreation();
-  renderProjectInitialization();
+  summaryStripTarget?.toggleAttribute('hidden', !hasActiveWorkspace);
+  workspaceEntryTarget?.toggleAttribute('hidden', !isEntryState);
+  stateBannerTarget?.toggleAttribute('hidden', isEntryState || hasActiveWorkspace);
+  renderWorkspaceCreation();
+  renderWorkspaceInitialization();
   renderSettings();
 
   switch (state.status) {
@@ -3971,18 +3973,18 @@ const generateContextPackage = async () => {
     setTranscriptionSummaryBatchStateForScan(result.scan);
     setDocumentRelationshipsStateForScan(result.scan);
     contextPackageState = { status: 'complete', result };
-    if (result.scope === 'project') {
-      if (result.projectSummary) {
-        projectInfoState = {
+    if (result.scope === 'workspace') {
+      if (result.workspaceSummary) {
+        workspaceInfoState = {
           rootPath: result.scan.rootPath,
           snapshot:
-            result.projectSummary.projectInfo ??
-            result.projectSummary.previousProjectInfo ?? {
+            result.workspaceSummary.workspaceInfo ??
+            result.workspaceSummary.previousWorkspaceInfo ?? {
               status: 'missing',
               path: '',
             },
           message:
-            result.projectSummary.status === 'failed' ? result.projectSummary.message : undefined,
+            result.workspaceSummary.status === 'failed' ? result.workspaceSummary.message : undefined,
         };
       }
       overviewContextPackageStatus = {
@@ -4258,7 +4260,7 @@ const handleDocumentRelationshipsPrimary = () => {
   void generateDocumentRelationships();
 };
 
-const refreshCodexStatus = async (scan: ProjectFolderScan) => {
+const refreshCodexStatus = async (scan: WorkspaceScan) => {
   if (!window.sidekick) {
     codexState = { status: 'unavailable', message: 'Åpne Sidekick i Electron for å bruke Codex.' };
     render();
@@ -4293,7 +4295,7 @@ const refreshCodexStatus = async (scan: ProjectFolderScan) => {
   render();
 };
 
-const startCodexLogin = async (scan: ProjectFolderScan) => {
+const startCodexLogin = async (scan: WorkspaceScan) => {
   if (!window.sidekick) {
     return;
   }
@@ -4311,7 +4313,7 @@ const startCodexLogin = async (scan: ProjectFolderScan) => {
   render();
 };
 
-const startCodexRun = async (scan: ProjectFolderScan) => {
+const startCodexRun = async (scan: WorkspaceScan) => {
   if (!window.sidekick || !codexPromptInput) {
     return;
   }
@@ -4466,7 +4468,7 @@ const chooseFolder = async () => {
   render();
 
   try {
-    const scan = await window.sidekick.chooseProjectFolder();
+    const scan = await window.sidekick.chooseWorkspaceFolder();
 
     if (!scan) {
       expandedPaths = new Set();
@@ -4501,167 +4503,167 @@ const chooseFolder = async () => {
   }
 };
 
-const chooseProjectFolderForInitialization = async () => {
+const chooseWorkspaceFolderForInitialization = async () => {
   if (!window.sidekick) {
-    projectInitializationState = {
+    workspaceInitializationState = {
       status: 'error',
-      message: 'Prosjektinitialisering er tilgjengelig i Electron-appen.',
+      message: 'Arbeidsområdeinitialisering er tilgjengelig i Electron-appen.',
     };
     render();
     return;
   }
 
-  projectInitializationState = {
+  workspaceInitializationState = {
     status: 'choosing',
-    message: 'Velg mappen som skal brukes som Sidekick-prosjekt.',
+    message: 'Velg mappen som skal brukes som Sidekick-arbeidsområde.',
   };
   render();
 
   try {
-    const preview = await window.sidekick.chooseProjectFolderForInitialization();
+    const preview = await window.sidekick.chooseWorkspaceFolderForInitialization();
 
     if (!preview) {
-      projectInitializationState = { status: 'idle', message: '' };
+      workspaceInitializationState = { status: 'idle', message: '' };
       render();
       return;
     }
 
     const missingCount = preview.requiredFolders.filter((folder) => folder.status === 'missing').length;
-    projectInitializationState = {
+    workspaceInitializationState = {
       status: 'preview',
       preview,
       message:
         missingCount > 0
           ? 'Kontroller mappen før Sidekick oppretter manglende standardmapper.'
-          : 'Kontroller mappen før Sidekick bruker den som aktivt prosjekt.',
+          : 'Kontroller mappen før Sidekick bruker den som aktivt arbeidsområde.',
     };
   } catch (error) {
-    projectInitializationState = {
+    workspaceInitializationState = {
       status: 'error',
-      message: error instanceof Error ? error.message : 'Kunne ikke kontrollere prosjektmappen.',
+      message: error instanceof Error ? error.message : 'Kunne ikke kontrollere arbeidsområdet.',
     };
   }
 
   render();
 };
 
-const cancelProjectInitialization = () => {
-  if (projectInitializationState.status === 'initializing') {
+const cancelWorkspaceInitialization = () => {
+  if (workspaceInitializationState.status === 'initializing') {
     return;
   }
 
-  projectInitializationState = { status: 'idle', message: '' };
+  workspaceInitializationState = { status: 'idle', message: '' };
   render();
-  initializeProjectButton?.focus();
+  initializeWorkspaceButton?.focus();
 };
 
-const confirmProjectInitialization = async () => {
+const confirmWorkspaceInitialization = async () => {
   if (
     !window.sidekick ||
-    (projectInitializationState.status !== 'preview' &&
-      projectInitializationState.status !== 'error')
+    (workspaceInitializationState.status !== 'preview' &&
+      workspaceInitializationState.status !== 'error')
   ) {
     return;
   }
 
   const previousState = state;
-  const { preview } = projectInitializationState;
+  const { preview } = workspaceInitializationState;
 
   if (!preview) {
     return;
   }
 
-  projectInitializationState = {
+  workspaceInitializationState = {
     status: 'initializing',
     preview,
-    message: 'Initialiserer prosjektmappe.',
+    message: 'Initialiserer arbeidsområde.',
   };
   state = { status: 'loading' };
   render();
 
   try {
-    const result = await window.sidekick.confirmProjectInitialization(preview.previewId);
+    const result = await window.sidekick.confirmWorkspaceInitialization(preview.previewId);
     setActiveScan(result.scan);
     void refreshOverviewContextPackageStatus(result.scan);
     void refreshCodexStatus(result.scan);
-    projectInitializationState = {
+    workspaceInitializationState = {
       status: 'complete',
       result,
-      message: `${result.rootName} er valgt som Sidekick-prosjekt.`,
+      message: `${result.rootName} er valgt som Sidekick-arbeidsområde.`,
     };
     render();
   } catch (error) {
-    projectInitializationState = {
+    workspaceInitializationState = {
       status: 'error',
       preview,
-      message: error instanceof Error ? error.message : 'Kunne ikke initialisere prosjektmappen.',
+      message: error instanceof Error ? error.message : 'Kunne ikke initialisere arbeidsområdet.',
     };
     state = previousState;
     render();
   }
 };
 
-const openProjectCreateDialog = () => {
-  projectNameTouched = false;
-  projectCreationState = {
+const openWorkspaceCreateDialog = () => {
+  workspaceNameTouched = false;
+  workspaceCreationState = {
     status: 'editing',
     message: '',
-    parentPath: projectCreationState.parentPath,
+    parentPath: workspaceCreationState.parentPath,
   };
   render();
-  projectNameInput?.focus();
+  workspaceNameInput?.focus();
 };
 
-const closeProjectCreateDialog = () => {
-  if (projectCreationState.status === 'creating') {
+const closeWorkspaceCreateDialog = () => {
+  if (workspaceCreationState.status === 'creating') {
     return;
   }
 
-  projectCreationState = {
+  workspaceCreationState = {
     status: 'closed',
     message: '',
-    parentPath: projectCreationState.parentPath,
+    parentPath: workspaceCreationState.parentPath,
   };
   render();
-  openCreateProjectButton?.focus();
+  openCreateWorkspaceButton?.focus();
 };
 
-const getProjectDialogFocusableElements = () =>
+const getWorkspaceDialogFocusableElements = () =>
   Array.from(
-    projectCreateDialogTarget?.querySelectorAll<HTMLElement>(
+    workspaceCreateDialogTarget?.querySelectorAll<HTMLElement>(
       'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
     ) ?? [],
   ).filter((element) => element.offsetParent !== null);
 
-const chooseProjectParentFolder = async () => {
+const chooseWorkspaceParentFolder = async () => {
   if (!window.sidekick) {
-    projectCreationState = {
-      ...projectCreationState,
+    workspaceCreationState = {
+      ...workspaceCreationState,
       status: 'error',
-      message: 'Prosjektopprettelse er tilgjengelig i Electron-appen.',
+      message: 'Arbeidsområdeopprettelse er tilgjengelig i Electron-appen.',
     };
     render();
     return;
   }
 
-  projectCreationState = {
-    ...projectCreationState,
+  workspaceCreationState = {
+    ...workspaceCreationState,
     status: 'selecting-parent',
-    message: 'Velg hvor prosjektmappen skal opprettes.',
+    message: 'Velg hvor arbeidsområdet skal opprettes.',
   };
   render();
 
   try {
-    const parentPath = await window.sidekick.chooseProjectParentFolder();
+    const parentPath = await window.sidekick.chooseWorkspaceParentFolder();
 
-    projectCreationState = {
+    workspaceCreationState = {
       status: 'editing',
       message: parentPath ? '' : 'Ingen plassering valgt.',
-      parentPath: parentPath ?? projectCreationState.parentPath,
+      parentPath: parentPath ?? workspaceCreationState.parentPath,
     };
   } catch (error) {
-    projectCreationState = {
-      ...projectCreationState,
+    workspaceCreationState = {
+      ...workspaceCreationState,
       status: 'error',
       message: error instanceof Error ? error.message : 'Kunne ikke velge plassering.',
     };
@@ -4670,68 +4672,68 @@ const chooseProjectParentFolder = async () => {
   render();
 };
 
-const createProject = async () => {
+const createWorkspace = async () => {
   if (!window.sidekick) {
-    projectCreationState = {
-      ...projectCreationState,
+    workspaceCreationState = {
+      ...workspaceCreationState,
       status: 'error',
-      message: 'Prosjektopprettelse er tilgjengelig i Electron-appen.',
+      message: 'Arbeidsområdeopprettelse er tilgjengelig i Electron-appen.',
     };
     render();
     return;
   }
 
-  const projectName = projectNameInput?.value ?? '';
-  const validationMessage = getProjectNameValidationMessage(projectName);
+  const workspaceName = workspaceNameInput?.value ?? '';
+  const validationMessage = getWorkspaceNameValidationMessage(workspaceName);
 
-  if (validationMessage || !projectCreationState.parentPath) {
-    projectNameTouched = true;
-    projectCreationState = {
-      ...projectCreationState,
+  if (validationMessage || !workspaceCreationState.parentPath) {
+    workspaceNameTouched = true;
+    workspaceCreationState = {
+      ...workspaceCreationState,
       status: 'error',
-      message: validationMessage || 'Velg hvor prosjektmappen skal opprettes.',
+      message: validationMessage || 'Velg hvor arbeidsområdet skal opprettes.',
     };
     render();
     return;
   }
 
   const previousState = state;
-  const parentPath = projectCreationState.parentPath;
-  projectCreationState = { status: 'creating', message: 'Oppretter prosjektmappe.', parentPath };
+  const parentPath = workspaceCreationState.parentPath;
+  workspaceCreationState = { status: 'creating', message: 'Oppretter arbeidsområde.', parentPath };
   state = { status: 'loading' };
   render();
 
   try {
-    const result: ProjectCreationResult | null = await window.sidekick.createProjectFolder({
-      projectName,
+    const result: WorkspaceCreationResult | null = await window.sidekick.createWorkspaceFolder({
+      workspaceName,
       parentPath,
     });
 
     if (!result) {
-      projectCreationState = { status: 'editing', message: '', parentPath };
+      workspaceCreationState = { status: 'editing', message: '', parentPath };
       state = previousState;
       render();
       return;
     }
 
-    if (projectNameInput) {
-      projectNameInput.value = '';
+    if (workspaceNameInput) {
+      workspaceNameInput.value = '';
     }
 
     setActiveScan(result.scan);
     void refreshOverviewContextPackageStatus(result.scan);
     void refreshCodexStatus(result.scan);
-    projectCreationState = {
+    workspaceCreationState = {
       status: 'closed',
       message: `Opprettet ${result.rootName}.`,
       parentPath,
     };
     render();
   } catch (error) {
-    projectCreationState = {
-      ...projectCreationState,
+    workspaceCreationState = {
+      ...workspaceCreationState,
       status: 'error',
-      message: error instanceof Error ? error.message : 'Kunne ikke opprette prosjektmappe.',
+      message: error instanceof Error ? error.message : 'Kunne ikke opprette arbeidsområde.',
     };
     state = previousState;
     render();
@@ -4752,37 +4754,37 @@ chooseFolderButtons.forEach((button) => {
   });
 });
 
-initializeProjectButton?.addEventListener('click', () => {
-  void chooseProjectFolderForInitialization();
+initializeWorkspaceButton?.addEventListener('click', () => {
+  void chooseWorkspaceFolderForInitialization();
 });
-projectInitializationConfirmButton?.addEventListener('click', () => {
-  void confirmProjectInitialization();
+workspaceInitializationConfirmButton?.addEventListener('click', () => {
+  void confirmWorkspaceInitialization();
 });
-projectInitializationCancelButton?.addEventListener('click', cancelProjectInitialization);
-openCreateProjectButton?.addEventListener('click', openProjectCreateDialog);
-projectCreateCancelButtons.forEach((button) => {
-  button.addEventListener('click', closeProjectCreateDialog);
+workspaceInitializationCancelButton?.addEventListener('click', cancelWorkspaceInitialization);
+openCreateWorkspaceButton?.addEventListener('click', openWorkspaceCreateDialog);
+workspaceCreateCancelButtons.forEach((button) => {
+  button.addEventListener('click', closeWorkspaceCreateDialog);
 });
-chooseProjectParentButton?.addEventListener('click', () => {
-  void chooseProjectParentFolder();
+chooseWorkspaceParentButton?.addEventListener('click', () => {
+  void chooseWorkspaceParentFolder();
 });
-projectNameInput?.addEventListener('input', () => {
-  projectNameTouched = true;
+workspaceNameInput?.addEventListener('input', () => {
+  workspaceNameTouched = true;
   render();
 });
-projectCreateDialogTarget?.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter' && event.target === projectNameInput && !createProjectButton?.disabled) {
+workspaceCreateDialogTarget?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && event.target === workspaceNameInput && !createWorkspaceButton?.disabled) {
     event.preventDefault();
-    void createProject();
+    void createWorkspace();
   }
 
   if (event.key !== 'Tab') {
     return;
   }
 
-  // The create-project surface behaves as a lightweight modal; keep tab focus
-  // inside it until the user cancels or creates the project.
-  const focusableElements = getProjectDialogFocusableElements();
+  // The create-workspace surface behaves as a lightweight modal; keep tab focus
+  // inside it until the user cancels or creates the workspace.
+  const focusableElements = getWorkspaceDialogFocusableElements();
   const firstElement = focusableElements[0];
   const lastElement = focusableElements.at(-1);
 
@@ -4799,9 +4801,9 @@ projectCreateDialogTarget?.addEventListener('keydown', (event) => {
   }
 });
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && projectCreationState.status !== 'closed') {
+  if (event.key === 'Escape' && workspaceCreationState.status !== 'closed') {
     event.preventDefault();
-    closeProjectCreateDialog();
+    closeWorkspaceCreateDialog();
   }
 });
 document.addEventListener('keydown', handleGlobalTreeKeyDown);
@@ -4822,15 +4824,15 @@ settingsResetCodexButton?.addEventListener('click', () => {
   void resetCodexPath();
 });
 
-createProjectButton?.addEventListener('click', () => {
-  void createProject();
+createWorkspaceButton?.addEventListener('click', () => {
+  void createWorkspace();
 });
 
 expandAllButton?.addEventListener('click', expandAllFolders);
 collapseAllButton?.addEventListener('click', collapseAllFolders);
 contextPackagePrimaryButton?.addEventListener('click', handleContextPackagePrimary);
 overviewGenerateContextButton?.addEventListener('click', () => {
-  openProjectContextPackageWorkflow();
+  openWorkspaceContextPackageWorkflow();
 });
 contextPackageSecondaryButton?.addEventListener('click', () => {
   closeActiveWorkflow();

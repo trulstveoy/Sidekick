@@ -39,14 +39,14 @@ const sha256 = (value: string | Buffer) => createHash('sha256').update(value).di
 
 const assertTranscriptionRelativePath = (relativePath: string) => {
   if (!relativePath || path.isAbsolute(relativePath)) {
-    throw new Error('A project-relative transcription path is required.');
+    throw new Error('A workspace-relative transcription path is required.');
   }
 
   const normalized = path.normalize(relativePath);
   const parts = normalized.split(path.sep);
 
   if (parts.includes('..') || parts.includes('')) {
-    throw new Error('The transcription path must stay inside the selected project.');
+    throw new Error('The transcription path must stay inside the selected workspace.');
   }
 
   if (!ALLOWED_TRANSCRIPTION_EXTENSIONS.has(path.extname(relativePath).toLowerCase())) {
@@ -68,11 +68,11 @@ const transcriptionSummaryPath = (rootPath: string, transcriptionRelativePath: s
 
 const relativePathFromRoot = (rootPath: string, candidatePath: string) => {
   if (!path.isAbsolute(rootPath) || !path.isAbsolute(candidatePath)) {
-    throw new Error('Absolute project and transcription paths are required.');
+    throw new Error('Absolute workspace and transcription paths are required.');
   }
 
   if (!isPathInside(rootPath, candidatePath)) {
-    throw new Error('The transcription must be inside the selected project.');
+    throw new Error('The transcription must be inside the selected workspace.');
   }
 
   return assertTranscriptionRelativePath(path.relative(rootPath, candidatePath));

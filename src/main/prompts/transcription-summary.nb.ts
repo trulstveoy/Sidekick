@@ -3,7 +3,7 @@ Du skal lage et kort, presist samtalesammendrag på norsk bokmål.
 
 Kontekst:
 - Filnavn: ${transcriptionFileName}
-- Innholdet under er en transkripsjon importert til et Sidekick-prosjekt.
+- Innholdet under er en transkripsjon importert til et Sidekick-arbeidsområde.
 
 Krav:
 - Svar kun med Markdown.

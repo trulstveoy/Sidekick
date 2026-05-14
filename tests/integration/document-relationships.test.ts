@@ -50,8 +50,8 @@ process.exit(2);
   };
 };
 
-const createProjectRoot = async () => {
-  const rootPath = await mkdtemp(path.join(os.tmpdir(), 'sidekick-relationships-project-'));
+const createWorkspaceRoot = async () => {
+  const rootPath = await mkdtemp(path.join(os.tmpdir(), 'sidekick-relationships-workspace-'));
   tempRoots.push(rootPath);
   await writeFile(path.join(rootPath, 'strategi.md'), '# Strategi\n\nMålbilde og retning.', 'utf8');
   await writeFile(
@@ -70,8 +70,8 @@ describe('document relationships generation integration', () => {
 
   it('generates relationship markdown through a Codex-compatible executable', async () => {
     const fake = await createFakeCodex();
-    const contextPackagePath = path.join(fake.rootPath, 'project.context-package.md');
-    await writeFile(contextPackagePath, '# File Summary\n\nProject contents', 'utf8');
+    const contextPackagePath = path.join(fake.rootPath, 'workspace.context-package.md');
+    await writeFile(contextPackagePath, '# File Summary\n\nWorkspace contents', 'utf8');
     const runner = new CodexRunner(fake.executablePath);
 
     const markdown = await generateDocumentRelationshipsMarkdown({
@@ -84,9 +84,9 @@ describe('document relationships generation integration', () => {
     expect(markdown).toContain('Confidence: høy');
   });
 
-  it('writes a relationship report after generating fresh project context', async () => {
+  it('writes a relationship report after generating fresh workspace context', async () => {
     const fake = await createFakeCodex();
-    const rootPath = await createProjectRoot();
+    const rootPath = await createWorkspaceRoot();
     const runner = new CodexRunner(fake.executablePath);
 
     const result = await generateDocumentRelationships({
@@ -97,14 +97,14 @@ describe('document relationships generation integration', () => {
 
     expect(result.status).toBe('complete');
     expect(result.report?.relationshipMap).toContain('Confidence: høy');
-    expect(result.contextPackage?.scope).toBe('project');
-    expect(result.contextPackage?.projectSummary).toBeUndefined();
-    expect(reportMarkdown).toContain('source_model: physical-project-folder');
+    expect(result.contextPackage?.scope).toBe('workspace');
+    expect(result.contextPackage?.workspaceSummary).toBeUndefined();
+    expect(reportMarkdown).toContain('source_model: physical-workspace');
     expect(reportMarkdown).toContain('context_package_sha256:');
   });
 
   it('fails without writing a report when the fresh context package is too large', async () => {
-    const rootPath = await createProjectRoot();
+    const rootPath = await createWorkspaceRoot();
 
     const result = await generateDocumentRelationships({
       rootPath,
@@ -120,8 +120,8 @@ describe('document relationships generation integration', () => {
 
   it('fails when Codex is not logged in', async () => {
     const fake = await createFakeCodex('logged-out');
-    const contextPackagePath = path.join(fake.rootPath, 'project.context-package.md');
-    await writeFile(contextPackagePath, '# File Summary\n\nProject contents', 'utf8');
+    const contextPackagePath = path.join(fake.rootPath, 'workspace.context-package.md');
+    await writeFile(contextPackagePath, '# File Summary\n\nWorkspace contents', 'utf8');
     const runner = new CodexRunner(fake.executablePath);
 
     await expect(
@@ -135,8 +135,8 @@ describe('document relationships generation integration', () => {
 
   it('fails when Codex returns malformed relationship markdown', async () => {
     const fake = await createFakeCodex('malformed');
-    const contextPackagePath = path.join(fake.rootPath, 'project.context-package.md');
-    await writeFile(contextPackagePath, '# File Summary\n\nProject contents', 'utf8');
+    const contextPackagePath = path.join(fake.rootPath, 'workspace.context-package.md');
+    await writeFile(contextPackagePath, '# File Summary\n\nWorkspace contents', 'utf8');
     const runner = new CodexRunner(fake.executablePath);
 
     await expect(

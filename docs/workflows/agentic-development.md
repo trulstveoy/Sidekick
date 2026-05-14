@@ -1181,7 +1181,17 @@ When moving a task to `Ready For Review`, the agent's user-facing handoff must i
 - a short "How to verify" section for the human;
 - confirmation that no merge or closeout has happened yet, unless the human requested otherwise.
 
-The "How to verify" section should be practical and specific. For GUI work, describe the exact flow to run through in the app and what the human should expect to see. For command-line, packaging, or documentation work, give the exact command, file, artifact, or release page to inspect. Keep it short enough to follow while testing.
+The handoff is incomplete without a practical "How to verify" section. Do not rely only on automated test output, and do not make the human infer how to start or inspect the work.
+
+The "How to verify" section must be practical and specific:
+
+- state the exact folder or worktree to run from;
+- state the exact command to start the app, server, CLI, or check;
+- describe the exact app flow, page, dialog, command output, file, artifact, or release page to inspect;
+- describe the expected result in concrete terms;
+- mention any useful cleanup, test data, or safe temporary location when the verification creates files.
+
+For GUI work, describe the exact flow to run through in the app and what the human should expect to see. For command-line, packaging, or documentation work, give the exact command, file, artifact, or release page to inspect. Keep it short enough to follow while testing.
 
 Example:
 
@@ -1189,12 +1199,18 @@ Example:
 Tasken er satt til Ready For Review. Ingen merge eller commit er gjort enda.
 
 How to verify:
-- Start appen fra worktree-et med `npm start`.
-- Velg en prosjektmappe som har én transkripsjonsmappe.
-- Klikk `Velg fil...` under Transkripsjoner og velg en `.md` eller `.txt` fil.
-- Bekreft at forhåndsvisningen viser kildefil, målmappe, nytt filnavn og at dette er en skriveoperasjon.
-- Klikk `Tilbake` og bekreft at ingen fil importeres.
-- Gjenta importen, klikk `Importer fil`, og bekreft at filen dukker opp i mappetreet med riktig `NN. filename`-navn.
+1. Start appen fra riktig arbeidsmappe:
+   `cd /path/to/repo-or-worktree && npm start`
+2. Velg en prosjektmappe som har én transkripsjonsmappe.
+3. Klikk `Velg fil...` under Transkripsjoner og velg en `.md` eller `.txt` fil.
+4. Bekreft at forhåndsvisningen viser kildefil, målmappe, nytt filnavn og at dette er en skriveoperasjon.
+5. Klikk `Tilbake` og bekreft at ingen fil importeres.
+6. Gjenta importen, klikk `Importer fil`, og bekreft at filen dukker opp i mappetreet med riktig `NN. filename`-navn.
+
+Expected result:
+- Importflyten viser korrekt forhåndsvisning før skriving.
+- Avbrutt import oppretter ingen fil.
+- Bekreftet import oppretter filen i riktig mappe og oppdaterer mappetreet.
 ```
 
 ### Completion Checklist
@@ -1202,8 +1218,10 @@ How to verify:
 - [ ] Build Log is current.
 - [ ] Verification Log is current.
 - [ ] Review Notes contain the agent's self-review.
-- [ ] Human has been told exactly how to inspect or test the result.
-- [ ] Handoff includes practical expected outcomes for manual verification.
+- [ ] Handoff includes a "How to verify" section.
+- [ ] "How to verify" includes exact folder/worktree and exact start or inspection command.
+- [ ] "How to verify" includes the concrete UI flow, command output, file, or artifact to inspect.
+- [ ] "How to verify" includes practical expected outcomes for manual verification.
 - [ ] Task status moved to `Ready For Review`.
 
 ## Phase 7: Review

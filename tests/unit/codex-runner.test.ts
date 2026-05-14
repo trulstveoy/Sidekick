@@ -30,7 +30,7 @@ describe('codex runner helpers', () => {
   });
 
   it('builds read-only exec args without placing the prompt in argv', () => {
-    const args = buildCodexExecArgs('/tmp/project', 'read-only');
+    const args = buildCodexExecArgs('/tmp/workspace', 'read-only');
 
     expect(args).toEqual([
       'exec',
@@ -38,7 +38,7 @@ describe('codex runner helpers', () => {
       '--ephemeral',
       '--skip-git-repo-check',
       '--cd',
-      '/tmp/project',
+      '/tmp/workspace',
       '--sandbox',
       'read-only',
       '-',
@@ -47,7 +47,7 @@ describe('codex runner helpers', () => {
   });
 
   it('builds workspace-write exec args', () => {
-    const args = buildCodexExecArgs('/tmp/project', 'workspace-write');
+    const args = buildCodexExecArgs('/tmp/workspace', 'workspace-write');
 
     expect(args).toContain('workspace-write');
     expect(args).not.toContain('danger-full-access');

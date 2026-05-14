@@ -10,8 +10,8 @@ import { calculateFileSha256, generateContextPackage } from './context-package';
 import {
   getSidekickMetadataPath,
   parseMarkdownSections,
-  toProjectRelativePath,
-} from './project-info';
+  toWorkspaceRelativePath,
+} from './workspace-info';
 import { DOCUMENT_RELATIONSHIPS_PROMPT_NB } from './prompts/document-relationships.nb';
 
 export const DOCUMENT_RELATIONSHIPS_FILE_NAME = 'document-relationships.md';
@@ -121,8 +121,8 @@ const createFrontMatter = ({
   '---',
   `sidekick_schema: ${DOCUMENT_RELATIONSHIPS_SCHEMA}`,
   `generated_at: ${generatedAt}`,
-  'source_scope: full-project',
-  'source_model: physical-project-folder',
+  'source_scope: full-workspace',
+  'source_model: physical-workspace',
   `context_package_path: ${contextPackagePath}`,
   `context_package_sha256: ${contextPackageSha256}`,
   'summary_language: nb',
@@ -138,7 +138,7 @@ export const createDocumentRelationshipsMarkdown = ({
   generatedAt = new Date().toISOString(),
 }: DocumentRelationshipWriteInput) => {
   validateDocumentRelationshipsMarkdown(analysisMarkdown);
-  const relativeContextPackagePath = toProjectRelativePath(rootPath, contextPackagePath);
+  const relativeContextPackagePath = toWorkspaceRelativePath(rootPath, contextPackagePath);
   const normalizedAnalysis = normalizeNewlines(analysisMarkdown).trim();
 
   return [
@@ -153,8 +153,8 @@ export const createDocumentRelationshipsMarkdown = ({
     '',
     '## Source Context',
     '',
-    '- Scope: full-project',
-    '- Source model: physical-project-folder',
+    '- Scope: full-workspace',
+    '- Source model: physical-workspace',
     `- Context package: \`${relativeContextPackagePath}\``,
     `- Generated at: \`${generatedAt}\``,
     `- Context hash: \`${contextPackageSha256}\``,
@@ -178,10 +178,10 @@ export const parseDocumentRelationshipsMarkdown = (
     status: 'complete',
     path: reportPath,
     generatedAt: attributes.get('generated_at'),
-    sourceScope: attributes.get('source_scope') === 'full-project' ? 'full-project' : undefined,
+    sourceScope: attributes.get('source_scope') === 'full-workspace' ? 'full-workspace' : undefined,
     sourceModel:
-      attributes.get('source_model') === 'physical-project-folder'
-        ? 'physical-project-folder'
+      attributes.get('source_model') === 'physical-workspace'
+        ? 'physical-workspace'
         : undefined,
     contextPackagePath: attributes.get('context_package_path'),
     contextPackageSha256: attributes.get('context_package_sha256'),
@@ -295,7 +295,7 @@ export const generateDocumentRelationships = async ({
   try {
     const contextPackage = await generateContextPackage(rootPath, {
       codexRunner,
-      generateProjectSummary: false,
+      generateWorkspaceSummary: false,
     });
     assertContextPackageSize(contextPackage, maxContextPackageTokens);
     const contextPackageSha256 = await calculateFileSha256(contextPackage.outputPath);

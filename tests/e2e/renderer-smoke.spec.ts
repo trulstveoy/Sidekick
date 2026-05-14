@@ -7,11 +7,11 @@ import type {
   DocumentRelationshipsGenerationResult,
   DocumentRelationshipsSnapshot,
   FolderSignal,
-  ProjectCreationResult,
-  ProjectFolderScan,
-  ProjectInfoSnapshot,
-  ProjectInitializationPreview,
-  ProjectInitializationResult,
+  WorkspaceCreationResult,
+  WorkspaceScan,
+  WorkspaceInfoSnapshot,
+  WorkspaceInitializationPreview,
+  WorkspaceInitializationResult,
   TranscriptionSummaryBatchPreview,
   TranscriptionSummaryBatchResult,
   TranscriptionImportPreview,
@@ -70,13 +70,13 @@ const createFolderSignalCounts = () =>
     thematic: 0,
   }) satisfies Record<FolderSignal, number>;
 
-const mockScan: ProjectFolderScan = {
-  rootPath: '/tmp/sidekick-project',
-  rootName: 'sidekick-project',
+const mockScan: WorkspaceScan = {
+  rootPath: '/tmp/sidekick-workspace',
+  rootName: 'sidekick-workspace',
   scannedAt: '2026-05-09T12:00:00.000Z',
   status: 'complete',
   tree: {
-    name: 'sidekick-project',
+    name: 'sidekick-workspace',
     relativePath: '.',
     kind: 'folder',
     children: [
@@ -146,7 +146,7 @@ const mockScan: ProjectFolderScan = {
   warnings: [],
 };
 
-const mockScanWithTextTranscriptions: ProjectFolderScan = {
+const mockScanWithTextTranscriptions: WorkspaceScan = {
   ...mockScan,
   tree: {
     ...mockScan.tree,
@@ -199,27 +199,27 @@ const mockScanWithTextTranscriptions: ProjectFolderScan = {
 };
 
 const mockContextPackagePreview: ContextPackagePreview = {
-  scope: 'project',
-  rootPath: '/tmp/sidekick-project',
-  targetPath: '/tmp/sidekick-project',
+  scope: 'workspace',
+  rootPath: '/tmp/sidekick-workspace',
+  targetPath: '/tmp/sidekick-workspace',
   targetRelativePath: '.',
-  outputPath: '/tmp/sidekick-project/sidekick-project.context-package.md',
-  outputFileName: 'sidekick-project.context-package.md',
+  outputPath: '/tmp/sidekick-workspace/sidekick-workspace.context-package.md',
+  outputFileName: 'sidekick-workspace.context-package.md',
   willOverwrite: true,
   binaryFileWarning:
     'Binary files such as PDF, DOCX, PPTX, images, audio, and video are not included as full text content.',
   selfIgnoreWarning: 'Generated context-package files are ignored during generation.',
 };
 
-const mockProjectInfo: ProjectInfoSnapshot = {
+const mockWorkspaceInfo: WorkspaceInfoSnapshot = {
   status: 'complete',
-  path: '/tmp/sidekick-project/.sidekick/project-info.md',
+  path: '/tmp/sidekick-workspace/.sidekic./workspace-info.md',
   generatedAt: '2026-05-09T12:10:00.000Z',
-  sourceScope: 'full-project',
-  contextPackagePath: './sidekick-project.context-package.md',
+  sourceScope: 'full-workspace',
+  contextPackagePath: './sidekick-workspace.context-package.md',
   contextPackageSha256: 'abc123',
   summaryLanguage: 'nb',
-  projectSummary: 'Prosjektet handler om lokal prosjektforståelse og kontekstpakker.',
+  workspaceSummary: 'Arbeidsområdet handler om lokal arbeidsområdeforståelse og kontekstpakker.',
   participants: '- Sidekick-teamet',
   themes: ['Lokal lagring', 'Kontekstpakker'],
   openQuestions: ['Hvordan skal metadata utvikles?'],
@@ -227,12 +227,12 @@ const mockProjectInfo: ProjectInfoSnapshot = {
 
 const mockContextPackageResult: ContextPackageResult = {
   status: 'complete',
-  scope: 'project',
-  rootPath: '/tmp/sidekick-project',
-  targetPath: '/tmp/sidekick-project',
+  scope: 'workspace',
+  rootPath: '/tmp/sidekick-workspace',
+  targetPath: '/tmp/sidekick-workspace',
   targetRelativePath: '.',
-  outputPath: '/tmp/sidekick-project/sidekick-project.context-package.md',
-  outputFileName: 'sidekick-project.context-package.md',
+  outputPath: '/tmp/sidekick-workspace/sidekick-workspace.context-package.md',
+  outputFileName: 'sidekick-workspace.context-package.md',
   overwritten: true,
   totalFiles: 2,
   totalCharacters: 4096,
@@ -244,9 +244,9 @@ const mockContextPackageResult: ContextPackageResult = {
     { path: '02-transkripsjoner/intervju-01.docx', reason: 'binary-extension' },
   ],
   warnings: [{ path: '03-modeller/model.md', message: 'Suspicious file content detected.' }],
-  projectSummary: {
+  workspaceSummary: {
     status: 'complete',
-    projectInfo: mockProjectInfo,
+    workspaceInfo: mockWorkspaceInfo,
   },
   scan: {
     ...mockScan,
@@ -256,8 +256,8 @@ const mockContextPackageResult: ContextPackageResult = {
       children: [
         ...(mockScan.tree.children ?? []),
         {
-          name: 'sidekick-project.context-package.md',
-          relativePath: 'sidekick-project.context-package.md',
+          name: 'sidekick-workspace.context-package.md',
+          relativePath: 'sidekick-workspace.context-package.md',
           kind: 'file',
           artifactType: 'markdown-text',
           contextHints: [],
@@ -279,14 +279,14 @@ const mockContextPackageResult: ContextPackageResult = {
 
 const mockDocumentRelationships: DocumentRelationshipsSnapshot = {
   status: 'complete',
-  path: '/tmp/sidekick-project/.sidekick/document-relationships.md',
+  path: '/tmp/sidekick-workspace/.sidekick/document-relationships.md',
   generatedAt: '2026-05-09T12:20:00.000Z',
-  sourceScope: 'full-project',
-  sourceModel: 'physical-project-folder',
-  contextPackagePath: './sidekick-project.context-package.md',
+  sourceScope: 'full-workspace',
+  sourceModel: 'physical-workspace',
+  contextPackagePath: './sidekick-workspace.context-package.md',
   contextPackageSha256: 'def456',
   summaryLanguage: 'nb',
-  overview: 'Prosjektet har tydelige koblinger mellom strategiintervjuer og operasjonsmodell.',
+  overview: 'Arbeidsområdet har tydelige koblinger mellom strategiintervjuer og operasjonsmodell.',
   relationshipMap:
     '- Type: tematisk overlapp\n  Dokumenter: intervju-01.txt, operasjonsmodell.md\n  Belegg: Begge omtaler styringsmodell.',
   thematicClusters: '- Styring og ansvar: intervju-01.txt, operasjonsmodell.md',
@@ -295,7 +295,7 @@ const mockDocumentRelationships: DocumentRelationshipsSnapshot = {
   lowConfidenceOrMissingEvidence: '- Rollen til ekstern partner bør undersøkes videre.',
   markdown: [
     '## Overview',
-    'Prosjektet har tydelige koblinger mellom strategiintervjuer og operasjonsmodell.',
+    'Arbeidsområdet har tydelige koblinger mellom strategiintervjuer og operasjonsmodell.',
     '## Relationship Map',
     '- Type: tematisk overlapp',
     '## Thematic Clusters',
@@ -314,11 +314,11 @@ const mockDocumentRelationshipsResult: DocumentRelationshipsGenerationResult = {
   report: mockDocumentRelationships,
   contextPackage: {
     ...mockContextPackageResult,
-    projectSummary: undefined,
+    workspaceSummary: undefined,
   },
 };
 
-const mockScanAfterTranscriptionImport: ProjectFolderScan = {
+const mockScanAfterTranscriptionImport: WorkspaceScan = {
   ...mockScan,
   scannedAt: '2026-05-09T12:05:00.000Z',
   tree: {
@@ -355,12 +355,12 @@ const mockScanAfterTranscriptionImport: ProjectFolderScan = {
 
 const mockTranscriptionImportPreview: TranscriptionImportPreview = {
   previewId: 'preview-1',
-  rootPath: '/tmp/sidekick-project',
+  rootPath: '/tmp/sidekick-workspace',
   sourcePath: '/tmp/downloads/new-transcription.md',
   sourceFileName: 'new-transcription.md',
-  targetFolderPath: '/tmp/sidekick-project/02-transkripsjoner',
+  targetFolderPath: '/tmp/sidekick-workspace/02-transkripsjoner',
   targetFolderRelativePath: '02-transkripsjoner',
-  destinationPath: '/tmp/sidekick-project/02-transkripsjoner/00. new-transcription.md',
+  destinationPath: '/tmp/sidekick-workspace/02-transkripsjoner/00. new-transcription.md',
   destinationFileName: '00. new-transcription.md',
   numbering: {
     nextNumber: 0,
@@ -373,12 +373,12 @@ const mockTranscriptionImportPreview: TranscriptionImportPreview = {
 
 const mockTranscriptionImportResult: TranscriptionImportResult = {
   status: 'complete',
-  rootPath: '/tmp/sidekick-project',
+  rootPath: '/tmp/sidekick-workspace',
   sourcePath: '/tmp/downloads/new-transcription.md',
   sourceFileName: 'new-transcription.md',
-  targetFolderPath: '/tmp/sidekick-project/02-transkripsjoner',
+  targetFolderPath: '/tmp/sidekick-workspace/02-transkripsjoner',
   targetFolderRelativePath: '02-transkripsjoner',
-  destinationPath: '/tmp/sidekick-project/02-transkripsjoner/00. new-transcription.md',
+  destinationPath: '/tmp/sidekick-workspace/02-transkripsjoner/00. new-transcription.md',
   destinationFileName: '00. new-transcription.md',
   finalNumber: 0,
   copiedBytes: 1024,
@@ -386,10 +386,10 @@ const mockTranscriptionImportResult: TranscriptionImportResult = {
     status: 'complete',
     summary: {
       status: 'complete',
-      rootPath: '/tmp/sidekick-project',
+      rootPath: '/tmp/sidekick-workspace',
       transcriptionRelativePath: '02-transkripsjoner/00. new-transcription.md',
       summaryRelativePath: '.sidekick/transcription-summaries/test.summary.md',
-      summaryPath: '/tmp/sidekick-project/.sidekick/transcription-summaries/test.summary.md',
+      summaryPath: '/tmp/sidekick-workspace/.sidekick/transcription-summaries/test.summary.md',
       generatedAt: '2026-05-09T12:05:30.000Z',
       transcriptionSha256: 'old',
       currentTranscriptionSha256: 'old',
@@ -403,8 +403,8 @@ const mockTranscriptionImportResult: TranscriptionImportResult = {
 
 const mockTranscriptionSummaryBatchPreview: TranscriptionSummaryBatchPreview = {
   previewId: 'summary-batch-1',
-  rootPath: '/tmp/sidekick-project',
-  targetFolderPath: '/tmp/sidekick-project/02-transkripsjoner',
+  rootPath: '/tmp/sidekick-workspace',
+  targetFolderPath: '/tmp/sidekick-workspace/02-transkripsjoner',
   targetFolderRelativePath: '02-transkripsjoner',
   counts: {
     total: 3,
@@ -440,8 +440,8 @@ const mockTranscriptionSummaryBatchPreview: TranscriptionSummaryBatchPreview = {
 
 const mockTranscriptionSummaryBatchResult: TranscriptionSummaryBatchResult = {
   status: 'complete',
-  rootPath: '/tmp/sidekick-project',
-  targetFolderPath: '/tmp/sidekick-project/02-transkripsjoner',
+  rootPath: '/tmp/sidekick-workspace',
+  targetFolderPath: '/tmp/sidekick-workspace/02-transkripsjoner',
   targetFolderRelativePath: '02-transkripsjoner',
   counts: {
     total: 3,
@@ -457,10 +457,10 @@ const mockTranscriptionSummaryBatchResult: TranscriptionSummaryBatchResult = {
       status: 'generated',
       summary: {
         status: 'complete',
-        rootPath: '/tmp/sidekick-project',
+        rootPath: '/tmp/sidekick-workspace',
         transcriptionRelativePath: '02-transkripsjoner/00. interview.md',
         summaryRelativePath: '.sidekick/transcription-summaries/interview.summary.md',
-        summaryPath: '/tmp/sidekick-project/.sidekick/transcription-summaries/interview.summary.md',
+        summaryPath: '/tmp/sidekick-workspace/.sidekick/transcription-summaries/interview.summary.md',
         generatedAt: '2026-05-09T12:15:00.000Z',
         transcriptionSha256: 'new',
         currentTranscriptionSha256: 'new',
@@ -484,28 +484,33 @@ const mockTranscriptionSummaryBatchResult: TranscriptionSummaryBatchResult = {
   scan: mockScanWithTextTranscriptions,
 };
 
-const mockProjectCreationResult: ProjectCreationResult = {
-  rootPath: '/tmp/new-sidekick-project',
-  rootName: 'new-sidekick-project',
+const mockWorkspaceCreationResult: WorkspaceCreationResult = {
+  rootPath: '/tmp/new-sidekick-workspace',
+  rootName: 'new-sidekick-workspace',
   requiredFolders: [
     {
       name: '00. Forutsetninger',
-      path: '/tmp/new-sidekick-project/00. Forutsetninger',
+      path: '/tmp/new-sidekick-workspace/00. Forutsetninger',
       status: 'created',
     },
     {
-      name: '01. Transkripsjoner',
-      path: '/tmp/new-sidekick-project/01. Transkripsjoner',
+      name: '01. Notater',
+      path: '/tmp/new-sidekick-workspace/01. Notater',
+      status: 'created',
+    },
+    {
+      name: '02. Transkripsjoner',
+      path: '/tmp/new-sidekick-workspace/02. Transkripsjoner',
       status: 'created',
     },
   ],
   scan: {
     ...mockScan,
-    rootPath: '/tmp/new-sidekick-project',
-    rootName: 'new-sidekick-project',
+    rootPath: '/tmp/new-sidekick-workspace',
+    rootName: 'new-sidekick-workspace',
     tree: {
       ...mockScan.tree,
-      name: 'new-sidekick-project',
+      name: 'new-sidekick-workspace',
       children: [
         {
           name: '00. Forutsetninger',
@@ -517,8 +522,17 @@ const mockProjectCreationResult: ProjectCreationResult = {
           modifiedAt: '2026-05-09T12:00:00.000Z',
         },
         {
-          name: '01. Transkripsjoner',
-          relativePath: '01. Transkripsjoner',
+          name: '01. Notater',
+          relativePath: '01. Notater',
+          kind: 'folder',
+          children: [],
+          folderSignals: [],
+          contextHints: [],
+          modifiedAt: '2026-05-09T12:00:00.000Z',
+        },
+        {
+          name: '02. Transkripsjoner',
+          relativePath: '02. Transkripsjoner',
           kind: 'folder',
           children: [],
           folderSignals: ['transcript'],
@@ -530,26 +544,31 @@ const mockProjectCreationResult: ProjectCreationResult = {
     summary: {
       ...mockScan.summary,
       fileCount: 0,
-      folderCount: 2,
+      folderCount: 3,
       recentFiles: [],
     },
   },
 };
 
-const mockProjectInitializationPreview: ProjectInitializationPreview = {
+const mockWorkspaceInitializationPreview: WorkspaceInitializationPreview = {
   previewId: 'init-preview',
-  rootPath: '/tmp/existing-sidekick-project',
-  rootName: 'existing-sidekick-project',
+  rootPath: '/tmp/existing-sidekick-workspace',
+  rootName: 'existing-sidekick-workspace',
   existingEntryCount: 3,
   requiredFolders: [
     {
       name: '00. Forutsetninger',
-      path: '/tmp/existing-sidekick-project/00. Forutsetninger',
+      path: '/tmp/existing-sidekick-workspace/00. Forutsetninger',
       status: 'existing',
     },
     {
-      name: '01. Transkripsjoner',
-      path: '/tmp/existing-sidekick-project/01. Transkripsjoner',
+      name: '01. Notater',
+      path: '/tmp/existing-sidekick-workspace/01. Notater',
+      status: 'missing',
+    },
+    {
+      name: '02. Transkripsjoner',
+      path: '/tmp/existing-sidekick-workspace/02. Transkripsjoner',
       status: 'missing',
     },
   ],
@@ -557,39 +576,44 @@ const mockProjectInitializationPreview: ProjectInitializationPreview = {
     {
       path: '01. Transkriberinger',
       message:
-        'This folder looks similar to a required project folder, but Sidekick requires the exact folder name.',
+        'This folder looks similar to a required workspace, but Sidekick requires the exact folder name.',
     },
   ],
 };
 
-const mockProjectInitializationResult: ProjectInitializationResult = {
+const mockWorkspaceInitializationResult: WorkspaceInitializationResult = {
   status: 'complete',
-  rootPath: '/tmp/existing-sidekick-project',
-  rootName: 'existing-sidekick-project',
+  rootPath: '/tmp/existing-sidekick-workspace',
+  rootName: 'existing-sidekick-workspace',
   requiredFolders: [
     {
       name: '00. Forutsetninger',
-      path: '/tmp/existing-sidekick-project/00. Forutsetninger',
+      path: '/tmp/existing-sidekick-workspace/00. Forutsetninger',
       status: 'existing',
     },
     {
-      name: '01. Transkripsjoner',
-      path: '/tmp/existing-sidekick-project/01. Transkripsjoner',
+      name: '01. Notater',
+      path: '/tmp/existing-sidekick-workspace/01. Notater',
+      status: 'created',
+    },
+    {
+      name: '02. Transkripsjoner',
+      path: '/tmp/existing-sidekick-workspace/02. Transkripsjoner',
       status: 'created',
     },
   ],
   scan: {
-    ...mockProjectCreationResult.scan,
-    rootPath: '/tmp/existing-sidekick-project',
-    rootName: 'existing-sidekick-project',
+    ...mockWorkspaceCreationResult.scan,
+    rootPath: '/tmp/existing-sidekick-workspace',
+    rootName: 'existing-sidekick-workspace',
     tree: {
-      ...mockProjectCreationResult.scan.tree,
-      name: 'existing-sidekick-project',
+      ...mockWorkspaceCreationResult.scan.tree,
+      name: 'existing-sidekick-workspace',
     },
   },
 };
 
-const mockPartialScan: ProjectFolderScan = {
+const mockPartialScan: WorkspaceScan = {
   ...mockScan,
   status: 'partial',
   warnings: [
@@ -609,7 +633,7 @@ const mockPartialScan: ProjectFolderScan = {
   },
 };
 
-const mockDeepScan: ProjectFolderScan = {
+const mockDeepScan: WorkspaceScan = {
   ...mockScan,
   tree: {
     ...mockScan.tree,
@@ -650,12 +674,12 @@ const mockDeepScan: ProjectFolderScan = {
   },
 };
 
-const mockEmptyScan: ProjectFolderScan = {
+const mockEmptyScan: WorkspaceScan = {
   ...mockScan,
-  rootPath: '/tmp/empty-sidekick-project',
-  rootName: 'empty-sidekick-project',
+  rootPath: '/tmp/empty-sidekick-workspace',
+  rootName: 'empty-sidekick-workspace',
   tree: {
-    name: 'empty-sidekick-project',
+    name: 'empty-sidekick-workspace',
     relativePath: '.',
     kind: 'folder',
     children: [],
@@ -698,20 +722,20 @@ test('renders the folder inspection empty state', async ({ page }) => {
   await expect(page.locator('[data-action-bar]')).toBeHidden();
   await expect(page.locator('[data-status-bar]')).toBeVisible();
   await expect(page.locator('.app-brand__name')).toHaveText('Sidekick');
-  await expect(page.getByRole('heading', { name: 'Velg en prosjektmappe' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Velg eksisterende mappe...' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Opprett ny prosjektmappe...' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Velg et arbeidsområde' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Opprett nytt arbeidsområde...' })).toBeVisible();
   await expect(
-    page.getByLabel('Valgt prosjektmappe').getByRole('heading', {
-      name: 'Ingen prosjektmappe valgt',
+    page.getByLabel('Valgt arbeidsområde').getByRole('heading', {
+      name: 'Ingen arbeidsområde valgt',
     }),
   ).toBeVisible();
   await expect(page.getByText('Browser preview')).toBeVisible();
 });
 
-test('creates a project and displays the required folders', async ({ page }) => {
+test('creates a workspace and displays the required folders', async ({ page }) => {
   await page.addInitScript(
-    ({ createdProject }) => {
+    ({ createdWorkspace }) => {
       window.sidekick = {
         getAppInfo: async () => ({
           name: 'Sidekick',
@@ -719,11 +743,11 @@ test('creates a project and displays the required folders', async ({ page }) => 
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => null,
-        chooseProjectParentFolder: async () => '/tmp',
-        createProjectFolder: async (request) =>
-          request.projectName === 'new-sidekick-project' && request.parentPath === '/tmp'
-            ? createdProject
+        chooseWorkspaceFolder: async () => null,
+        chooseWorkspaceParentFolder: async () => '/tmp',
+        createWorkspaceFolder: async (request) =>
+          request.workspaceName === 'new-sidekick-workspace' && request.parentPath === '/tmp'
+            ? createdWorkspace
             : null,
         previewContextPackage: async () => {
           throw new Error('No context package preview.');
@@ -749,32 +773,35 @@ test('creates a project and displays the required folders', async ({ page }) => 
       };
     },
     {
-      createdProject: mockProjectCreationResult,
+      createdWorkspace: mockWorkspaceCreationResult,
     },
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Opprett ny prosjektmappe...' }).click();
-  await expect(page.getByRole('dialog', { name: 'Opprett ny prosjektmappe' })).toBeVisible();
-  await expect(page.getByLabel('Prosjektnavn')).toBeFocused();
-  await expect(page.getByText('Prosjektnavn er påkrevd.')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Opprett nytt arbeidsområde...' }).click();
+  await expect(page.getByRole('dialog', { name: 'Opprett nytt arbeidsområde' })).toBeVisible();
+  await expect(page.getByLabel('Arbeidsområdenavn')).toBeFocused();
+  await expect(page.getByText('Arbeidsområdenavn er påkrevd.')).toHaveCount(0);
   await page.getByRole('button', { name: 'Avbryt' }).focus();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Lukk' })).toBeFocused();
-  await page.getByLabel('Prosjektnavn').focus();
-  await page.getByLabel('Prosjektnavn').fill('new-sidekick-project');
+  await page.getByLabel('Arbeidsområdenavn').focus();
+  await page.getByLabel('Arbeidsområdenavn').fill('new-sidekick-workspace');
   await page.getByRole('button', { name: 'Velg...' }).click();
-  await expect(page.locator('[data-project-target-preview]')).toContainText(
-    '/tmp/new-sidekick-project',
+  await expect(page.locator('[data-workspace-target-preview]')).toContainText(
+    '/tmp/new-sidekick-workspace',
   );
-  await page.getByRole('button', { name: 'Opprett mappe' }).click();
+  await expect(page.locator('[data-workspace-target-preview]')).toContainText('01. Notater');
+  await expect(page.locator('[data-workspace-target-preview]')).toContainText('02. Transkripsjoner');
+  await page.getByRole('button', { name: 'Opprett arbeidsområde' }).click();
 
-  await expect(page.getByLabel('Valgt prosjektmappe').getByRole('heading')).toHaveText(
-    'new-sidekick-project',
+  await expect(page.getByLabel('Valgt arbeidsområde').getByRole('heading')).toHaveText(
+    'new-sidekick-workspace',
   );
-  await expect(page.getByLabel('Valgt prosjektmappe')).toContainText('/tmp/new-sidekick-project');
+  await expect(page.getByLabel('Valgt arbeidsområde')).toContainText('/tmp/new-sidekick-workspace');
   await expect(page.getByRole('treeitem', { name: /00. Forutsetninger/ })).toBeVisible();
-  await expect(page.getByRole('treeitem', { name: /01. Transkripsjoner/ })).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /01. Notater/ })).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /02. Transkripsjoner/ })).toBeVisible();
   await expect(page.locator('[data-workflow-panel="codex"]')).toContainText('codex-cli 0.130.0-test');
 });
 
@@ -788,11 +815,11 @@ test('initializes an existing folder after preview confirmation', async ({ page 
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => null,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
-        chooseProjectFolderForInitialization: async () => preview,
-        confirmProjectInitialization: async (previewId) => {
+        chooseWorkspaceFolder: async () => null,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
+        chooseWorkspaceFolderForInitialization: async () => preview,
+        confirmWorkspaceInitialization: async (previewId) => {
           if (previewId !== preview.previewId) {
             throw new Error('Unexpected preview id.');
           }
@@ -823,35 +850,36 @@ test('initializes an existing folder after preview confirmation', async ({ page 
       };
     },
     {
-      preview: mockProjectInitializationPreview,
-      result: mockProjectInitializationResult,
+      preview: mockWorkspaceInitializationPreview,
+      result: mockWorkspaceInitializationResult,
     },
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Initialiser eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Initialiser eksisterende arbeidsområde...' }).click();
 
-  await expect(page.locator('[data-project-initialization-panel]')).toBeVisible();
-  await expect(page.locator('[data-project-initialization-details]')).toContainText(
-    '/tmp/existing-sidekick-project',
+  await expect(page.locator('[data-workspace-initialization-panel]')).toBeVisible();
+  await expect(page.locator('[data-workspace-initialization-details]')).toContainText(
+    '/tmp/existing-sidekick-workspace',
   );
-  await expect(page.locator('[data-project-initialization-details]')).toContainText(
-    '01. Transkripsjoner',
+  await expect(page.locator('[data-workspace-initialization-details]')).toContainText(
+    '02. Transkripsjoner',
   );
-  await expect(page.locator('[data-project-initialization-warnings]')).toContainText(
+  await expect(page.locator('[data-workspace-initialization-warnings]')).toContainText(
     '01. Transkriberinger',
   );
 
   await page.getByRole('button', { name: 'Opprett manglende mapper' }).click();
 
-  await expect(page.getByLabel('Valgt prosjektmappe').getByRole('heading')).toHaveText(
-    'existing-sidekick-project',
+  await expect(page.getByLabel('Valgt arbeidsområde').getByRole('heading')).toHaveText(
+    'existing-sidekick-workspace',
   );
   await expect(page.getByRole('treeitem', { name: /00. Forutsetninger/ })).toBeVisible();
-  await expect(page.getByRole('treeitem', { name: /01. Transkripsjoner/ })).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /01. Notater/ })).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /02. Transkripsjoner/ })).toBeVisible();
 });
 
-test('validates and cancels the project creation dialog', async ({ page }) => {
+test('validates and cancels the workspace creation dialog', async ({ page }) => {
   await page.addInitScript(() => {
     window.sidekick = {
       getAppInfo: async () => ({
@@ -860,9 +888,9 @@ test('validates and cancels the project creation dialog', async ({ page }) => {
         platform: 'linux',
         isPackaged: false,
       }),
-      chooseProjectFolder: async () => null,
-      chooseProjectParentFolder: async () => null,
-      createProjectFolder: async () => {
+      chooseWorkspaceFolder: async () => null,
+      chooseWorkspaceParentFolder: async () => null,
+      createWorkspaceFolder: async () => {
         throw new Error('Create should not be called.');
       },
       previewContextPackage: async () => {
@@ -890,21 +918,21 @@ test('validates and cancels the project creation dialog', async ({ page }) => {
   });
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Opprett ny prosjektmappe...' }).click();
-  await page.getByLabel('Prosjektnavn').fill('../outside');
+  await page.getByRole('button', { name: 'Opprett nytt arbeidsområde...' }).click();
+  await page.getByLabel('Arbeidsområdenavn').fill('../outside');
 
-  await expect(page.getByText('Prosjektnavnet må være et mappenavn, ikke en sti.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Opprett mappe' })).toBeDisabled();
+  await expect(page.getByText('Arbeidsområdenavnet må være et mappenavn, ikke en sti.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Opprett arbeidsområde' })).toBeDisabled();
 
   await page.getByRole('button', { name: 'Velg...' }).click();
-  await expect(page.locator('[data-project-parent-path]')).toHaveText('Ingen plassering valgt.');
+  await expect(page.locator('[data-workspace-parent-path]')).toHaveText('Ingen plassering valgt.');
 
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: 'Opprett ny prosjektmappe' })).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: 'Velg en prosjektmappe' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Opprett nytt arbeidsområde' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Velg et arbeidsområde' })).toBeVisible();
 });
 
-test('shows a project creation error and keeps the dialog usable', async ({ page }) => {
+test('shows a workspace creation error and keeps the dialog usable', async ({ page }) => {
   await page.addInitScript(() => {
     window.sidekick = {
       getAppInfo: async () => ({
@@ -913,10 +941,10 @@ test('shows a project creation error and keeps the dialog usable', async ({ page
         platform: 'linux',
         isPackaged: false,
       }),
-      chooseProjectFolder: async () => null,
-      chooseProjectParentFolder: async () => '/tmp',
-      createProjectFolder: async () => {
-        throw new Error('Project folder already exists.');
+      chooseWorkspaceFolder: async () => null,
+      chooseWorkspaceParentFolder: async () => '/tmp',
+      createWorkspaceFolder: async () => {
+        throw new Error('Arbeidsområdet finnes allerede.');
       },
       previewContextPackage: async () => {
         throw new Error('No context package preview.');
@@ -943,17 +971,17 @@ test('shows a project creation error and keeps the dialog usable', async ({ page
   });
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Opprett ny prosjektmappe...' }).click();
-  await page.getByLabel('Prosjektnavn').fill('existing-project');
+  await page.getByRole('button', { name: 'Opprett nytt arbeidsområde...' }).click();
+  await page.getByLabel('Arbeidsområdenavn').fill('existing-workspace');
   await page.getByRole('button', { name: 'Velg...' }).click();
-  await page.getByRole('button', { name: 'Opprett mappe' }).click();
+  await page.getByRole('button', { name: 'Opprett arbeidsområde' }).click();
 
-  await expect(page.getByRole('dialog', { name: 'Opprett ny prosjektmappe' })).toBeVisible();
-  await expect(page.getByText('Project folder already exists.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Opprett mappe' })).toBeEnabled();
+  await expect(page.getByRole('dialog', { name: 'Opprett nytt arbeidsområde' })).toBeVisible();
+  await expect(page.getByText('Arbeidsområdet finnes allerede.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Opprett arbeidsområde' })).toBeEnabled();
 });
 
-test('renders the refreshed project overview at minimum viewport', async ({ page }) => {
+test('renders the refreshed workspace overview at minimum viewport', async ({ page }) => {
   await page.setViewportSize({ width: 1040, height: 720 });
   await page.addInitScript(
     ({ scan, preview }) => {
@@ -964,9 +992,9 @@ test('renders the refreshed project overview at minimum viewport', async ({ page
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => {
           throw new Error('No context package result.');
@@ -995,10 +1023,10 @@ test('renders the refreshed project overview at minimum viewport', async ({ page
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
 
-  await expect(page.locator('[data-overview-title]')).toHaveText('Prosjektoversikt');
-  await expect(page.getByLabel('Valgt prosjektmappe')).toContainText('/tmp/sidekick-project');
+  await expect(page.locator('[data-overview-title]')).toHaveText('Arbeidsområdeoversikt');
+  await expect(page.getByLabel('Valgt arbeidsområde')).toContainText('/tmp/sidekick-workspace');
 
   const stats = page.locator('[data-overview-stats]');
   await expect(stats).toContainText('Filer');
@@ -1034,9 +1062,9 @@ test('keeps the refreshed shell balanced at reference viewport', async ({ page }
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => {
           throw new Error('No context package result.');
@@ -1065,7 +1093,7 @@ test('keeps the refreshed shell balanced at reference viewport', async ({ page }
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
 
   const primary = page.locator('[data-primary-workspace]');
   const context = page.locator('[data-context-surface]');
@@ -1096,9 +1124,9 @@ test('shows partial scan status and warnings in the overview', async ({ page }) 
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => {
           throw new Error('No context package result.');
@@ -1130,9 +1158,9 @@ test('shows partial scan status and warnings in the overview', async ({ page }) 
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Prosjektoversikt (delvis)' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Arbeidsområdeoversikt (delvis)' })).toBeVisible();
   await expect(page.locator('[data-selection-details]')).toContainText('Delvis');
   await expect(page.locator('[data-selection-details]')).toContainText('Mangler');
   await expect(page.locator('[data-selection-warnings]')).toContainText(
@@ -1151,7 +1179,7 @@ test('shows partial scan status and warnings in the overview', async ({ page }) 
     .toBe('"!"');
 });
 
-test('shows an empty scanned project as an overview state', async ({ page }) => {
+test('shows an empty scanned workspace as an overview state', async ({ page }) => {
   await page.addInitScript(
     ({ scan, preview }) => {
       window.sidekick = {
@@ -1161,9 +1189,9 @@ test('shows an empty scanned project as an overview state', async ({ page }) => 
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => {
           throw new Error('No context package result.');
@@ -1195,10 +1223,10 @@ test('shows an empty scanned project as an overview state', async ({ page }) => 
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Prosjektmappen er tom' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Velg en prosjektmappe' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Arbeidsområdet er tomt' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Velg et arbeidsområde' })).toHaveCount(0);
   await expect(page.locator('[data-overview-stats]')).toContainText('0');
   await expect(page.locator('[data-selection-details]')).toContainText('Ingen');
 });
@@ -1213,12 +1241,12 @@ test('expands and collapses scanned folders', async ({ page }) => {
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => result,
-        readProjectInfo: async () => result.projectSummary.projectInfo ?? mockProjectInfo,
+        readWorkspaceInfo: async () => result.workspaceSummary.workspaceInfo ?? mockWorkspaceInfo,
         previewTranscriptionImport: async () => null,
         confirmTranscriptionImport: async () => {
           throw new Error('No transcription import preview.');
@@ -1233,10 +1261,10 @@ test('expands and collapses scanned folders', async ({ page }) => {
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
 
   await expect(page.getByRole('tree', { name: 'Skannet mappetre' })).toBeVisible();
-  await expect(page.getByRole('treeitem', { name: /sidekick-project/ })).toBeVisible();
+  await expect(page.getByRole('treeitem', { name: /sidekick-workspace/ })).toBeVisible();
   await expect(page.getByRole('treeitem', { name: /01-bakgrunn/ })).toBeVisible();
   await expect(page.getByText('brief.pdf')).toHaveCount(0);
 
@@ -1259,9 +1287,9 @@ test('expands and collapses all scanned folders', async ({ page }) => {
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => result,
         previewTranscriptionImport: async () => null,
@@ -1278,7 +1306,7 @@ test('expands and collapses all scanned folders', async ({ page }) => {
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
   await page.getByRole('button', { name: 'Utvid alle mapper' }).click();
 
   await expect(page.getByText('brief.pdf')).toBeVisible();
@@ -1300,9 +1328,9 @@ test('selects folders and shows selected folder detail', async ({ page }) => {
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => result,
         previewTranscriptionImport: async () => null,
@@ -1319,7 +1347,7 @@ test('selects folders and shows selected folder detail', async ({ page }) => {
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
   await page.locator('.tree-row[data-tree-path="01-bakgrunn"]').click();
 
   const selectedItem = page.locator('[role="treeitem"][data-tree-path="01-bakgrunn"]');
@@ -1347,9 +1375,9 @@ test('supports keyboard navigation and breadcrumb selection in the folder tree',
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => result,
         previewTranscriptionImport: async () => null,
@@ -1366,7 +1394,7 @@ test('supports keyboard navigation and breadcrumb selection in the folder tree',
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
 
   const rootRow = page.locator('.tree-row[data-tree-path="."]');
   await rootRow.focus();
@@ -1414,9 +1442,9 @@ test('confirms and displays a generated context package', async ({ page }) => {
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => preview,
         generateContextPackage: async () => result,
         previewTranscriptionImport: async () => null,
@@ -1433,11 +1461,11 @@ test('confirms and displays a generated context package', async ({ page }) => {
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
   await page.getByRole('button', { name: 'Generer kontekstpakke' }).click();
 
   await expect(page.getByRole('heading', { name: 'Lag kontekstpakke' })).toBeVisible();
-  await expect(page.locator('[data-selection-title]')).toHaveText('sidekick-project');
+  await expect(page.locator('[data-selection-title]')).toHaveText('sidekick-workspace');
   await expect(page.getByRole('button', { name: 'Importer transkripsjon' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Kjør Codex' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Velg annen mappe...' })).toBeDisabled();
@@ -1450,18 +1478,18 @@ test('confirms and displays a generated context package', async ({ page }) => {
   const contextPackageState = page.locator('[data-context-package-state]');
   const contextPackageDetails = page.locator('[data-context-package-details]');
   await expect(contextPackageState.getByText('Skriveoperasjon')).toBeVisible();
-  await expect(contextPackageDetails).toContainText('sidekick-project.context-package.md');
+  await expect(contextPackageDetails).toContainText('sidekick-workspace.context-package.md');
   await expect(contextPackageDetails).toContainText(
-    '/tmp/sidekick-project/sidekick-project.context-package.md',
+    '/tmp/sidekick-workspace/sidekick-workspace.context-package.md',
   );
   await expect(contextPackageDetails).toContainText('Overskriver');
   await expect(contextPackageDetails).toContainText('Ja');
-  await expect(page.getByText(/erstatter eksisterende sidekick-project.context-package.md/)).toBeVisible();
+  await expect(page.getByText(/erstatter eksisterende sidekick-workspace.context-package.md/)).toBeVisible();
   await expect(page.getByText(/Binary files such as PDF/)).toBeVisible();
   await expect(page.getByText(/Generated context-package files are ignored/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Tilbake' }).click();
-  await expect(page.getByRole('heading', { name: 'Prosjektoversikt' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Arbeidsområdeoversikt' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Generer kontekstpakke' }).click();
   await page.getByRole('button', { name: 'Forhåndsvis' }).click();
@@ -1475,16 +1503,16 @@ test('confirms and displays a generated context package', async ({ page }) => {
   await expect(contextPackageDetails).toContainText('Hoppet over');
   await expect(contextPackageDetails).toContainText('Tokens');
   await expect(contextPackageDetails).toContainText('523');
-  await expect(contextPackageDetails).toContainText('Prosjektsammendrag oppdatert');
+  await expect(contextPackageDetails).toContainText('Arbeidsområdesammendrag oppdatert');
   await expect(page.getByText('01-bakgrunn/brief.pdf: binary-extension')).toBeVisible();
   await expect(page.getByText('03-modeller/model.md: Suspicious file content detected.')).toBeVisible();
   await expect(page.locator('[data-selection-details]')).toContainText('Finnes');
   await page.getByRole('button', { name: 'Tilbake' }).click();
   await expect(
-    page.getByRole('tree', { name: 'Skannet mappetre' }).getByText('sidekick-project.context-package.md'),
+    page.getByRole('tree', { name: 'Skannet mappetre' }).getByText('sidekick-workspace.context-package.md'),
   ).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Prosjektsammendrag' })).toBeVisible();
-  await expect(page.getByText('Prosjektet handler om lokal prosjektforståelse')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Arbeidsområdesammendrag' })).toBeVisible();
+  await expect(page.getByText('Arbeidsområdet handler om lokal arbeidsområdeforståelse')).toBeVisible();
   await expect(page.locator('[data-overview-stats]')).toContainText('4');
 });
 
@@ -1493,7 +1521,7 @@ test('generates and displays document relationship reports', async ({ page }) =>
     ({ scan, contextPreview, contextResult, relationshipResult }) => {
       let relationshipSnapshot: DocumentRelationshipsSnapshot = {
         status: 'missing',
-        path: '/tmp/sidekick-project/.sidekick/document-relationships.md',
+        path: '/tmp/sidekick-workspace/.sidekick/document-relationships.md',
       };
 
       window.sidekick = {
@@ -1503,9 +1531,9 @@ test('generates and displays document relationship reports', async ({ page }) =>
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => contextPreview,
         generateContextPackage: async () => contextResult,
         readDocumentRelationships: async () => relationshipSnapshot,
@@ -1540,7 +1568,7 @@ test('generates and displays document relationship reports', async ({ page }) =>
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
 
   await expect(page.locator('[data-selection-details]')).toContainText('Sammenhenger');
   await expect(page.locator('[data-selection-details]')).toContainText('Mangler');
@@ -1548,7 +1576,7 @@ test('generates and displays document relationship reports', async ({ page }) =>
 
   const relationshipPanel = page.locator('[data-workflow-panel="document-relationships"]');
   await expect(relationshipPanel.getByRole('heading', { name: 'Finn sammenhenger' })).toBeVisible();
-  await expect(relationshipPanel).toContainText('Hele valgt prosjektmappe');
+  await expect(relationshipPanel).toContainText('Hele valgt arbeidsområde');
   await relationshipPanel.locator('[data-document-relationships-primary]').click();
 
   await expect(
@@ -1579,14 +1607,14 @@ test('shows no-write feedback when document relationship analysis fails', async 
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => contextPreview,
         generateContextPackage: async () => contextResult,
         readDocumentRelationships: async () => ({
           status: 'missing',
-          path: '/tmp/sidekick-project/.sidekick/document-relationships.md',
+          path: '/tmp/sidekick-workspace/.sidekick/document-relationships.md',
         }),
         generateDocumentRelationships: async () => ({
           status: 'failed',
@@ -1606,7 +1634,7 @@ test('shows no-write feedback when document relationship analysis fails', async 
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
   await page.locator('[data-overview-action-document-relationships]').click();
 
   const relationshipPanel = page.locator('[data-workflow-panel="document-relationships"]');
@@ -1622,18 +1650,18 @@ test('generates a folder-scoped context package from selected folder context', a
   const folderPreview: ContextPackagePreview = {
     ...mockContextPackagePreview,
     scope: 'folder',
-    targetPath: '/tmp/sidekick-project/02-transkripsjoner',
+    targetPath: '/tmp/sidekick-workspace/02-transkripsjoner',
     targetRelativePath: '02-transkripsjoner',
-    outputPath: '/tmp/sidekick-project/02-transkripsjoner/transkripsjoner.context-package.md',
+    outputPath: '/tmp/sidekick-workspace/02-transkripsjoner/transkripsjoner.context-package.md',
     outputFileName: 'transkripsjoner.context-package.md',
     willOverwrite: false,
   };
   const folderResult: ContextPackageResult = {
     ...mockContextPackageResult,
     scope: 'folder',
-    targetPath: '/tmp/sidekick-project/02-transkripsjoner',
+    targetPath: '/tmp/sidekick-workspace/02-transkripsjoner',
     targetRelativePath: '02-transkripsjoner',
-    outputPath: '/tmp/sidekick-project/02-transkripsjoner/transkripsjoner.context-package.md',
+    outputPath: '/tmp/sidekick-workspace/02-transkripsjoner/transkripsjoner.context-package.md',
     outputFileName: 'transkripsjoner.context-package.md',
     overwritten: false,
     scan: {
@@ -1672,9 +1700,9 @@ test('generates a folder-scoped context package from selected folder context', a
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => {
           throw new Error('Use folder preview in this test.');
         },
@@ -1697,7 +1725,7 @@ test('generates a folder-scoped context package from selected folder context', a
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
   await page.locator('.tree-row[data-tree-path="02-transkripsjoner"]').click();
 
   await expect(page.locator('[data-selection-title]')).toHaveText('02-transkripsjoner');
@@ -1715,7 +1743,7 @@ test('generates a folder-scoped context package from selected folder context', a
   await expect(contextPackageDetails).toContainText('02-transkripsjoner');
   await expect(contextPackageDetails).toContainText('transkripsjoner.context-package.md');
   await expect(contextPackageDetails).toContainText(
-    '/tmp/sidekick-project/02-transkripsjoner/transkripsjoner.context-package.md',
+    '/tmp/sidekick-workspace/02-transkripsjoner/transkripsjoner.context-package.md',
   );
   await expect(page.getByText(/Sidekick skriver én Markdown-fil til valgt mappe/)).toBeVisible();
 
@@ -1737,9 +1765,9 @@ test('shows folder-scoped context package action only for non-root folders', asy
         platform: 'linux',
         isPackaged: false,
       }),
-      chooseProjectFolder: async () => scan,
-      chooseProjectParentFolder: async () => null,
-      createProjectFolder: async () => null,
+      chooseWorkspaceFolder: async () => scan,
+      chooseWorkspaceParentFolder: async () => null,
+      createWorkspaceFolder: async () => null,
       previewContextPackage: async () => {
         throw new Error('No context package preview.');
       },
@@ -1754,7 +1782,7 @@ test('shows folder-scoped context package action only for non-root folders', asy
   }, { scan: mockScan });
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
 
   await expect(
     page.getByRole('button', { name: 'Generer kontekstpakke for denne mappen' }),
@@ -1782,9 +1810,9 @@ test('generates missing transcription summaries from the transcription folder ac
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => {
           throw new Error('No context package preview.');
         },
@@ -1807,7 +1835,7 @@ test('generates missing transcription summaries from the transcription folder ac
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
   await page.locator('.tree-row[data-tree-path="02-transkripsjoner"]').click();
 
   await expect(page.getByRole('button', { name: 'Generer manglende sammendrag' })).toBeVisible();
@@ -1843,11 +1871,11 @@ test('shows no-write feedback when context package preview fails', async ({ page
         platform: 'linux',
         isPackaged: false,
       }),
-      chooseProjectFolder: async () => scan,
-      chooseProjectParentFolder: async () => null,
-      createProjectFolder: async () => null,
+      chooseWorkspaceFolder: async () => scan,
+      chooseWorkspaceParentFolder: async () => null,
+      createWorkspaceFolder: async () => null,
       previewContextPackage: async () => {
-        throw new Error('Project folder path must point to a directory.');
+        throw new Error('Workspace path must point to a directory.');
       },
       generateContextPackage: async () => {
         throw new Error('No context package result.');
@@ -1860,14 +1888,14 @@ test('shows no-write feedback when context package preview fails', async ({ page
   }, { scan: mockScan });
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
   await page.getByRole('button', { name: 'Generer kontekstpakke' }).click();
   await page.getByRole('button', { name: 'Forhåndsvis' }).click();
 
   await expect(
     page.getByRole('heading', { name: 'Kontekstpakke kan ikke forberedes' }),
   ).toBeVisible();
-  await expect(page.getByText('Project folder path must point to a directory.')).toBeVisible();
+  await expect(page.getByText('Workspace path must point to a directory.')).toBeVisible();
   await expect(page.getByText('Ingen fil ble skrevet')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Prøv igjen' })).toBeEnabled();
 });
@@ -1882,9 +1910,9 @@ test('confirms and displays an imported transcription', async ({ page }) => {
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => contextPreview,
         generateContextPackage: async () => contextResult,
         previewTranscriptionImport: async () => importPreview,
@@ -1902,7 +1930,7 @@ test('confirms and displays an imported transcription', async ({ page }) => {
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
   await page.getByRole('button', { name: 'Importer transkripsjon' }).click();
 
   await expect(page.getByRole('button', { name: 'Velg fil...' })).toBeEnabled();
@@ -1919,7 +1947,7 @@ test('confirms and displays an imported transcription', async ({ page }) => {
   await expect(page.getByText(/Ingen andre filer endres/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Tilbake' }).click();
-  await expect(page.getByRole('heading', { name: 'Prosjektoversikt' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Arbeidsområdeoversikt' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Importer transkripsjon' }).click();
   await page.getByRole('button', { name: 'Velg fil...' }).click();
@@ -1951,9 +1979,9 @@ test('keeps the transcript import ready state when file selection is cancelled',
         platform: 'linux',
         isPackaged: false,
       }),
-      chooseProjectFolder: async () => scan,
-      chooseProjectParentFolder: async () => null,
-      createProjectFolder: async () => null,
+      chooseWorkspaceFolder: async () => scan,
+      chooseWorkspaceParentFolder: async () => null,
+      createWorkspaceFolder: async () => null,
       previewContextPackage: async () => contextPreview,
       generateContextPackage: async () => contextResult,
       previewTranscriptionImport: async () => null,
@@ -1968,7 +1996,7 @@ test('keeps the transcript import ready state when file selection is cancelled',
   });
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
   await page.getByRole('button', { name: 'Importer transkripsjon' }).click();
   await page.getByRole('button', { name: 'Velg fil...' }).click();
 
@@ -1986,15 +2014,15 @@ test('shows no-change feedback when transcript import preview fails', async ({ p
         platform: 'linux',
         isPackaged: false,
       }),
-      chooseProjectFolder: async () => scan,
-      chooseProjectParentFolder: async () => null,
-      createProjectFolder: async () => null,
+      chooseWorkspaceFolder: async () => scan,
+      chooseWorkspaceParentFolder: async () => null,
+      createWorkspaceFolder: async () => null,
       previewContextPackage: async () => {
         return contextPreview;
       },
       generateContextPackage: async () => contextResult,
       previewTranscriptionImport: async () => {
-        throw new Error('No transcription folder was detected in this project.');
+        throw new Error('No transcription folder was detected in this workspace.');
       },
       confirmTranscriptionImport: async () => {
         throw new Error('No transcription import preview.');
@@ -2007,12 +2035,12 @@ test('shows no-change feedback when transcript import preview fails', async ({ p
   });
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
   await page.getByRole('button', { name: 'Importer transkripsjon' }).click();
   await page.getByRole('button', { name: 'Velg fil...' }).click();
 
   await expect(page.getByRole('heading', { name: 'Importen kan ikke fullføres' })).toBeVisible();
-  await expect(page.getByText('No transcription folder was detected in this project.')).toBeVisible();
+  await expect(page.getByText('No transcription folder was detected in this workspace.')).toBeVisible();
   await expect(page.getByText('Ingen filer ble endret')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Prøv igjen' })).toBeEnabled();
 });
@@ -2027,9 +2055,9 @@ test('operates refreshed workflow controls from keyboard focus', async ({ page }
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => contextPreview,
         generateContextPackage: async () => contextResult,
         previewTranscriptionImport: async () => importPreview,
@@ -2057,7 +2085,7 @@ test('operates refreshed workflow controls from keyboard focus', async ({ page }
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
 
   const contextAction = page.locator('[data-overview-action-generate-context]');
   await contextAction.focus();
@@ -2069,7 +2097,7 @@ test('operates refreshed workflow controls from keyboard focus', async ({ page }
   await contextPrimary.press('Enter');
   await expect(page.getByRole('heading', { name: 'Bekreft kontekstpakke' })).toBeVisible();
   await page.locator('[data-context-package-secondary]').press('Enter');
-  await expect(page.getByRole('heading', { name: 'Prosjektoversikt' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Arbeidsområdeoversikt' })).toBeVisible();
 
   const importAction = page.locator('[data-overview-action-import-transcription]');
   await importAction.focus();
@@ -2081,14 +2109,14 @@ test('operates refreshed workflow controls from keyboard focus', async ({ page }
   await importPrimary.press('Enter');
   await expect(page.getByRole('heading', { name: 'Bekreft import' })).toBeVisible();
   await page.locator('[data-transcription-import-secondary]').press('Enter');
-  await expect(page.getByRole('heading', { name: 'Prosjektoversikt' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Arbeidsområdeoversikt' })).toBeVisible();
 
   await page.locator('[data-overview-action-run-codex]').focus();
   await page.keyboard.press('Enter');
   const codexPrompt = page.locator('[data-codex-prompt]');
   await codexPrompt.focus();
   await expect(codexPrompt).toBeFocused();
-  await codexPrompt.fill('Inspect the project');
+  await codexPrompt.fill('Inspect the workspace');
   await page.locator('[data-codex-edit-mode]').focus();
   await page.keyboard.press('Space');
   await expect(page.locator('[data-codex-state]')).toContainText('Skriveoperasjon');
@@ -2127,9 +2155,9 @@ test('runs Codex in read-only mode from the controlled panel', async ({ page }) 
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => contextPreview,
         generateContextPackage: async () => contextResult,
         previewTranscriptionImport: async () => null,
@@ -2149,7 +2177,7 @@ test('runs Codex in read-only mode from the controlled panel', async ({ page }) 
             outputListener?.({
               runId: 'codex-run',
               stream: 'stdout',
-              text: 'Project summary complete',
+              text: 'Workspace summary complete',
               createdAt: '2026-05-11T12:00:00.000Z',
             });
             completionListener?.({
@@ -2187,20 +2215,20 @@ test('runs Codex in read-only mode from the controlled panel', async ({ page }) 
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
   await page.getByRole('button', { name: 'Kjør Codex' }).click();
 
   const codexPanel = page.locator('[data-workflow-panel="codex"]');
   await expect(codexPanel.getByRole('heading', { name: 'Codex er klar' })).toBeVisible();
   await expect(codexPanel).toContainText('codex-cli 0.130.0-test');
   await expect(codexPanel).toContainText('Lesetilgang');
-  await expect(codexPanel).toContainText('/tmp/sidekick-project');
+  await expect(codexPanel).toContainText('/tmp/sidekick-workspace');
 
-  await codexPanel.getByLabel('Instruksjon').fill('Summarize this project');
+  await codexPanel.getByLabel('Instruksjon').fill('Summarize this workspace');
   await codexPanel.getByRole('button', { name: 'Kjør Codex' }).click();
 
   await expect(codexPanel.getByRole('heading', { name: 'Codex fullført' })).toBeVisible();
-  await expect(codexPanel).toContainText('Project summary complete');
+  await expect(codexPanel).toContainText('Workspace summary complete');
   await expect(codexPanel).toContainText('Kjørelogg');
   await expect
     .poll(() =>
@@ -2223,9 +2251,9 @@ test('shows Codex write-mode warning before running', async ({ page }) => {
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => contextPreview,
         generateContextPackage: async () => contextResult,
         previewTranscriptionImport: async () => null,
@@ -2256,16 +2284,16 @@ test('shows Codex write-mode warning before running', async ({ page }) => {
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
   await page.getByRole('button', { name: 'Kjør Codex' }).click();
 
   const codexPanel = page.locator('[data-workflow-panel="codex"]');
-  await codexPanel.getByLabel('Instruksjon').fill('Update the project notes');
+  await codexPanel.getByLabel('Instruksjon').fill('Update the workspace notes');
   await codexPanel.locator('[data-codex-edit-mode]').check();
 
   await expect(codexPanel).toContainText('Skrivetilgang');
   await expect(codexPanel).toContainText('Skriveoperasjon');
-  await expect(codexPanel).toContainText('Codex kan endre filer direkte i /tmp/sidekick-project');
+  await expect(codexPanel).toContainText('Codex kan endre filer direkte i /tmp/sidekick-workspace');
 
   await codexPanel.getByRole('button', { name: 'Kjør Codex' }).click();
   await expect(codexPanel.getByRole('heading', { name: 'Codex kjører' })).toBeVisible();
@@ -2308,9 +2336,9 @@ test('shows Codex login state and returns to ready after device login', async ({
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => contextPreview,
         generateContextPackage: async () => contextResult,
         previewTranscriptionImport: async () => null,
@@ -2380,7 +2408,7 @@ test('shows Codex login state and returns to ready after device login', async ({
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
   await page.getByRole('button', { name: 'Kjør Codex' }).click();
 
   const codexPanel = page.locator('[data-workflow-panel="codex"]');
@@ -2415,9 +2443,9 @@ test('cancels a running Codex operation from the controlled panel', async ({ pag
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => contextPreview,
         generateContextPackage: async () => contextResult,
         previewTranscriptionImport: async () => null,
@@ -2460,11 +2488,11 @@ test('cancels a running Codex operation from the controlled panel', async ({ pag
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
   await page.getByRole('button', { name: 'Kjør Codex' }).click();
 
   const codexPanel = page.locator('[data-workflow-panel="codex"]');
-  await codexPanel.getByLabel('Instruksjon').fill('Inspect the project');
+  await codexPanel.getByLabel('Instruksjon').fill('Inspect the workspace');
   await codexPanel.getByRole('button', { name: 'Kjør Codex' }).click();
   await expect(codexPanel.getByRole('heading', { name: 'Codex kjører' })).toBeVisible();
   await codexPanel.getByRole('button', { name: 'Avbryt' }).click();
@@ -2496,9 +2524,9 @@ test('shows Codex failure state and refreshes scan after write completion', asyn
           platform: 'linux',
           isPackaged: false,
         }),
-        chooseProjectFolder: async () => scan,
-        chooseProjectParentFolder: async () => null,
-        createProjectFolder: async () => null,
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
         previewContextPackage: async () => contextPreview,
         generateContextPackage: async () => contextResult,
         previewTranscriptionImport: async () => null,
@@ -2559,7 +2587,7 @@ test('shows Codex failure state and refreshes scan after write completion', asyn
   );
 
   await page.goto('/');
-  await page.getByRole('button', { name: 'Velg eksisterende mappe...' }).click();
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
   await page.getByRole('button', { name: 'Kjør Codex' }).click();
 
   const codexPanel = page.locator('[data-workflow-panel="codex"]');
@@ -2568,7 +2596,7 @@ test('shows Codex failure state and refreshes scan after write completion', asyn
   await expect(codexPanel.getByRole('heading', { name: 'Codex feilet' })).toBeVisible();
   await expect(codexPanel).toContainText('Codex returned an error.');
 
-  await codexPanel.getByLabel('Instruksjon').fill('Update the project');
+  await codexPanel.getByLabel('Instruksjon').fill('Update the workspace');
   await codexPanel.locator('[data-codex-edit-mode]').check();
   await codexPanel.getByRole('button', { name: 'Kjør igjen' }).click();
 
@@ -2588,9 +2616,9 @@ test('opens settings and manages Codex CLI path', async ({ page }) => {
         platform: 'linux',
         isPackaged: false,
       }),
-      chooseProjectFolder: async () => null,
-        chooseProjectParentFolder: async () => null,
-      createProjectFolder: async () => null,
+      chooseWorkspaceFolder: async () => null,
+        chooseWorkspaceParentFolder: async () => null,
+      createWorkspaceFolder: async () => null,
       previewContextPackage: async () => {
         throw new Error('No context package preview.');
       },

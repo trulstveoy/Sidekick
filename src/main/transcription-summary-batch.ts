@@ -3,7 +3,7 @@ import { lstat, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import type {
   FolderTreeNode,
-  ProjectFolderScan,
+  WorkspaceScan,
   TranscriptionSummaryBatchCounts,
   TranscriptionSummaryBatchItem,
   TranscriptionSummaryBatchPreview,
@@ -11,7 +11,7 @@ import type {
   TranscriptionSummaryBatchResultItem,
   TranscriptionSummaryGenerationResult,
 } from '../shared/sidekick-api';
-import { scanProjectFolder } from './folder-scanner';
+import { scanWorkspaceFolder } from './folder-scanner';
 import {
   findTranscriptionFolders,
   isAllowedTranscriptionFile,
@@ -32,7 +32,7 @@ type TranscriptionSummaryReader = (
 }>;
 
 type BatchTarget = {
-  scan: ProjectFolderScan;
+  scan: WorkspaceScan;
   targetFolder: FolderTreeNode;
   targetFolderPath: string;
 };
@@ -49,27 +49,27 @@ const normalizeRelativePath = (relativePath: string) => relativePath.split(path.
 
 const toDiskRelativePath = (relativePath: string) => relativePath.split('/').join(path.sep);
 
-const getSingleTranscriptionFolder = (scan: ProjectFolderScan) => {
+const getSingleTranscriptionFolder = (scan: WorkspaceScan) => {
   const transcriptionFolders = findTranscriptionFolders(scan);
 
   if (transcriptionFolders.length === 0) {
-    throw new Error('No transcription folder was detected in the selected project.');
+    throw new Error('No transcription folder was detected in the selected workspace.');
   }
 
   if (transcriptionFolders.length > 1) {
-    throw new Error('Multiple transcription folders were detected in the selected project.');
+    throw new Error('Multiple transcription folders were detected in the selected workspace.');
   }
 
   return transcriptionFolders[0];
 };
 
 const resolveBatchTarget = async (rootPath: string): Promise<BatchTarget> => {
-  const scan = await scanProjectFolder(rootPath);
+  const scan = await scanWorkspaceFolder(rootPath);
   const targetFolder = getSingleTranscriptionFolder(scan);
   const targetFolderPath = path.join(rootPath, toDiskRelativePath(targetFolder.relativePath));
 
   if (!isPathInside(rootPath, targetFolderPath)) {
-    throw new Error('Detected transcription folder is outside the selected project.');
+    throw new Error('Detected transcription folder is outside the selected workspace.');
   }
 
   const targetStats = await lstat(targetFolderPath);
@@ -206,7 +206,7 @@ export const confirmTranscriptionSummaryBatch = async ({
         transcriptionRelativePath: item.transcriptionRelativePath,
         transcriptionFileName: item.transcriptionFileName,
         status: 'failed',
-        message: 'Transkripsjonen ligger utenfor valgt prosjektmappe.',
+        message: 'Transkripsjonen ligger utenfor valgt arbeidsområde.',
       });
       continue;
     }
@@ -238,6 +238,6 @@ export const confirmTranscriptionSummaryBatch = async ({
     targetFolderRelativePath: preview.targetFolderRelativePath,
     counts: resultCounts(items),
     items,
-    scan: await scanProjectFolder(rootPath),
+    scan: await scanWorkspaceFolder(rootPath),
   };
 };

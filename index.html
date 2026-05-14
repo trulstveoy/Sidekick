@@ -10,21 +10,21 @@
     <title>Sidekick</title>
   </head>
   <body>
-    <main class="app-shell" aria-label="Sidekick prosjektarbeidsflate">
+    <main class="app-shell" aria-label="Sidekick arbeidsflate">
       <header class="app-topbar" data-app-topbar>
         <div class="app-brand" aria-label="Sidekick">
           <span class="app-brand__mark" aria-hidden="true">S</span>
           <span class="app-brand__name">Sidekick</span>
         </div>
 
-        <section class="project-context" aria-label="Valgt prosjektmappe">
-          <p class="section-label">Prosjektmappe</p>
-          <h1 data-selected-name>Ingen prosjektmappe valgt</h1>
+        <section class="workspace-context" aria-label="Valgt arbeidsområde">
+          <p class="section-label">Arbeidsområde</p>
+          <h1 data-selected-name>Ingen arbeidsområde valgt</h1>
           <p class="path" data-selected-path>Velg en mappe for å inspisere innholdet.</p>
         </section>
 
         <nav class="topbar-actions" aria-label="Appnavigasjon">
-          <button class="project-switch" type="button" data-choose-folder disabled>
+          <button class="workspace-switch" type="button" data-choose-folder disabled>
             Velg annen mappe...
           </button>
           <button class="topbar-button" type="button" data-open-settings>Innstillinger</button>
@@ -39,7 +39,7 @@
                 <p class="eyebrow">Lesende inspeksjon</p>
                 <h2 data-overview-title>Mappestruktur</h2>
                 <p class="workspace-subtitle" data-overview-subtitle>
-                  Velg en mappe for å se prosjektoversikt.
+                  Velg et arbeidsområde for å se oversikt.
                 </p>
               </div>
               <div class="workspace-header__actions" data-tree-toolbar hidden>
@@ -52,7 +52,7 @@
               </div>
             </header>
 
-            <dl class="stats-strip" data-summary data-overview-stats aria-label="Prosjektstatistikk">
+            <dl class="stats-strip" data-summary data-overview-stats aria-label="Arbeidsområdestatistikk">
               <div>
                 <dt>Files</dt>
                 <dd>0</dd>
@@ -67,56 +67,56 @@
               </div>
             </dl>
 
-            <section class="project-entry" data-project-entry>
-              <div class="project-entry-card">
-                <div class="project-entry-icon" aria-hidden="true">
+            <section class="workspace-entry" data-workspace-entry>
+              <div class="workspace-entry-card">
+                <div class="workspace-entry-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24" focusable="false">
                     <path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
                   </svg>
                 </div>
-                <h3>Velg en prosjektmappe</h3>
+                <h3>Velg et arbeidsområde</h3>
                 <p>
-                  Sidekick hjelper deg forstå og jobbe med innholdet i en lokal prosjektmappe.
-                  Velg en eksisterende mappe, eller opprett en ny.
+                  Sidekick hjelper deg forstå og jobbe med innholdet i et lokalt arbeidsområde.
+                  Velg et eksisterende arbeidsområde, eller opprett et nytt.
                 </p>
-                <div class="entry-error" data-project-entry-error hidden></div>
-                <div class="project-entry-actions">
+                <div class="entry-error" data-workspace-entry-error hidden></div>
+                <div class="workspace-entry-actions">
                   <button class="btn btn-primary btn-lg" type="button" data-choose-folder>
-                    Velg eksisterende mappe...
+                    Velg eksisterende arbeidsområde...
                   </button>
-                  <button class="btn btn-secondary btn-lg" type="button" data-initialize-project>
-                    Initialiser eksisterende mappe...
+                  <button class="btn btn-secondary btn-lg" type="button" data-initialize-workspace>
+                    Initialiser eksisterende arbeidsområde...
                   </button>
-                  <div class="project-initialization-panel" data-project-initialization-panel hidden>
-                    <h4 data-project-initialization-title>Initialiser eksisterende mappe</h4>
-                    <p data-project-initialization-message>Velg en mappe for å se hva Sidekick vil gjøre.</p>
-                    <dl class="detail-list" data-project-initialization-details></dl>
-                    <ul class="plain-list" data-project-initialization-warnings></ul>
+                  <div class="workspace-initialization-panel" data-workspace-initialization-panel hidden>
+                    <h4 data-workspace-initialization-title>Initialiser eksisterende arbeidsområde</h4>
+                    <p data-workspace-initialization-message>Velg en mappe for å se hva Sidekick vil gjøre.</p>
+                    <dl class="detail-list" data-workspace-initialization-details></dl>
+                    <ul class="plain-list" data-workspace-initialization-warnings></ul>
                     <div class="inline-actions">
-                      <button class="btn btn-primary" type="button" data-project-initialization-confirm hidden>
-                        Bruk som prosjekt
+                      <button class="btn btn-primary" type="button" data-workspace-initialization-confirm hidden>
+                        Bruk som arbeidsområde
                       </button>
-                      <button class="btn btn-secondary" type="button" data-project-initialization-cancel hidden>
+                      <button class="btn btn-secondary" type="button" data-workspace-initialization-cancel hidden>
                         Avbryt
                       </button>
                     </div>
                   </div>
                   <div class="entry-divider"><span>eller</span></div>
-                  <button class="btn btn-secondary btn-lg" type="button" data-open-create-project>
-                    Opprett ny prosjektmappe...
+                  <button class="btn btn-secondary btn-lg" type="button" data-open-create-workspace>
+                    Opprett nytt arbeidsområde...
                   </button>
                 </div>
               </div>
             </section>
 
             <section class="state-banner state-banner--info" data-state-banner>
-              <h3 data-state-title>Velg en prosjektmappe</h3>
+              <h3 data-state-title>Velg et arbeidsområde</h3>
               <p data-state-message>Sidekick skanner struktur, metadata og artefakttyper uten å endre filer.</p>
             </section>
 
             <section class="overview-empty" data-overview-empty hidden>
-              <h3>Prosjektmappen er tom</h3>
-              <p>Sidekick fant ingen filer eller undermapper i denne prosjektmappen.</p>
+              <h3>Arbeidsområdet er tomt</h3>
+              <p>Sidekick fant ingen filer eller undermapper i dette arbeidsområdet.</p>
             </section>
 
             <section class="tree-panel" aria-label="Mappestruktur">
@@ -129,8 +129,8 @@
               <header class="workflow-header">
                 <div>
                   <p class="section-label">Transkripsjoner</p>
-                  <h2 data-transcription-import-title>Ingen prosjektmappe valgt</h2>
-                  <p data-transcription-import-message>Velg en prosjektmappe først.</p>
+                  <h2 data-transcription-import-title>Ingen arbeidsområde valgt</h2>
+                  <p data-transcription-import-message>Velg et arbeidsområde først.</p>
                 </div>
               </header>
               <div class="workflow-body transcription-import-panel">
@@ -152,8 +152,8 @@
               <header class="workflow-header">
                 <div>
                   <p class="section-label">Kontekstpakke</p>
-                  <h2 data-context-package-title>Ingen prosjektmappe valgt</h2>
-                  <p data-context-package-message>Velg en prosjektmappe først.</p>
+                  <h2 data-context-package-title>Ingen arbeidsområde valgt</h2>
+                  <p data-context-package-message>Velg et arbeidsområde først.</p>
                 </div>
               </header>
               <div class="workflow-body context-package-panel">
@@ -175,8 +175,8 @@
               <header class="workflow-header">
                 <div>
                   <p class="section-label">Transkripsjoner</p>
-                  <h2 data-transcription-summary-batch-title>Ingen prosjektmappe valgt</h2>
-                  <p data-transcription-summary-batch-message>Velg en prosjektmappe først.</p>
+                  <h2 data-transcription-summary-batch-title>Ingen arbeidsområde valgt</h2>
+                  <p data-transcription-summary-batch-message>Velg et arbeidsområde først.</p>
                 </div>
               </header>
               <div class="workflow-body transcription-summary-batch-panel">
@@ -198,8 +198,8 @@
               <header class="workflow-header">
                 <div>
                   <p class="section-label">Sammenhenger</p>
-                  <h2 data-document-relationships-title>Ingen prosjektmappe valgt</h2>
-                  <p data-document-relationships-message>Velg en prosjektmappe først.</p>
+                  <h2 data-document-relationships-title>Ingen arbeidsområde valgt</h2>
+                  <p data-document-relationships-message>Velg et arbeidsområde først.</p>
                 </div>
               </header>
               <div class="workflow-body document-relationships-panel">
@@ -221,8 +221,8 @@
               <header class="workflow-header">
                 <div>
                   <p class="section-label">Codex</p>
-                  <h2 data-codex-title>Ingen prosjektmappe valgt</h2>
-                  <p data-codex-message>Velg en prosjektmappe først.</p>
+                  <h2 data-codex-title>Ingen arbeidsområde valgt</h2>
+                  <p data-codex-message>Velg et arbeidsområde først.</p>
                 </div>
               </header>
               <div class="workflow-body codex-panel">
@@ -233,14 +233,14 @@
                   id="codex-prompt"
                   data-codex-prompt
                   rows="4"
-                  placeholder="Be Codex undersøke eller arbeide med prosjektmappen..."
+                  placeholder="Be Codex undersøke eller arbeide med arbeidsområdet..."
                   disabled
                 ></textarea>
                 <label class="codex-mode">
                   <input type="checkbox" data-codex-edit-mode disabled />
                   <span class="codex-mode-copy">
                     <strong data-codex-mode-title>Lesetilgang</strong>
-                    <span data-codex-mode-description>Codex kan lese prosjektmappen, men ikke endre filer.</span>
+                    <span data-codex-mode-description>Codex kan lese arbeidsområdet, men ikke endre filer.</span>
                   </span>
                 </label>
                 <p class="codex-output-label">Kjørelogg</p>
@@ -326,57 +326,59 @@
         class="modal-overlay"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="project-create-title"
-        data-project-create-dialog
+        aria-labelledby="workspace-create-title"
+        data-workspace-create-dialog
         hidden
       >
         <div class="modal-panel">
           <header class="modal-header">
             <div>
               <p class="section-label">Skriveoperasjon</p>
-              <h2 id="project-create-title">Opprett ny prosjektmappe</h2>
+              <h2 id="workspace-create-title">Opprett nytt arbeidsområde</h2>
             </div>
-            <button class="btn btn-ghost btn-sm" type="button" data-project-create-cancel aria-label="Lukk">
+            <button class="btn btn-ghost btn-sm" type="button" data-workspace-create-cancel aria-label="Lukk">
               Lukk
             </button>
           </header>
 
           <div class="modal-body">
             <p class="modal-copy">
-              En ny mappe opprettes med standard undermapper for Sidekick-prosjekter.
+              Et nytt arbeidsområde opprettes med standard mapper for Sidekick-arbeid.
             </p>
 
             <div class="form-field">
-              <label for="project-name">Prosjektnavn</label>
-              <input id="project-name" type="text" data-project-name autocomplete="off" />
-              <p class="field-message" data-project-name-message></p>
+              <label for="workspace-name">Arbeidsområdenavn</label>
+              <input id="workspace-name" type="text" data-workspace-name autocomplete="off" />
+              <p class="field-message" data-workspace-name-message></p>
             </div>
 
             <div class="form-field">
               <label>Overordnet plassering</label>
               <div class="path-picker">
-                <p data-project-parent-path>Ingen plassering valgt.</p>
-                <button class="btn btn-secondary" type="button" data-choose-project-parent>
+                <p data-workspace-parent-path>Ingen plassering valgt.</p>
+                <button class="btn btn-secondary" type="button" data-choose-workspace-parent>
                   Velg...
                 </button>
               </div>
             </div>
 
-            <div class="target-preview" data-project-target-preview>
-              Velg prosjektnavn og plassering for å se hva som opprettes.
+            <div class="target-preview" data-workspace-target-preview>
+              Velg arbeidsområdenavn og plassering for å se hva som opprettes.
             </div>
 
             <p class="write-hint">
-              En tom prosjektmappe og undermappene `00. Forutsetninger` og `01. Transkripsjoner`
-              opprettes på valgt sted.
+              Et tomt arbeidsområde og mappene `00. Forutsetninger`, `01. Notater` og
+              `02. Transkripsjoner` opprettes på valgt sted.
             </p>
 
-            <p class="project-create-message" data-create-project-message></p>
+            <p class="workspace-create-message" data-create-workspace-message></p>
           </div>
 
           <footer class="modal-footer">
-            <button class="btn btn-secondary" type="button" data-project-create-cancel>Avbryt</button>
-            <button class="btn btn-primary" type="button" data-create-project disabled>Opprett mappe</button>
+            <button class="btn btn-secondary" type="button" data-workspace-create-cancel>Avbryt</button>
+            <button class="btn btn-primary" type="button" data-create-workspace disabled>
+              Opprett arbeidsområde
+            </button>
           </footer>
         </div>
       </section>
@@ -398,7 +400,7 @@
 
       <footer class="status-bar" data-status-bar>
         <span data-app-info>Loading...</span>
-        <span data-status-message>Ingen prosjektmappe valgt</span>
+        <span data-status-message>Ingen arbeidsområde valgt</span>
       </footer>
     </main>
     <script type="module" src="/src/renderer.ts"></script>

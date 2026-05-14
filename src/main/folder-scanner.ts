@@ -5,7 +5,7 @@ import type {
   ArtifactType,
   FolderSignal,
   FolderTreeNode,
-  ProjectFolderScan,
+  WorkspaceScan,
   RecentFile,
   ScanOptions,
   ScanSummary,
@@ -74,7 +74,7 @@ const includesAny = (value: string, keywords: string[]) =>
   keywords.some((keyword) => value.includes(keyword));
 
 // Folder and artifact classification is intentionally heuristic. Folder names
-// help users understand a project, but they must not become hidden rules that
+// help users understand a workspace, but they must not become hidden rules that
 // block access to files.
 const artifactExtensionGroups: Array<{ extensions: string[]; type: ArtifactType }> = [
   { extensions: ['.md', '.markdown', '.txt'], type: 'markdown-text' },
@@ -499,7 +499,7 @@ const scanNode = async (
       message: 'Symbolic link skipped.',
     });
 
-    // Do not follow symlinks by default; a selected project folder is the trust
+    // Do not follow symlinks by default; a selected workspace is the trust
     // boundary for read-only scanning.
     return null;
   }
@@ -522,10 +522,10 @@ const scanNode = async (
   return scanFile(context, scannedPath);
 };
 
-export const scanProjectFolder = async (
+export const scanWorkspaceFolder = async (
   rootPath: string,
   options: Partial<ScanOptions> = {},
-): Promise<ProjectFolderScan> => {
+): Promise<WorkspaceScan> => {
   const resolvedOptions = {
     ...DEFAULT_SCAN_OPTIONS,
     ...options,

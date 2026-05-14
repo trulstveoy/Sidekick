@@ -7,8 +7,8 @@ import type {
   CodexPathTestResult,
   CodexCompletionEvent,
   CodexRunRequest,
-  ProjectCreationRequest,
-  ProjectInitializationPreview,
+  WorkspaceCreationRequest,
+  WorkspaceInitializationPreview,
   TranscriptionSummaryBatchPreview,
   TranscriptionSummaryReadRequest,
   TranscriptionImportPreview,
@@ -24,13 +24,13 @@ import {
   readDocumentRelationships,
 } from './main/document-relationships';
 import { CodexRunner } from './main/codex-runner';
-import { scanProjectFolder } from './main/folder-scanner';
-import { readProjectInfo } from './main/project-info';
-import { createProjectFolder } from './main/project-creator';
+import { scanWorkspaceFolder } from './main/folder-scanner';
+import { readWorkspaceInfo } from './main/workspace-info';
+import { createWorkspaceFolder } from './main/workspace-creator';
 import {
-  confirmProjectInitialization,
-  createProjectInitializationPreview,
-} from './main/project-initializer';
+  confirmWorkspaceInitialization,
+  createWorkspaceInitializationPreview,
+} from './main/workspace-initializer';
 import {
   confirmTranscriptionImport,
   createTranscriptionImportPreview,
@@ -66,11 +66,11 @@ const appIconPath = () =>
     ? path.join(process.resourcesPath, 'sidekick-icon.png')
     : path.join(app.getAppPath(), 'assets', 'icons', 'generated', 'sidekick-icon.png');
 
-const selectedProjectRoots = new Set<string>();
-const selectedProjectParentFolders = new Set<string>();
+const selectedWorkspaceRoots = new Set<string>();
+const selectedWorkspaceParentFolders = new Set<string>();
 const pendingTranscriptionImports = new Map<string, TranscriptionImportPreview>();
 const pendingTranscriptionSummaryBatches = new Map<string, TranscriptionSummaryBatchPreview>();
-const pendingProjectInitializations = new Map<string, ProjectInitializationPreview>();
+const pendingWorkspaceInitializations = new Map<string, WorkspaceInitializationPreview>();
 let settingsStore: AppSettingsStore | undefined;
 const codexRunner = new CodexRunner();
 const codexRuns = new Map<
@@ -110,10 +110,10 @@ const applyCodexSettings = async () => {
   return snapshot;
 };
 
-ipcMain.handle('project-folder:choose-and-scan', async (event) => {
+ipcMain.handle('workspace:choose-and-scan', async (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   const dialogOptions: Electron.OpenDialogOptions = {
-    title: 'Choose project folder',
+    title: 'Choose workspace',
     properties: ['openDirectory'],
   };
   const result = window
@@ -124,14 +124,14 @@ ipcMain.handle('project-folder:choose-and-scan', async (event) => {
     return null;
   }
 
-  selectedProjectRoots.add(result.filePaths[0]);
-  return scanProjectFolder(result.filePaths[0]);
+  selectedWorkspaceRoots.add(result.filePaths[0]);
+  return scanWorkspaceFolder(result.filePaths[0]);
 });
 
-ipcMain.handle('project-folder:choose-parent', async (event) => {
+ipcMain.handle('workspace:choose-parent', async (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   const dialogOptions: Electron.OpenDialogOptions = {
-    title: 'Choose where to create the project',
+    title: 'Choose where to create the workspace',
     properties: ['openDirectory'],
   };
   const result = window
@@ -142,35 +142,35 @@ ipcMain.handle('project-folder:choose-parent', async (event) => {
     return null;
   }
 
-  selectedProjectParentFolders.add(result.filePaths[0]);
+  selectedWorkspaceParentFolders.add(result.filePaths[0]);
   return result.filePaths[0];
 });
 
-ipcMain.handle('project-folder:create', async (event, request: ProjectCreationRequest) => {
-  if (!request || typeof request.projectName !== 'string') {
-    throw new Error('Project name is required.');
+ipcMain.handle('workspace:create', async (event, request: WorkspaceCreationRequest) => {
+  if (!request || typeof request.workspaceName !== 'string') {
+    throw new Error('Workspace name is required.');
   }
 
-  if (typeof request.parentPath !== 'string' || !selectedProjectParentFolders.has(request.parentPath)) {
-    throw new Error('Choose where the project should be created.');
+  if (typeof request.parentPath !== 'string' || !selectedWorkspaceParentFolders.has(request.parentPath)) {
+    throw new Error('Choose where the workspace should be created.');
   }
 
-  const createdProject = await createProjectFolder({
+  const createdWorkspace = await createWorkspaceFolder({
     parentPath: request.parentPath,
     request,
   });
-  selectedProjectRoots.add(createdProject.rootPath);
+  selectedWorkspaceRoots.add(createdWorkspace.rootPath);
 
   return {
-    ...createdProject,
-    scan: await scanProjectFolder(createdProject.rootPath),
+    ...createdWorkspace,
+    scan: await scanWorkspaceFolder(createdWorkspace.rootPath),
   };
 });
 
-ipcMain.handle('project-folder:choose-for-initialization', async (event) => {
+ipcMain.handle('workspace:choose-for-initialization', async (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   const dialogOptions: Electron.OpenDialogOptions = {
-    title: 'Choose existing project folder',
+    title: 'Choose existing workspace',
     properties: ['openDirectory'],
   };
   const result = window
@@ -181,45 +181,45 @@ ipcMain.handle('project-folder:choose-for-initialization', async (event) => {
     return null;
   }
 
-  const preview = await createProjectInitializationPreview(result.filePaths[0]);
-  pendingProjectInitializations.set(preview.previewId, preview);
+  const preview = await createWorkspaceInitializationPreview(result.filePaths[0]);
+  pendingWorkspaceInitializations.set(preview.previewId, preview);
 
   return preview;
 });
 
-ipcMain.handle('project-folder:confirm-initialization', async (_event, previewId) => {
+ipcMain.handle('workspace:confirm-initialization', async (_event, previewId) => {
   if (typeof previewId !== 'string' || previewId.trim().length === 0) {
-    throw new Error('A project initialization preview is required.');
+    throw new Error('A workspace initialization preview is required.');
   }
 
-  const preview = pendingProjectInitializations.get(previewId);
+  const preview = pendingWorkspaceInitializations.get(previewId);
 
   if (!preview) {
-    throw new Error('The project initialization preview has expired.');
+    throw new Error('The workspace initialization preview has expired.');
   }
 
   try {
-    const initializedProject = await confirmProjectInitialization(preview.rootPath);
-    selectedProjectRoots.add(initializedProject.rootPath);
+    const initializedWorkspace = await confirmWorkspaceInitialization(preview.rootPath);
+    selectedWorkspaceRoots.add(initializedWorkspace.rootPath);
 
     return {
       status: 'complete',
-      ...initializedProject,
-      scan: await scanProjectFolder(initializedProject.rootPath),
+      ...initializedWorkspace,
+      scan: await scanWorkspaceFolder(initializedWorkspace.rootPath),
     };
   } finally {
-    pendingProjectInitializations.delete(previewId);
+    pendingWorkspaceInitializations.delete(previewId);
   }
 });
 
-const assertKnownProjectRoot = (rootPath: unknown) => {
+const assertKnownWorkspaceRoot = (rootPath: unknown) => {
   if (typeof rootPath !== 'string' || !path.isAbsolute(rootPath)) {
-    throw new Error('A selected project folder is required.');
+    throw new Error('A selected workspace is required.');
   }
 
   // Renderer requests may name only roots that were selected through a native
   // dialog or created by Sidekick in this process.
-  if (!selectedProjectRoots.has(rootPath)) {
+  if (!selectedWorkspaceRoots.has(rootPath)) {
     throw new Error('This action requires a folder selected in Sidekick.');
   }
 
@@ -227,24 +227,24 @@ const assertKnownProjectRoot = (rootPath: unknown) => {
 };
 
 ipcMain.handle('context-package:preview', (_event, rootPath) =>
-  getContextPackagePreview(assertKnownProjectRoot(rootPath)),
+  getContextPackagePreview(assertKnownWorkspaceRoot(rootPath)),
 );
 
 ipcMain.handle('context-package:generate', (_event, rootPath) =>
-  generateContextPackage(assertKnownProjectRoot(rootPath), { codexRunner }),
+  generateContextPackage(assertKnownWorkspaceRoot(rootPath), { codexRunner }),
 );
 
-ipcMain.handle('project-info:read', (_event, rootPath) =>
-  readProjectInfo(assertKnownProjectRoot(rootPath)),
+ipcMain.handle('workspace-info:read', (_event, rootPath) =>
+  readWorkspaceInfo(assertKnownWorkspaceRoot(rootPath)),
 );
 
 ipcMain.handle('document-relationships:read', (_event, rootPath) =>
-  readDocumentRelationships(assertKnownProjectRoot(rootPath)),
+  readDocumentRelationships(assertKnownWorkspaceRoot(rootPath)),
 );
 
 ipcMain.handle('document-relationships:generate', (_event, rootPath) =>
   generateDocumentRelationships({
-    rootPath: assertKnownProjectRoot(rootPath),
+    rootPath: assertKnownWorkspaceRoot(rootPath),
     codexRunner,
   }),
 );
@@ -264,7 +264,7 @@ const assertFolderContextPackageRequest = (request: unknown) => {
   }
 
   return {
-    rootPath: assertKnownProjectRoot(rootPath),
+    rootPath: assertKnownWorkspaceRoot(rootPath),
     folderRelativePath,
   };
 };
@@ -278,7 +278,7 @@ ipcMain.handle('context-package:generate-folder', (_event, request) =>
 );
 
 ipcMain.handle('transcription:preview-import', async (event, rootPath) => {
-  const projectRoot = assertKnownProjectRoot(rootPath);
+  const workspaceRoot = assertKnownWorkspaceRoot(rootPath);
   const window = BrowserWindow.fromWebContents(event.sender);
   const dialogOptions: Electron.OpenDialogOptions = {
     title: 'Choose transcription',
@@ -298,7 +298,7 @@ ipcMain.handle('transcription:preview-import', async (event, rootPath) => {
     return null;
   }
 
-  const preview = await createTranscriptionImportPreview(projectRoot, result.filePaths[0]);
+  const preview = await createTranscriptionImportPreview(workspaceRoot, result.filePaths[0]);
   pendingTranscriptionImports.set(preview.previewId, preview);
 
   return preview;
@@ -317,8 +317,8 @@ ipcMain.handle('transcription:confirm-import', async (_event, previewId) => {
 
   try {
     // Confirm uses the stored preview rather than renderer-supplied paths, then
-    // revalidates the root in case the selected project set has changed.
-    assertKnownProjectRoot(preview.rootPath);
+    // revalidates the root in case the selected workspace set has changed.
+    assertKnownWorkspaceRoot(preview.rootPath);
 
     return await confirmTranscriptionImport(preview, ({ rootPath, transcriptionPath }) =>
       generateTranscriptionSummary({
@@ -342,11 +342,11 @@ const assertTranscriptionSummaryReadRequest = (
   const { rootPath, transcriptionRelativePath } = request as Partial<TranscriptionSummaryReadRequest>;
 
   if (typeof transcriptionRelativePath !== 'string') {
-    throw new Error('A project-relative transcription path is required.');
+    throw new Error('A workspace-relative transcription path is required.');
   }
 
   return {
-    rootPath: assertKnownProjectRoot(rootPath),
+    rootPath: assertKnownWorkspaceRoot(rootPath),
     transcriptionRelativePath,
   };
 };
@@ -361,9 +361,9 @@ ipcMain.handle('transcription:read-summary', (_event, request) => {
 });
 
 ipcMain.handle('transcription:preview-summary-batch', async (_event, rootPath) => {
-  const projectRoot = assertKnownProjectRoot(rootPath);
+  const workspaceRoot = assertKnownWorkspaceRoot(rootPath);
   const preview = await createTranscriptionSummaryBatchPreview(
-    projectRoot,
+    workspaceRoot,
     readTranscriptionSummary,
   );
   pendingTranscriptionSummaryBatches.set(preview.previewId, preview);
@@ -383,10 +383,10 @@ ipcMain.handle('transcription:confirm-summary-batch', async (_event, previewId) 
   }
 
   try {
-    const projectRoot = assertKnownProjectRoot(preview.rootPath);
+    const workspaceRoot = assertKnownWorkspaceRoot(preview.rootPath);
 
     return await confirmTranscriptionSummaryBatch({
-      rootPath: projectRoot,
+      rootPath: workspaceRoot,
       reader: readTranscriptionSummary,
       generateSummary: ({ rootPath: summaryRootPath, transcriptionPath }) =>
         generateTranscriptionSummary({
@@ -416,7 +416,7 @@ const assertCodexRunRequest = (request: unknown): CodexRunRequest => {
   }
 
   return {
-    rootPath: assertKnownProjectRoot(rootPath),
+    rootPath: assertKnownWorkspaceRoot(rootPath),
     prompt,
     mode,
   };
@@ -446,7 +446,7 @@ codexRunner.on('completion', (completion) => {
       try {
         // Edit-mode Codex runs may have changed files, so the renderer receives
         // a fresh scan as part of the completion event.
-        const scan = await scanProjectFolder(run.rootPath);
+        const scan = await scanWorkspaceFolder(run.rootPath);
         completedEvent = {
           ...completion,
           scan,
@@ -456,8 +456,8 @@ codexRunner.on('completion', (completion) => {
           ...completion,
           message:
             error instanceof Error
-              ? `Codex completed, but the project refresh failed: ${error.message}`
-              : 'Codex completed, but the project refresh failed.',
+              ? `Codex completed, but the workspace refresh failed: ${error.message}`
+              : 'Codex completed, but the workspace refresh failed.',
         };
       }
     }
@@ -471,15 +471,15 @@ codexRunner.on('completion', (completion) => {
 });
 
 ipcMain.handle('codex:get-status', (_event, rootPath) =>
-  codexRunner.getStatus(assertKnownProjectRoot(rootPath)),
+  codexRunner.getStatus(assertKnownWorkspaceRoot(rootPath)),
 );
 
 ipcMain.handle('codex:start-login', (event, rootPath) => {
-  const projectRoot = assertKnownProjectRoot(rootPath);
-  const runId = codexRunner.startLogin(projectRoot);
+  const workspaceRoot = assertKnownWorkspaceRoot(rootPath);
+  const runId = codexRunner.startLogin(workspaceRoot);
   codexRuns.set(runId, {
     sender: event.sender,
-    rootPath: projectRoot,
+    rootPath: workspaceRoot,
     mode: 'login',
   });
 

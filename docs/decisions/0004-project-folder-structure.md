@@ -1,6 +1,6 @@
 # Decision: Project Folder Structure
 
-Status: Accepted
+Status: Superseded by `0005-workspace-creation-folder-structure.md`
 Date: 2026-05-11
 
 ## Context
@@ -29,6 +29,9 @@ If the target project folder already exists, Sidekick stops and reports a clear 
 - Converting an existing folder into this structure requires a separate task and safety review.
 
 ## Related
+
+Superseded by:
+- `0005-workspace-creation-folder-structure.md`
 
 Related task:
 - `../tasks/closed/TASK-0011-create-project-folder-structure.md`

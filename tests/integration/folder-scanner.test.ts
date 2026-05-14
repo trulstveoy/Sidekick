@@ -1,15 +1,15 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { scanProjectFolder } from '../../src/main/folder-scanner';
+import { scanWorkspaceFolder } from '../../src/main/folder-scanner';
 
-const fixturePath = path.resolve(__dirname, '../fixtures/project-folder-basic');
+const fixturePath = path.resolve(__dirname, '../fixtures/workspace-basic');
 
 describe('folder scanner', () => {
-  it('scans a project folder and returns summary counts', async () => {
-    const result = await scanProjectFolder(fixturePath);
+  it('scans a workspace and returns summary counts', async () => {
+    const result = await scanWorkspaceFolder(fixturePath);
 
     expect(result.status).toBe('complete');
-    expect(result.rootName).toBe('project-folder-basic');
+    expect(result.rootName).toBe('workspace-basic');
     expect(result.summary.fileCount).toBe(8);
     expect(result.summary.folderCount).toBe(4);
     expect(result.summary.artifactTypeCounts.pdf).toBe(1);
@@ -24,7 +24,7 @@ describe('folder scanner', () => {
   });
 
   it('returns partial results when the file limit is reached', async () => {
-    const result = await scanProjectFolder(fixturePath, { maxFiles: 2 });
+    const result = await scanWorkspaceFolder(fixturePath, { maxFiles: 2 });
 
     expect(result.status).toBe('partial');
     expect(result.summary.limitsReached.maxFiles).toBe(true);

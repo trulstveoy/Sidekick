@@ -7,15 +7,15 @@ import type {
   ContextPackageSkippedFile,
   ContextPackageWarning,
   FolderContextPackageRequest,
-  ProjectSummaryGenerationResult,
+  WorkspaceSummaryGenerationResult,
 } from '../shared/sidekick-api';
 import { CodexRunner } from './codex-runner';
-import { scanProjectFolder } from './folder-scanner';
-import { writeProjectInfo } from './project-info';
+import { scanWorkspaceFolder } from './folder-scanner';
+import { writeWorkspaceInfo } from './workspace-info';
 import {
-  createFailedProjectSummaryResult,
-  generateProjectSummaryMarkdown,
-} from './project-summary';
+  createFailedWorkspaceSummaryResult,
+  generateWorkspaceSummaryMarkdown,
+} from './workspace-summary';
 import { runRepomixContextPackage } from './repomix-runner';
 
 export const CONTEXT_PACKAGE_SUFFIX = 'context-package.md';
@@ -50,19 +50,19 @@ const NUMERIC_FOLDER_PREFIX_PATTERN = /^\d+\.\s*/;
 
 const assertAbsoluteRootPath = (rootPath: string) => {
   if (typeof rootPath !== 'string' || rootPath.trim() === '') {
-    throw new Error('A project folder path is required.');
+    throw new Error('A workspace path is required.');
   }
 
   if (!path.isAbsolute(rootPath)) {
-    throw new Error('Project folder path must be absolute.');
+    throw new Error('Workspace path must be absolute.');
   }
 };
 
 export const createContextPackageFileName = (rootPath: string) => {
-  const projectName = path.basename(rootPath);
-  // The output filename is derived from the project folder, but it still has to
+  const workspaceName = path.basename(rootPath);
+  // The output filename is derived from the workspace, but it still has to
   // be safe on Windows because release builds target Windows first.
-  const safeProjectName = Array.from(projectName)
+  const safeWorkspaceName = Array.from(workspaceName)
     .map((character) =>
       character.charCodeAt(0) < 32 || INVALID_FILENAME_CHARACTERS.has(character)
         ? '-'
@@ -72,7 +72,7 @@ export const createContextPackageFileName = (rootPath: string) => {
     .replace(/[. ]+$/g, '')
     .trim();
 
-  return `${safeProjectName || 'project'}.${CONTEXT_PACKAGE_SUFFIX}`;
+  return `${safeWorkspaceName || 'workspace'}.${CONTEXT_PACKAGE_SUFFIX}`;
 };
 
 export const createFolderContextPackageFileName = (folderName: string) => {
@@ -118,7 +118,7 @@ const assertReadableDirectory = async (rootPath: string) => {
   const stats = await stat(rootPath);
 
   if (!stats.isDirectory()) {
-    throw new Error('Project folder path must point to a directory.');
+    throw new Error('Workspace path must point to a directory.');
   }
 };
 
@@ -128,18 +128,18 @@ const assertRelativeFolderPath = (folderRelativePath: string) => {
   }
 
   if (folderRelativePath === ROOT_RELATIVE_PATH) {
-    throw new Error('Use the full-project context package action for the project root.');
+    throw new Error('Use the full-workspace context package action for the workspace root.');
   }
 
   if (path.isAbsolute(folderRelativePath)) {
-    throw new Error('Selected folder path must be relative to the project root.');
+    throw new Error('Selected folder path must be relative to the workspace root.');
   }
 
   const normalized = folderRelativePath.replace(/\\/g, '/');
   const segments = normalized.split('/');
 
   if (segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
-    throw new Error('Selected folder path must stay inside the project root.');
+    throw new Error('Selected folder path must stay inside the workspace root.');
   }
 
   return normalized;
@@ -162,7 +162,7 @@ const resolveFolderContextPackageTarget = async ({
   const folderPath = path.resolve(rootPath, ...normalizedRelativePath.split('/'));
 
   if (!isPathInside(rootPath, folderPath)) {
-    throw new Error('Selected folder must stay inside the project root.');
+    throw new Error('Selected folder must stay inside the workspace root.');
   }
 
   await assertReadableDirectory(folderPath);
@@ -190,7 +190,7 @@ export const getContextPackagePreview = async (
   const outputPath = getContextPackageOutputPath(rootPath);
 
   return {
-    scope: 'project',
+    scope: 'workspace',
     rootPath,
     targetPath: rootPath,
     targetRelativePath: ROOT_RELATIVE_PATH,
@@ -240,23 +240,23 @@ const toWarnings = (
 
 type GenerateContextPackageOptions = {
   codexRunner?: CodexRunner;
-  generateProjectSummary?: boolean;
+  generateWorkspaceSummary?: boolean;
 };
 
-const generateProjectSummary = async (
+const generateWorkspaceSummary = async (
   rootPath: string,
   contextPackagePath: string,
   codexRunner: CodexRunner,
-): Promise<ProjectSummaryGenerationResult> => {
+): Promise<WorkspaceSummaryGenerationResult> => {
   const contextPackageSha256 = await calculateFileSha256(contextPackagePath);
 
   try {
-    const summary = await generateProjectSummaryMarkdown({
+    const summary = await generateWorkspaceSummaryMarkdown({
       rootPath,
       contextPackagePath,
       codexRunner,
     });
-    const projectInfo = await writeProjectInfo({
+    const workspaceInfo = await writeWorkspaceInfo({
       rootPath,
       contextPackagePath,
       contextPackageSha256,
@@ -265,12 +265,12 @@ const generateProjectSummary = async (
 
     return {
       status: 'complete',
-      projectInfo,
+      workspaceInfo,
     };
   } catch (error) {
-    return createFailedProjectSummaryResult(
+    return createFailedWorkspaceSummaryResult(
       rootPath,
-      error instanceof Error ? error.message : 'Project summary generation failed.',
+      error instanceof Error ? error.message : 'Workspace summary generation failed.',
     );
   }
 };
@@ -287,19 +287,19 @@ export const generateContextPackage = async (
   });
 
   const outputStats = await stat(preview.outputPath);
-  const shouldGenerateProjectSummary = options.generateProjectSummary ?? true;
-  const projectSummary = shouldGenerateProjectSummary
-    ? await generateProjectSummary(
+  const shouldGenerateWorkspaceSummary = options.generateWorkspaceSummary ?? true;
+  const workspaceSummary = shouldGenerateWorkspaceSummary
+    ? await generateWorkspaceSummary(
         rootPath,
         preview.outputPath,
         options.codexRunner ?? new CodexRunner(),
       )
     : undefined;
-  const scan = await scanProjectFolder(rootPath);
+  const scan = await scanWorkspaceFolder(rootPath);
 
   return {
     status: 'complete',
-    scope: 'project',
+    scope: 'workspace',
     rootPath,
     targetPath: rootPath,
     targetRelativePath: ROOT_RELATIVE_PATH,
@@ -313,7 +313,7 @@ export const generateContextPackage = async (
     processedFiles: packResult.processedFiles.map((file) => file.path).sort(),
     skippedFiles: toSkippedFiles(packResult.skippedFiles),
     warnings: toWarnings(packResult.suspiciousFilesResults),
-    projectSummary,
+    workspaceSummary,
     scan,
   };
 };
@@ -329,7 +329,7 @@ export const generateFolderContextPackage = async (
   });
 
   const outputStats = await stat(preview.outputPath);
-  const scan = await scanProjectFolder(preview.rootPath);
+  const scan = await scanWorkspaceFolder(preview.rootPath);
 
   return {
     status: 'complete',

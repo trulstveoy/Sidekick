@@ -12,7 +12,7 @@ import {
   writeTranscriptionSummary,
 } from '../../src/main/transcription-summary';
 
-const fixturePath = path.resolve(__dirname, '../fixtures/project-folder-basic');
+const fixturePath = path.resolve(__dirname, '../fixtures/workspace-basic');
 const temporaryRoots: string[] = [];
 
 const copyFixtureToTemp = async () => {

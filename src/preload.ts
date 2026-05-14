@@ -5,16 +5,16 @@ import type { CodexCompletionEvent, CodexOutputEvent, SidekickApi } from './shar
 // ipcRenderer, filesystem, process, or shell access.
 const sidekickApi: SidekickApi = {
   getAppInfo: () => ipcRenderer.invoke('app:get-info'),
-  chooseProjectFolder: () => ipcRenderer.invoke('project-folder:choose-and-scan'),
-  chooseProjectParentFolder: () => ipcRenderer.invoke('project-folder:choose-parent'),
-  createProjectFolder: (request) => ipcRenderer.invoke('project-folder:create', request),
-  chooseProjectFolderForInitialization: () =>
-    ipcRenderer.invoke('project-folder:choose-for-initialization'),
-  confirmProjectInitialization: (previewId) =>
-    ipcRenderer.invoke('project-folder:confirm-initialization', previewId),
+  chooseWorkspaceFolder: () => ipcRenderer.invoke('workspace:choose-and-scan'),
+  chooseWorkspaceParentFolder: () => ipcRenderer.invoke('workspace:choose-parent'),
+  createWorkspaceFolder: (request) => ipcRenderer.invoke('workspace:create', request),
+  chooseWorkspaceFolderForInitialization: () =>
+    ipcRenderer.invoke('workspace:choose-for-initialization'),
+  confirmWorkspaceInitialization: (previewId) =>
+    ipcRenderer.invoke('workspace:confirm-initialization', previewId),
   previewContextPackage: (rootPath) => ipcRenderer.invoke('context-package:preview', rootPath),
   generateContextPackage: (rootPath) => ipcRenderer.invoke('context-package:generate', rootPath),
-  readProjectInfo: (rootPath) => ipcRenderer.invoke('project-info:read', rootPath),
+  readWorkspaceInfo: (rootPath) => ipcRenderer.invoke('workspace-info:read', rootPath),
   readDocumentRelationships: (rootPath) =>
     ipcRenderer.invoke('document-relationships:read', rootPath),
   generateDocumentRelationships: (rootPath) =>

@@ -57,7 +57,7 @@ describe('document relationships report handling', () => {
 
   it('writes and reads document relationships markdown with front matter', async () => {
     const rootPath = await createTempRoot();
-    const contextPackagePath = path.join(rootPath, 'project.context-package.md');
+    const contextPackagePath = path.join(rootPath, 'workspace.context-package.md');
     const snapshot = await writeDocumentRelationships({
       rootPath,
       contextPackagePath,
@@ -69,9 +69,9 @@ describe('document relationships report handling', () => {
 
     expect(snapshot.status).toBe('complete');
     expect(snapshot.generatedAt).toBe('2026-05-13T12:00:00.000Z');
-    expect(snapshot.sourceScope).toBe('full-project');
-    expect(snapshot.sourceModel).toBe('physical-project-folder');
-    expect(snapshot.contextPackagePath).toBe('./project.context-package.md');
+    expect(snapshot.sourceScope).toBe('full-workspace');
+    expect(snapshot.sourceModel).toBe('physical-workspace');
+    expect(snapshot.contextPackagePath).toBe('./workspace.context-package.md');
     expect(snapshot.contextPackageSha256).toBe('abc123');
     expect(snapshot.overview).toContain('strategi og operasjon');
     expect(snapshot.relationshipMap).toContain('Confidence: høy');
@@ -93,7 +93,7 @@ describe('document relationships report handling', () => {
     const reportPath = getDocumentRelationshipsPath(rootPath);
     await writeDocumentRelationships({
       rootPath,
-      contextPackagePath: path.join(rootPath, 'project.context-package.md'),
+      contextPackagePath: path.join(rootPath, 'workspace.context-package.md'),
       contextPackageSha256: 'abc123',
       generatedAt: '2026-05-13T12:00:00.000Z',
       analysisMarkdown: validRelationships,
@@ -112,7 +112,7 @@ describe('document relationships report handling', () => {
     );
   });
 
-  it('rejects generated context packages outside the project root', async () => {
+  it('rejects generated context packages outside the workspace root', async () => {
     const rootPath = await createTempRoot();
     const otherRoot = await createTempRoot();
 
@@ -123,14 +123,14 @@ describe('document relationships report handling', () => {
         contextPackageSha256: 'abc123',
         analysisMarkdown: validRelationships,
       }),
-    ).toThrow(/inside the selected project/);
+    ).toThrow(/inside the selected workspace/);
   });
 
   it('parses an existing report markdown snapshot', async () => {
     const rootPath = await createTempRoot();
     const markdown = createDocumentRelationshipsMarkdown({
       rootPath,
-      contextPackagePath: path.join(rootPath, 'project.context-package.md'),
+      contextPackagePath: path.join(rootPath, 'workspace.context-package.md'),
       contextPackageSha256: 'abc123',
       generatedAt: '2026-05-13T12:00:00.000Z',
       analysisMarkdown: validRelationships,

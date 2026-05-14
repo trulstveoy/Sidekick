@@ -4,20 +4,20 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type {
   FolderTreeNode,
-  ProjectFolderScan,
+  WorkspaceScan,
   TranscriptionImportNumbering,
   TranscriptionImportPreview,
   TranscriptionImportResult,
   TranscriptionSummaryGenerationResult,
 } from '../shared/sidekick-api';
-import { scanProjectFolder } from './folder-scanner';
+import { scanWorkspaceFolder } from './folder-scanner';
 
 const ALLOWED_TRANSCRIPTION_EXTENSIONS = new Set(['.txt', '.md', '.markdown']);
 const STRICT_NUMBER_SEPARATOR = '. ';
 const STRICT_NUMBER_WIDTH = 2;
 const FIRST_STRICT_NUMBER = 0;
 // Incoming files may already be numbered by another tool. Sidekick strips that
-// loose prefix and then applies the project's strict NN. sequence.
+// loose prefix and then applies the workspace's strict NN. sequence.
 const NUMBERED_PREFIX_PATTERN = /^(\d+)(?:\. |[\s_-]+)(.+)$/;
 const STRICT_NUMBERED_PREFIX_PATTERN = /^(\d{2})\. (.+)$/;
 
@@ -129,7 +129,7 @@ export const createTranscriptionDestination = (
   };
 };
 
-export const findTranscriptionFolders = (scan: ProjectFolderScan) => {
+export const findTranscriptionFolders = (scan: WorkspaceScan) => {
   const transcriptionFolders: FolderTreeNode[] = [];
 
   const visit = (node: FolderTreeNode) => {
@@ -165,15 +165,15 @@ const assertAllowedSourceFile = async (sourcePath: string) => {
   }
 };
 
-const getSingleTranscriptionFolder = (scan: ProjectFolderScan) => {
+const getSingleTranscriptionFolder = (scan: WorkspaceScan) => {
   const transcriptionFolders = findTranscriptionFolders(scan);
 
   if (transcriptionFolders.length === 0) {
-    throw new Error('No transcription folder was detected in the selected project.');
+    throw new Error('No transcription folder was detected in the selected workspace.');
   }
 
   if (transcriptionFolders.length > 1) {
-    throw new Error('Multiple transcription folders were detected in the selected project.');
+    throw new Error('Multiple transcription folders were detected in the selected workspace.');
   }
 
   return transcriptionFolders[0];
@@ -189,7 +189,7 @@ const getTargetFolderPath = async (rootPath: string, targetFolder: FolderTreeNod
   const targetFolderPath = path.join(rootPath, normalizeRelativePath(targetFolder.relativePath));
 
   if (!isPathInside(rootPath, targetFolderPath)) {
-    throw new Error('Detected transcription folder is outside the selected project.');
+    throw new Error('Detected transcription folder is outside the selected workspace.');
   }
 
   const targetStats = await lstat(targetFolderPath);
@@ -208,7 +208,7 @@ export const createTranscriptionImportPreview = async (
 ): Promise<TranscriptionImportPreview> => {
   await assertAllowedSourceFile(sourcePath);
 
-  const scan = await scanProjectFolder(rootPath);
+  const scan = await scanWorkspaceFolder(rootPath);
   const targetFolder = getSingleTranscriptionFolder(scan);
   const targetFolderPath = await getTargetFolderPath(rootPath, targetFolder);
   const targetFileNames = await readTargetFileNames(targetFolderPath);
@@ -276,7 +276,7 @@ export const confirmTranscriptionImport = async (
 ): Promise<TranscriptionImportResult> => {
   await assertAllowedSourceFile(preview.sourcePath);
 
-  const scanBeforeCopy = await scanProjectFolder(preview.rootPath);
+  const scanBeforeCopy = await scanWorkspaceFolder(preview.rootPath);
   const targetFolder = getSingleTranscriptionFolder(scanBeforeCopy);
   const targetFolderPath = await getTargetFolderPath(preview.rootPath, targetFolder);
   const copied = await copyWithoutOverwrite(
@@ -294,7 +294,7 @@ export const confirmTranscriptionImport = async (
         status: 'failed' as const,
         message: 'Sammendrag ble ikke konfigurert for denne importen.',
       };
-  const scan = await scanProjectFolder(preview.rootPath);
+  const scan = await scanWorkspaceFolder(preview.rootPath);
 
   return {
     status: 'complete',

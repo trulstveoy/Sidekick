@@ -2,12 +2,12 @@ import { lstat, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type {
-  ProjectCreationFolder,
-  ProjectInitializationPreview,
-  ProjectInitializationWarning,
-  RequiredProjectFolderName,
+  WorkspaceCreationFolder,
+  WorkspaceInitializationPreview,
+  WorkspaceInitializationWarning,
+  RequiredWorkspaceFolderName,
 } from '../shared/sidekick-api';
-import { ensureRequiredProjectFolders, REQUIRED_PROJECT_FOLDERS } from './project-creator';
+import { ensureRequiredWorkspaceFolders, REQUIRED_WORKSPACE_FOLDERS } from './workspace-creator';
 
 const SIMILAR_FOLDER_TERMS = [
   'transkrips',
@@ -15,6 +15,8 @@ const SIMILAR_FOLDER_TERMS = [
   'transcript',
   'forutset',
   'assumption',
+  'notat',
+  'note',
 ];
 
 type DirectoryEntry = {
@@ -25,13 +27,13 @@ type DirectoryEntry = {
 
 const assertAbsoluteDirectory = async (rootPath: string) => {
   if (typeof rootPath !== 'string' || !path.isAbsolute(rootPath)) {
-    throw new Error('Choose an existing project folder.');
+    throw new Error('Choose an existing workspace.');
   }
 
   const stats = await lstat(rootPath);
 
   if (!stats.isDirectory()) {
-    throw new Error('Choose a project folder, not a file.');
+    throw new Error('Choose a workspace, not a file.');
   }
 };
 
@@ -45,7 +47,7 @@ const readDirectoryEntries = async (rootPath: string): Promise<DirectoryEntry[]>
   }));
 };
 
-const requiredFolderExists = async (rootPath: string, folderName: RequiredProjectFolderName) => {
+const requiredFolderExists = async (rootPath: string, folderName: RequiredWorkspaceFolderName) => {
   try {
     const stats = await lstat(path.join(rootPath, folderName));
 
@@ -64,17 +66,17 @@ const normalizeFolderName = (name: string) => name.toLocaleLowerCase('nb-NO');
 const findSimilarFolderWarnings = (
   rootPath: string,
   entries: DirectoryEntry[],
-  missingRequiredFolders: RequiredProjectFolderName[],
-): ProjectInitializationWarning[] => {
+  missingRequiredFolders: RequiredWorkspaceFolderName[],
+): WorkspaceInitializationWarning[] => {
   if (missingRequiredFolders.length === 0) {
     return [];
   }
 
-  const requiredFolderSet = new Set(REQUIRED_PROJECT_FOLDERS);
+  const requiredFolderSet = new Set(REQUIRED_WORKSPACE_FOLDERS);
 
   return entries
     .filter((entry) => entry.isDirectory)
-    .filter((entry) => !requiredFolderSet.has(entry.name as RequiredProjectFolderName))
+    .filter((entry) => !requiredFolderSet.has(entry.name as RequiredWorkspaceFolderName))
     .filter((entry) => {
       const normalizedName = normalizeFolderName(entry.name);
 
@@ -85,19 +87,19 @@ const findSimilarFolderWarnings = (
       // Similar names are warnings only. Initialization still requires the exact
       // standard folder names so later workflows have predictable targets.
       message:
-        'This folder looks similar to a required project folder, but Sidekick requires the exact folder name.',
+        'This folder looks similar to a required workspace, but Sidekick requires the exact folder name.',
     }));
 };
 
-export const createProjectInitializationPreview = async (
+export const createWorkspaceInitializationPreview = async (
   rootPath: string,
   previewId = randomUUID(),
-): Promise<ProjectInitializationPreview> => {
+): Promise<WorkspaceInitializationPreview> => {
   await assertAbsoluteDirectory(rootPath);
 
   const entries = await readDirectoryEntries(rootPath);
   const requiredFolders = await Promise.all(
-    REQUIRED_PROJECT_FOLDERS.map(async (folderName) => ({
+    REQUIRED_WORKSPACE_FOLDERS.map(async (folderName) => ({
       name: folderName,
       path: path.join(rootPath, folderName),
       status: (await requiredFolderExists(rootPath, folderName)) ? ('existing' as const) : ('missing' as const),
@@ -117,16 +119,16 @@ export const createProjectInitializationPreview = async (
   };
 };
 
-export const confirmProjectInitialization = async (
+export const confirmWorkspaceInitialization = async (
   rootPath: string,
 ): Promise<{
   rootPath: string;
   rootName: string;
-  requiredFolders: ProjectCreationFolder[];
+  requiredFolders: WorkspaceCreationFolder[];
 }> => {
   await assertAbsoluteDirectory(rootPath);
 
-  const requiredFolders = await ensureRequiredProjectFolders(rootPath);
+  const requiredFolders = await ensureRequiredWorkspaceFolders(rootPath);
 
   return {
     rootPath,

@@ -38,7 +38,7 @@ describe('transcription importer helpers', () => {
     });
   });
 
-  it('strips a leading source number before adding the project sequence', () => {
+  it('strips a leading source number before adding the workspace sequence', () => {
     expect(stripLeadingNumberPrefix('01 - downloaded transcript.md')).toBe(
       'downloaded transcript.md',
     );

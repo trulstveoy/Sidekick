@@ -1,12 +1,12 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { ProjectInfoSnapshot } from '../shared/sidekick-api';
+import type { WorkspaceInfoSnapshot } from '../shared/sidekick-api';
 
 export const SIDEKICK_METADATA_FOLDER = '.sidekick';
-export const PROJECT_INFO_FILE_NAME = 'project-info.md';
-export const PROJECT_INFO_SCHEMA = 'project-info.v1';
+export const WORKSPACE_INFO_FILE_NAME = 'workspace-info.md';
+export const WORKSPACE_INFO_SCHEMA = 'workspace-info.v1';
 
-type ProjectInfoWriteInput = {
+type WorkspaceInfoWriteInput = {
   rootPath: string;
   contextPackagePath: string;
   contextPackageSha256: string;
@@ -14,15 +14,15 @@ type ProjectInfoWriteInput = {
   generatedAt?: string;
 };
 
-type ProjectInfoMetadata = {
+type WorkspaceInfoMetadata = {
   generatedAt: string;
-  sourceScope: 'full-project';
+  sourceScope: 'full-workspace';
   contextPackagePath: string;
   contextPackageSha256: string;
   summaryLanguage: 'nb';
 };
 
-const REQUIRED_SUMMARY_SECTIONS = ['Project Summary', 'Participants', 'Themes'];
+const REQUIRED_SUMMARY_SECTIONS = ['Workspace Summary', 'Participants', 'Themes'];
 
 const normalizeNewlines = (value: string) => value.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
@@ -34,32 +34,32 @@ const isPathInside = (parentPath: string, candidatePath: string) => {
   return relativePath === '' || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath));
 };
 
-const assertProjectPath = (rootPath: string, candidatePath: string) => {
+const assertWorkspacePath = (rootPath: string, candidatePath: string) => {
   if (!path.isAbsolute(rootPath)) {
-    throw new Error('Project root path must be absolute.');
+    throw new Error('Workspace root path must be absolute.');
   }
 
   if (!isPathInside(rootPath, candidatePath)) {
-    throw new Error('Project info path must stay inside the selected project.');
+    throw new Error('Workspace info path must stay inside the selected workspace.');
   }
 };
 
 export const getSidekickMetadataPath = (rootPath: string) => {
   const metadataPath = path.join(rootPath, SIDEKICK_METADATA_FOLDER);
-  assertProjectPath(rootPath, metadataPath);
+  assertWorkspacePath(rootPath, metadataPath);
 
   return metadataPath;
 };
 
-export const getProjectInfoPath = (rootPath: string) => {
-  const projectInfoPath = path.join(getSidekickMetadataPath(rootPath), PROJECT_INFO_FILE_NAME);
-  assertProjectPath(rootPath, projectInfoPath);
+export const getWorkspaceInfoPath = (rootPath: string) => {
+  const workspaceInfoPath = path.join(getSidekickMetadataPath(rootPath), WORKSPACE_INFO_FILE_NAME);
+  assertWorkspacePath(rootPath, workspaceInfoPath);
 
-  return projectInfoPath;
+  return workspaceInfoPath;
 };
 
-export const toProjectRelativePath = (rootPath: string, targetPath: string) => {
-  assertProjectPath(rootPath, targetPath);
+export const toWorkspaceRelativePath = (rootPath: string, targetPath: string) => {
+  assertWorkspacePath(rootPath, targetPath);
 
   const relativePath = path.relative(rootPath, targetPath);
 
@@ -71,7 +71,7 @@ const parseFrontMatter = (markdown: string) => {
   const match = /^---\n([\s\S]*?)\n---\n?/.exec(normalized);
 
   if (!match) {
-    throw new Error('Project info front matter is missing.');
+    throw new Error('Workspace info front matter is missing.');
   }
 
   const attributes = new Map<string, string>();
@@ -122,12 +122,12 @@ export const parseMarkdownSections = (markdown: string) => {
   return sections;
 };
 
-export const validateProjectSummaryMarkdown = (summaryMarkdown: string) => {
+export const validateWorkspaceSummaryMarkdown = (summaryMarkdown: string) => {
   const sections = parseMarkdownSections(summaryMarkdown);
   const missingSections = REQUIRED_SUMMARY_SECTIONS.filter((section) => !sections.get(section));
 
   if (missingSections.length > 0) {
-    throw new Error(`Project summary is missing required sections: ${missingSections.join(', ')}.`);
+    throw new Error(`Workspace summary is missing required sections: ${missingSections.join(', ')}.`);
   }
 
   return sections;
@@ -144,9 +144,9 @@ const parseListSection = (value: string | undefined) => {
     .filter((line) => line.length > 0);
 };
 
-const createFrontMatter = (metadata: ProjectInfoMetadata) => [
+const createFrontMatter = (metadata: WorkspaceInfoMetadata) => [
   '---',
-  `sidekick_schema: ${PROJECT_INFO_SCHEMA}`,
+  `sidekick_schema: ${WORKSPACE_INFO_SCHEMA}`,
   `generated_at: ${metadata.generatedAt}`,
   `source_scope: ${metadata.sourceScope}`,
   `context_package_path: ${metadata.contextPackagePath}`,
@@ -156,18 +156,18 @@ const createFrontMatter = (metadata: ProjectInfoMetadata) => [
   '',
 ].join('\n');
 
-export const createProjectInfoMarkdown = ({
+export const createWorkspaceInfoMarkdown = ({
   rootPath,
   contextPackagePath,
   contextPackageSha256,
   summaryMarkdown,
   generatedAt = new Date().toISOString(),
-}: ProjectInfoWriteInput) => {
-  validateProjectSummaryMarkdown(summaryMarkdown);
-  const metadata: ProjectInfoMetadata = {
+}: WorkspaceInfoWriteInput) => {
+  validateWorkspaceSummaryMarkdown(summaryMarkdown);
+  const metadata: WorkspaceInfoMetadata = {
     generatedAt,
-    sourceScope: 'full-project',
-    contextPackagePath: toProjectRelativePath(rootPath, contextPackagePath),
+    sourceScope: 'full-workspace',
+    contextPackagePath: toWorkspaceRelativePath(rootPath, contextPackagePath),
     contextPackageSha256,
     summaryLanguage: 'nb',
   };
@@ -175,13 +175,13 @@ export const createProjectInfoMarkdown = ({
 
   return [
     createFrontMatter(metadata),
-    '# Sidekick Project Info',
+    '# Sidekick Workspace Info',
     '',
     normalizedSummary,
     '',
     '## Source Context',
     '',
-    '- Scope: full-project',
+    '- Scope: full-workspace',
     `- Context package: \`${metadata.contextPackagePath}\``,
     `- Generated at: \`${metadata.generatedAt}\``,
     `- Context hash: \`${metadata.contextPackageSha256}\``,
@@ -189,32 +189,32 @@ export const createProjectInfoMarkdown = ({
   ].join('\n');
 };
 
-export const parseProjectInfoMarkdown = (
-  projectInfoPath: string,
+export const parseWorkspaceInfoMarkdown = (
+  workspaceInfoPath: string,
   markdown: string,
-): ProjectInfoSnapshot => {
+): WorkspaceInfoSnapshot => {
   const { attributes, body } = parseFrontMatter(markdown);
 
-  if (attributes.get('sidekick_schema') !== PROJECT_INFO_SCHEMA) {
-    throw new Error('Project info schema is unsupported.');
+  if (attributes.get('sidekick_schema') !== WORKSPACE_INFO_SCHEMA) {
+    throw new Error('Workspace info schema is unsupported.');
   }
 
   const sections = parseMarkdownSections(body);
-  const projectSummary = sections.get('Project Summary');
+  const workspaceSummary = sections.get('Workspace Summary');
 
-  if (!projectSummary) {
-    throw new Error('Project info summary section is missing.');
+  if (!workspaceSummary) {
+    throw new Error('Workspace info summary section is missing.');
   }
 
   return {
     status: 'complete',
-    path: projectInfoPath,
+    path: workspaceInfoPath,
     generatedAt: attributes.get('generated_at'),
-    sourceScope: attributes.get('source_scope') === 'full-project' ? 'full-project' : undefined,
+    sourceScope: attributes.get('source_scope') === 'full-workspace' ? 'full-workspace' : undefined,
     contextPackagePath: attributes.get('context_package_path'),
     contextPackageSha256: attributes.get('context_package_sha256'),
     summaryLanguage: attributes.get('summary_language') === 'nb' ? 'nb' : undefined,
-    projectSummary,
+    workspaceSummary,
     participants: sections.get('Participants'),
     themes: parseListSection(sections.get('Themes')),
     openQuestions: parseListSection(sections.get('Open Questions')).filter(
@@ -223,38 +223,38 @@ export const parseProjectInfoMarkdown = (
   };
 };
 
-export const readProjectInfo = async (rootPath: string): Promise<ProjectInfoSnapshot> => {
-  const projectInfoPath = getProjectInfoPath(rootPath);
+export const readWorkspaceInfo = async (rootPath: string): Promise<WorkspaceInfoSnapshot> => {
+  const workspaceInfoPath = getWorkspaceInfoPath(rootPath);
 
   try {
-    const markdown = await readFile(projectInfoPath, 'utf8');
+    const markdown = await readFile(workspaceInfoPath, 'utf8');
 
-    return parseProjectInfoMarkdown(projectInfoPath, markdown);
+    return parseWorkspaceInfoMarkdown(workspaceInfoPath, markdown);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return {
         status: 'missing',
-        path: projectInfoPath,
+        path: workspaceInfoPath,
       };
     }
 
     return {
       status: 'invalid',
-      path: projectInfoPath,
-      message: error instanceof Error ? error.message : 'Project info could not be read.',
+      path: workspaceInfoPath,
+      message: error instanceof Error ? error.message : 'Workspace info could not be read.',
     };
   }
 };
 
-export const writeProjectInfo = async (
-  input: ProjectInfoWriteInput,
-): Promise<ProjectInfoSnapshot> => {
+export const writeWorkspaceInfo = async (
+  input: WorkspaceInfoWriteInput,
+): Promise<WorkspaceInfoSnapshot> => {
   const metadataPath = getSidekickMetadataPath(input.rootPath);
-  const projectInfoPath = getProjectInfoPath(input.rootPath);
-  const markdown = createProjectInfoMarkdown(input);
+  const workspaceInfoPath = getWorkspaceInfoPath(input.rootPath);
+  const markdown = createWorkspaceInfoMarkdown(input);
 
   await mkdir(metadataPath, { recursive: true });
-  await writeFile(projectInfoPath, markdown, 'utf8');
+  await writeFile(workspaceInfoPath, markdown, 'utf8');
 
-  return parseProjectInfoMarkdown(projectInfoPath, markdown);
+  return parseWorkspaceInfoMarkdown(workspaceInfoPath, markdown);
 };

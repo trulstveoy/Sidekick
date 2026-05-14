@@ -3,12 +3,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CodexRunner } from '../../src/main/codex-runner';
-import { generateProjectSummaryMarkdown } from '../../src/main/project-summary';
+import { generateWorkspaceSummaryMarkdown } from '../../src/main/workspace-summary';
 
 const tempRoots: string[] = [];
 
 const createFakeCodex = async (mode: 'ready' | 'logged-out' | 'malformed' = 'ready') => {
-  const rootPath = await mkdtemp(path.join(os.tmpdir(), 'sidekick-project-summary-codex-'));
+  const rootPath = await mkdtemp(path.join(os.tmpdir(), 'sidekick-workspace-summary-codex-'));
   tempRoots.push(rootPath);
   const executablePath = path.join(rootPath, 'fake-codex');
   await writeFile(
@@ -27,8 +27,8 @@ if (args[0] === 'exec') {
   process.stdin.on('end', () => {
     ${
       mode === 'malformed'
-        ? "console.log('## Project Summary\\n\\nFor kort');"
-        : "console.log('## Project Summary\\n\\nProsjektet handler om Sidekick.\\n\\n## Participants\\n\\n- Sidekick-teamet\\n\\n## Themes\\n\\n- Lokal kontekst');"
+        ? "console.log('## Workspace Summary\\n\\nFor kort');"
+        : "console.log('## Workspace Summary\\n\\nArbeidsområdet handler om Sidekick.\\n\\n## Participants\\n\\n- Sidekick-teamet\\n\\n## Themes\\n\\n- Lokal kontekst');"
     }
     process.exit(0);
   });
@@ -46,35 +46,35 @@ process.exit(2);
   };
 };
 
-describe('project summary generation integration', () => {
+describe('workspace summary generation integration', () => {
   afterEach(async () => {
     await Promise.all(tempRoots.splice(0).map((rootPath) => rm(rootPath, { recursive: true, force: true })));
   });
 
   it('generates summary markdown through a Codex-compatible executable', async () => {
     const fake = await createFakeCodex();
-    const contextPackagePath = path.join(fake.rootPath, 'project.context-package.md');
-    await writeFile(contextPackagePath, '# File Summary\n\nProject contents', 'utf8');
+    const contextPackagePath = path.join(fake.rootPath, 'workspace.context-package.md');
+    await writeFile(contextPackagePath, '# File Summary\n\nWorkspace contents', 'utf8');
     const runner = new CodexRunner(fake.executablePath);
 
-    const result = await generateProjectSummaryMarkdown({
+    const result = await generateWorkspaceSummaryMarkdown({
       rootPath: fake.rootPath,
       contextPackagePath,
       codexRunner: runner,
     });
 
-    expect(result.markdown).toContain('## Project Summary');
+    expect(result.markdown).toContain('## Workspace Summary');
     expect(result.markdown).toContain('## Themes');
   });
 
   it('fails when Codex is not logged in', async () => {
     const fake = await createFakeCodex('logged-out');
-    const contextPackagePath = path.join(fake.rootPath, 'project.context-package.md');
-    await writeFile(contextPackagePath, '# File Summary\n\nProject contents', 'utf8');
+    const contextPackagePath = path.join(fake.rootPath, 'workspace.context-package.md');
+    await writeFile(contextPackagePath, '# File Summary\n\nWorkspace contents', 'utf8');
     const runner = new CodexRunner(fake.executablePath);
 
     await expect(
-      generateProjectSummaryMarkdown({
+      generateWorkspaceSummaryMarkdown({
         rootPath: fake.rootPath,
         contextPackagePath,
         codexRunner: runner,
@@ -84,12 +84,12 @@ describe('project summary generation integration', () => {
 
   it('fails when Codex returns malformed summary markdown', async () => {
     const fake = await createFakeCodex('malformed');
-    const contextPackagePath = path.join(fake.rootPath, 'project.context-package.md');
-    await writeFile(contextPackagePath, '# File Summary\n\nProject contents', 'utf8');
+    const contextPackagePath = path.join(fake.rootPath, 'workspace.context-package.md');
+    await writeFile(contextPackagePath, '# File Summary\n\nWorkspace contents', 'utf8');
     const runner = new CodexRunner(fake.executablePath);
 
     await expect(
-      generateProjectSummaryMarkdown({
+      generateWorkspaceSummaryMarkdown({
         rootPath: fake.rootPath,
         contextPackagePath,
         codexRunner: runner,

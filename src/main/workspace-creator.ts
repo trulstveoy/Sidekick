@@ -1,38 +1,39 @@
 import { lstat, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import type {
-  ProjectCreationFolder,
-  ProjectCreationRequest,
-  RequiredProjectFolderName,
+  WorkspaceCreationFolder,
+  WorkspaceCreationRequest,
+  RequiredWorkspaceFolderName,
 } from '../shared/sidekick-api';
 
-export const REQUIRED_PROJECT_FOLDERS: RequiredProjectFolderName[] = [
+export const REQUIRED_WORKSPACE_FOLDERS: RequiredWorkspaceFolderName[] = [
   '00. Forutsetninger',
-  '01. Transkripsjoner',
+  '01. Notater',
+  '02. Transkripsjoner',
 ];
 
-type CreateProjectFolderOptions = {
+type CreateWorkspaceFolderOptions = {
   parentPath: string;
-  request: ProjectCreationRequest;
+  request: WorkspaceCreationRequest;
 };
 
-type CreateProjectFolderResult = {
+type CreateWorkspaceFolderResult = {
   rootPath: string;
   rootName: string;
-  requiredFolders: ProjectCreationFolder[];
+  requiredFolders: WorkspaceCreationFolder[];
 };
 
 const assertAbsoluteParentPath = (parentPath: string) => {
   if (!path.isAbsolute(parentPath)) {
-    throw new Error('Choose where the project should be created.');
+    throw new Error('Choose where the workspace should be created.');
   }
 };
 
-export const validateProjectName = (projectName: string) => {
-  const trimmedName = projectName.trim();
+export const validateWorkspaceName = (workspaceName: string) => {
+  const trimmedName = workspaceName.trim();
 
   if (!trimmedName) {
-    throw new Error('Project name is required.');
+    throw new Error('Workspace name is required.');
   }
 
   if (
@@ -43,21 +44,21 @@ export const validateProjectName = (projectName: string) => {
     trimmedName.includes('\0') ||
     path.isAbsolute(trimmedName)
   ) {
-    throw new Error('Project name must be a folder name, not a path.');
+    throw new Error('Workspace name must be a folder name, not a path.');
   }
 
   return trimmedName;
 };
 
-export const getProjectRootPath = (parentPath: string, projectName: string) => {
+export const getWorkspaceRootPath = (parentPath: string, workspaceName: string) => {
   assertAbsoluteParentPath(parentPath);
 
-  const rootName = validateProjectName(projectName);
+  const rootName = validateWorkspaceName(workspaceName);
   const parentRoot = path.resolve(parentPath);
   const rootPath = path.resolve(parentRoot, rootName);
   const relativeTarget = path.relative(parentRoot, rootPath);
 
-  // A project name is accepted only as one direct child of the chosen parent;
+  // A workspace name is accepted only as one direct child of the chosen parent;
   // this prevents path traversal and accidental nested creation.
   if (
     !relativeTarget ||
@@ -65,7 +66,7 @@ export const getProjectRootPath = (parentPath: string, projectName: string) => {
     path.isAbsolute(relativeTarget) ||
     path.dirname(rootPath) !== parentRoot
   ) {
-    throw new Error('Project folder must be created inside the selected parent folder.');
+    throw new Error('Workspace must be created inside the selected parent folder.');
   }
 
   return rootPath;
@@ -86,8 +87,8 @@ const pathExists = async (targetPath: string) => {
 
 const createRequiredFolder = async (
   rootPath: string,
-  name: RequiredProjectFolderName,
-): Promise<ProjectCreationFolder> => {
+  name: RequiredWorkspaceFolderName,
+): Promise<WorkspaceCreationFolder> => {
   const folderPath = path.join(rootPath, name);
   const alreadyExists = await pathExists(folderPath);
 
@@ -100,25 +101,25 @@ const createRequiredFolder = async (
   };
 };
 
-export const ensureRequiredProjectFolders = (rootPath: string) =>
+export const ensureRequiredWorkspaceFolders = (rootPath: string) =>
   Promise.all(
-    REQUIRED_PROJECT_FOLDERS.map((folderName) => createRequiredFolder(rootPath, folderName)),
+    REQUIRED_WORKSPACE_FOLDERS.map((folderName) => createRequiredFolder(rootPath, folderName)),
   );
 
-export const createProjectFolder = async ({
+export const createWorkspaceFolder = async ({
   parentPath,
   request,
-}: CreateProjectFolderOptions): Promise<CreateProjectFolderResult> => {
-  const rootName = validateProjectName(request.projectName);
-  const rootPath = getProjectRootPath(parentPath, rootName);
+}: CreateWorkspaceFolderOptions): Promise<CreateWorkspaceFolderResult> => {
+  const rootName = validateWorkspaceName(request.workspaceName);
+  const rootPath = getWorkspaceRootPath(parentPath, rootName);
 
   if (await pathExists(rootPath)) {
-    throw new Error('Project folder already exists.');
+    throw new Error('Arbeidsområdet finnes allerede.');
   }
 
   await mkdir(rootPath);
 
-  const requiredFolders = await ensureRequiredProjectFolders(rootPath);
+  const requiredFolders = await ensureRequiredWorkspaceFolders(rootPath);
 
   return {
     rootPath,

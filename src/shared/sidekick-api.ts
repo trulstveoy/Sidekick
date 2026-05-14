@@ -77,7 +77,7 @@ export type ScanSummary = {
   };
 };
 
-export type ProjectFolderScan = {
+export type WorkspaceScan = {
   rootPath: string;
   rootName: string;
   scannedAt: string;
@@ -95,56 +95,59 @@ export type ScanOptions = {
   followSymlinks: boolean;
 };
 
-export type ProjectCreationRequest = {
-  projectName: string;
+export type WorkspaceCreationRequest = {
+  workspaceName: string;
   parentPath: string;
 };
 
-export type RequiredProjectFolderName = '00. Forutsetninger' | '01. Transkripsjoner';
+export type RequiredWorkspaceFolderName =
+  | '00. Forutsetninger'
+  | '01. Notater'
+  | '02. Transkripsjoner';
 
-export type ProjectCreationFolderStatus = 'created' | 'existing';
+export type WorkspaceCreationFolderStatus = 'created' | 'existing';
 
-export type ProjectCreationFolder = {
-  name: RequiredProjectFolderName;
+export type WorkspaceCreationFolder = {
+  name: RequiredWorkspaceFolderName;
   path: string;
-  status: ProjectCreationFolderStatus;
+  status: WorkspaceCreationFolderStatus;
 };
 
-export type ProjectCreationResult = {
+export type WorkspaceCreationResult = {
   rootPath: string;
   rootName: string;
-  requiredFolders: ProjectCreationFolder[];
-  scan: ProjectFolderScan;
+  requiredFolders: WorkspaceCreationFolder[];
+  scan: WorkspaceScan;
 };
 
-export type ProjectInitializationFolderStatus = 'existing' | 'missing';
+export type WorkspaceInitializationFolderStatus = 'existing' | 'missing';
 
-export type ProjectInitializationFolder = {
-  name: RequiredProjectFolderName;
+export type WorkspaceInitializationFolder = {
+  name: RequiredWorkspaceFolderName;
   path: string;
-  status: ProjectInitializationFolderStatus;
+  status: WorkspaceInitializationFolderStatus;
 };
 
-export type ProjectInitializationWarning = {
+export type WorkspaceInitializationWarning = {
   path: string;
   message: string;
 };
 
-export type ProjectInitializationPreview = {
+export type WorkspaceInitializationPreview = {
   previewId: string;
   rootPath: string;
   rootName: string;
-  requiredFolders: ProjectInitializationFolder[];
+  requiredFolders: WorkspaceInitializationFolder[];
   existingEntryCount: number;
-  warnings: ProjectInitializationWarning[];
+  warnings: WorkspaceInitializationWarning[];
 };
 
-export type ProjectInitializationResult = {
+export type WorkspaceInitializationResult = {
   status: 'complete';
   rootPath: string;
   rootName: string;
-  requiredFolders: ProjectCreationFolder[];
-  scan: ProjectFolderScan;
+  requiredFolders: WorkspaceCreationFolder[];
+  scan: WorkspaceScan;
 };
 
 export type ContextPackageSkippedFile = {
@@ -157,25 +160,25 @@ export type ContextPackageWarning = {
   message: string;
 };
 
-export type ProjectInfoSnapshot = {
+export type WorkspaceInfoSnapshot = {
   status: 'missing' | 'complete' | 'invalid';
   path: string;
   generatedAt?: string;
-  sourceScope?: 'full-project';
+  sourceScope?: 'full-workspace';
   contextPackagePath?: string;
   contextPackageSha256?: string;
   summaryLanguage?: 'nb';
-  projectSummary?: string;
+  workspaceSummary?: string;
   participants?: string;
   themes?: string[];
   openQuestions?: string[];
   message?: string;
 };
 
-export type ProjectSummaryGenerationResult = {
+export type WorkspaceSummaryGenerationResult = {
   status: 'complete' | 'failed';
-  projectInfo?: ProjectInfoSnapshot;
-  previousProjectInfo?: ProjectInfoSnapshot;
+  workspaceInfo?: WorkspaceInfoSnapshot;
+  previousWorkspaceInfo?: WorkspaceInfoSnapshot;
   message?: string;
 };
 
@@ -183,8 +186,8 @@ export type DocumentRelationshipsSnapshot = {
   status: 'missing' | 'complete' | 'invalid';
   path: string;
   generatedAt?: string;
-  sourceScope?: 'full-project';
-  sourceModel?: 'physical-project-folder';
+  sourceScope?: 'full-workspace';
+  sourceModel?: 'physical-workspace';
   contextPackagePath?: string;
   contextPackageSha256?: string;
   summaryLanguage?: 'nb';
@@ -206,7 +209,7 @@ export type DocumentRelationshipsGenerationResult = {
   message?: string;
 };
 
-export type ContextPackageScope = 'project' | 'folder';
+export type ContextPackageScope = 'workspace' | 'folder';
 
 export type FolderContextPackageRequest = {
   rootPath: string;
@@ -241,8 +244,8 @@ export type ContextPackageResult = {
   processedFiles: string[];
   skippedFiles: ContextPackageSkippedFile[];
   warnings: ContextPackageWarning[];
-  projectSummary?: ProjectSummaryGenerationResult;
-  scan: ProjectFolderScan;
+  workspaceSummary?: WorkspaceSummaryGenerationResult;
+  scan: WorkspaceScan;
 };
 
 export type TranscriptionImportWarning = {
@@ -359,7 +362,7 @@ export type TranscriptionSummaryBatchResult = {
   targetFolderRelativePath: string;
   counts: TranscriptionSummaryBatchResultCounts;
   items: TranscriptionSummaryBatchResultItem[];
-  scan: ProjectFolderScan;
+  scan: WorkspaceScan;
 };
 
 export type TranscriptionImportResult = {
@@ -374,7 +377,7 @@ export type TranscriptionImportResult = {
   finalNumber: number;
   copiedBytes: number;
   summary: TranscriptionSummaryGenerationResult;
-  scan: ProjectFolderScan;
+  scan: WorkspaceScan;
 };
 
 export type CodexRunMode = 'read-only' | 'workspace-write';
@@ -434,7 +437,7 @@ export type CodexCompletionEvent = {
   exitCode: number | null;
   signal: string | null;
   message?: string;
-  scan?: ProjectFolderScan;
+  scan?: WorkspaceScan;
   createdAt: string;
 };
 
@@ -444,16 +447,16 @@ export type CodexEventUnsubscribe = () => void;
 // should map to one intentional app capability, not a generic system primitive.
 export type SidekickApi = {
   getAppInfo: () => Promise<AppInfo>;
-  chooseProjectFolder: () => Promise<ProjectFolderScan | null>;
-  chooseProjectParentFolder: () => Promise<string | null>;
-  createProjectFolder: (
-    request: ProjectCreationRequest,
-  ) => Promise<ProjectCreationResult | null>;
-  chooseProjectFolderForInitialization: () => Promise<ProjectInitializationPreview | null>;
-  confirmProjectInitialization: (previewId: string) => Promise<ProjectInitializationResult>;
+  chooseWorkspaceFolder: () => Promise<WorkspaceScan | null>;
+  chooseWorkspaceParentFolder: () => Promise<string | null>;
+  createWorkspaceFolder: (
+    request: WorkspaceCreationRequest,
+  ) => Promise<WorkspaceCreationResult | null>;
+  chooseWorkspaceFolderForInitialization: () => Promise<WorkspaceInitializationPreview | null>;
+  confirmWorkspaceInitialization: (previewId: string) => Promise<WorkspaceInitializationResult>;
   previewContextPackage: (rootPath: string) => Promise<ContextPackagePreview>;
   generateContextPackage: (rootPath: string) => Promise<ContextPackageResult>;
-  readProjectInfo: (rootPath: string) => Promise<ProjectInfoSnapshot>;
+  readWorkspaceInfo: (rootPath: string) => Promise<WorkspaceInfoSnapshot>;
   readDocumentRelationships: (rootPath: string) => Promise<DocumentRelationshipsSnapshot>;
   generateDocumentRelationships: (
     rootPath: string,

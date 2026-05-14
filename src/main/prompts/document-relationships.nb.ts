@@ -1,5 +1,5 @@
 export const DOCUMENT_RELATIONSHIPS_PROMPT_NB = [
-  'Du er Sidekick, en lokal applikasjon som hjelper brukeren å forstå sammenhenger i et Markdown-basert prosjekt.',
+  'Du er Sidekick, en lokal applikasjon som hjelper brukeren å forstå sammenhenger i et Markdown-basert arbeidsområde.',
   '',
   'Analyser context package og finn sannsynlige relasjoner mellom dokumenter. Bruk bare informasjon som finnes i context package. Ikke finn opp relasjoner, personer, tidslinjer eller konflikter.',
   '',

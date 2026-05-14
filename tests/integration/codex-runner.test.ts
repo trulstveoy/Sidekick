@@ -37,9 +37,9 @@ if (args[0] === 'exec') {
   });
   process.stdin.on('end', () => {
     if (!args.includes('--json')) {
-      console.log('## Project Summary');
+      console.log('## Workspace Summary');
       console.log('');
-      console.log('Prosjektet handler om Sidekick.');
+      console.log('Arbeidsområdet handler om Sidekick.');
       console.log('');
       console.log('## Participants');
       console.log('');
@@ -131,7 +131,7 @@ describe('codex runner', () => {
     const result = await runner.runExecText(fake.rootPath, 'summarize this folder', 'read-only');
 
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain('## Project Summary');
+    expect(result.stdout).toContain('## Workspace Summary');
     expect(result.stdout).toContain('## Themes');
   });
 

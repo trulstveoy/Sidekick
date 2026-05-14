@@ -12,7 +12,7 @@ import {
   getContextPackagePreview,
 } from '../../src/main/context-package';
 
-const fixturePath = path.resolve(__dirname, '../fixtures/project-folder-basic');
+const fixturePath = path.resolve(__dirname, '../fixtures/workspace-basic');
 const temporaryRoots: string[] = [];
 
 const copyFixtureToTemp = async () => {
@@ -24,9 +24,9 @@ const copyFixtureToTemp = async () => {
 };
 
 const summaryMarkdown = [
-  '## Project Summary',
+  '## Workspace Summary',
   '',
-  'Prosjektet handler om Sidekick.',
+  'Arbeidsområdet handler om Sidekick.',
   '',
   '## Participants',
   '',
@@ -79,7 +79,7 @@ describe('context package generation', () => {
     const outputPath = getContextPackageOutputPath(rootPath);
     await writeFile(outputPath, 'SHOULD_NOT_BE_INCLUDED');
     await mkdir(path.join(rootPath, '.sidekick'), { recursive: true });
-    await writeFile(path.join(rootPath, '.sidekick', 'project-info.md'), 'SIDEKICK_METADATA_SECRET');
+    await writeFile(path.join(rootPath, '.sidekick', 'workspace-info.md'), 'SIDEKICK_METADATA_SECRET');
 
     const result = await generateContextPackage(rootPath, { codexRunner: fakeCodexRunner });
     const output = await readFile(outputPath, 'utf8');
@@ -87,7 +87,7 @@ describe('context package generation', () => {
     const skippedPaths = result.skippedFiles.map((file) => file.path);
 
     expect(result.status).toBe('complete');
-    expect(result.projectSummary.status).toBe('complete');
+    expect(result.workspaceSummary.status).toBe('complete');
     expect(result.outputPath).toBe(outputPath);
     expect(result.outputFileName).toBe(`${path.basename(rootPath)}.context-package.md`);
     expect(result.overwritten).toBe(true);
@@ -175,12 +175,12 @@ describe('context package generation', () => {
 
     await expect(
       getFolderContextPackagePreview({ rootPath, folderRelativePath: '../outside' }),
-    ).rejects.toThrow('Selected folder path must stay inside the project root.');
+    ).rejects.toThrow('Selected folder path must stay inside the workspace root.');
     await expect(
       getFolderContextPackagePreview({ rootPath, folderRelativePath: path.join(rootPath, '02-transkripsjoner') }),
-    ).rejects.toThrow('Selected folder path must be relative to the project root.');
+    ).rejects.toThrow('Selected folder path must be relative to the workspace root.');
     await expect(
       getFolderContextPackagePreview({ rootPath, folderRelativePath: '.' }),
-    ).rejects.toThrow('Use the full-project context package action for the project root.');
+    ).rejects.toThrow('Use the full-workspace context package action for the workspace root.');
   });
 });

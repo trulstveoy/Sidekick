@@ -282,8 +282,8 @@ export const runRepomixContextPackage = async ({
     ignore: ignorePatterns.join(','),
   };
   const config = mergeConfigs(rootPath, {}, buildCliConfig(cliOptions));
-  // Pack only the selected project root. The caller is responsible for choosing
-  // rootPath through Sidekick's project-root allowlist.
+  // Pack only the selected workspace root. The caller is responsible for choosing
+  // rootPath through Sidekick's workspace-root allowlist.
   const packResult = await pack([path.resolve(rootPath)], config, () => undefined, {
     createMetricsTaskRunner: createInProcessMetricsTaskRunner,
     validateFileSafety: validateFileSafetyInProcess,
