@@ -620,4 +620,9 @@ Integration:
 
 - Task branch: `task/TASK-0037-folder-context-tagging`.
 - Task worktree: `/home/trutve/code/Sidekick-worktrees/TASK-0037-folder-context-tagging`.
-- Ready to merge into `main` and remove the task worktree.
+- Merged into `main` with fast-forward merge.
+- Feature commit: `21afd07 feat: add folder context tagging`.
+- Final verification from `main`:
+  - `npm run check` passed.
+  - `npm run test` passed: 25 unit/integration test files, 111 tests.
+  - `npm run test:ui -- tests/e2e/renderer-smoke.spec.ts` passed: 33 UI tests.
