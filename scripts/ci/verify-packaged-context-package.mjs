@@ -25,7 +25,7 @@ const findPackagedAsar = async (outDirectory) => {
   throw new Error(`No packaged app.asar found under ${outDirectory}.`);
 };
 
-const createElectronStub = (selectedProjectRoot, ipcHandlers) => ({
+const createElectronStub = (selectedWorkspaceRoot, ipcHandlers) => ({
   app: {
     quit() {},
     enableSandbox() {},
@@ -60,7 +60,7 @@ const createElectronStub = (selectedProjectRoot, ipcHandlers) => ({
     async showOpenDialog() {
       return {
         canceled: false,
-        filePaths: [selectedProjectRoot],
+        filePaths: [selectedWorkspaceRoot],
       };
     },
   },
@@ -74,15 +74,15 @@ const runVerification = async () => {
   const asarPath = await findPackagedAsar(outDirectory);
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'sidekick-packaged-context-'));
   const extractPath = path.join(tempRoot, 'app');
-  const projectRoot = path.join(tempRoot, 'project');
+  const workspaceRoot = path.join(tempRoot, 'workspace');
   const ipcHandlers = new Map();
   const originalLoad = Module._load;
 
   try {
     extractAll(asarPath, extractPath);
-    await mkdir(projectRoot, { recursive: true });
+    await mkdir(workspaceRoot, { recursive: true });
     await writeFile(
-      path.join(projectRoot, 'note.md'),
+      path.join(workspaceRoot, 'note.md'),
       '# Packaged context check\n\nHello from packaged Sidekick.\n',
       'utf8',
     );
@@ -92,7 +92,7 @@ const runVerification = async () => {
     // worker paths, without launching the GUI in CI.
     Module._load = function load(request, parent, isMain) {
       if (request === 'electron') {
-        return createElectronStub(projectRoot, ipcHandlers);
+        return createElectronStub(workspaceRoot, ipcHandlers);
       }
 
       return originalLoad.apply(this, [request, parent, isMain]);
@@ -101,7 +101,7 @@ const runVerification = async () => {
     const require = createRequire(import.meta.url);
     require(path.join(extractPath, '.vite', 'build', 'main.js'));
 
-    const selectAndScan = ipcHandlers.get('project-folder:choose-and-scan');
+    const selectAndScan = ipcHandlers.get('workspace:choose-and-scan');
     const generateContextPackage = ipcHandlers.get('context-package:generate');
 
     if (!selectAndScan || !generateContextPackage) {
@@ -124,8 +124,15 @@ const runVerification = async () => {
 };
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  runVerification().catch((error) => {
-    console.error(error instanceof Error ? error.stack : error);
-    process.exitCode = 1;
-  });
+  runVerification()
+    .then(() => {
+      // Loading the packaged main bundle registers app-level background
+      // resources in the Electron stub. The verification work is complete
+      // once runVerification resolves, so exit explicitly to keep CI finite.
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error(error instanceof Error ? error.stack : error);
+      process.exit(1);
+    });
 }
