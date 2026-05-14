@@ -12,6 +12,7 @@ import type {
   TranscriptionSummaryBatchPreview,
   TranscriptionSummaryReadRequest,
   TranscriptionImportPreview,
+  SearchWorkspaceRequest,
 } from './shared/sidekick-api';
 import {
   generateContextPackage,
@@ -44,6 +45,7 @@ import {
   createTranscriptionSummaryBatchPreview,
 } from './main/transcription-summary-batch';
 import { AppSettingsStore, normalizeCodexPath, validateCodexPath } from './main/settings-store';
+import { SearchIndexManager } from './main/search-index';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -73,6 +75,7 @@ const pendingTranscriptionSummaryBatches = new Map<string, TranscriptionSummaryB
 const pendingWorkspaceInitializations = new Map<string, WorkspaceInitializationPreview>();
 let settingsStore: AppSettingsStore | undefined;
 const codexRunner = new CodexRunner();
+const searchIndexManager = new SearchIndexManager();
 const codexRuns = new Map<
   string,
   {
@@ -110,6 +113,14 @@ const applyCodexSettings = async () => {
   return snapshot;
 };
 
+searchIndexManager.on('status', (status) => {
+  BrowserWindow.getAllWindows().forEach((window) => {
+    if (!window.webContents.isDestroyed()) {
+      window.webContents.send('search-index:status', status);
+    }
+  });
+});
+
 ipcMain.handle('workspace:choose-and-scan', async (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   const dialogOptions: Electron.OpenDialogOptions = {
@@ -125,7 +136,10 @@ ipcMain.handle('workspace:choose-and-scan', async (event) => {
   }
 
   selectedWorkspaceRoots.add(result.filePaths[0]);
-  return scanWorkspaceFolder(result.filePaths[0]);
+  const scan = await scanWorkspaceFolder(result.filePaths[0]);
+  searchIndexManager.startInitialIndex(scan.rootPath);
+
+  return scan;
 });
 
 ipcMain.handle('workspace:choose-parent', async (event) => {
@@ -160,10 +174,12 @@ ipcMain.handle('workspace:create', async (event, request: WorkspaceCreationReque
     request,
   });
   selectedWorkspaceRoots.add(createdWorkspace.rootPath);
+  const scan = await scanWorkspaceFolder(createdWorkspace.rootPath);
+  searchIndexManager.startInitialIndex(createdWorkspace.rootPath);
 
   return {
     ...createdWorkspace,
-    scan: await scanWorkspaceFolder(createdWorkspace.rootPath),
+    scan,
   };
 });
 
@@ -201,11 +217,13 @@ ipcMain.handle('workspace:confirm-initialization', async (_event, previewId) => 
   try {
     const initializedWorkspace = await confirmWorkspaceInitialization(preview.rootPath);
     selectedWorkspaceRoots.add(initializedWorkspace.rootPath);
+    const scan = await scanWorkspaceFolder(initializedWorkspace.rootPath);
+    searchIndexManager.startInitialIndex(initializedWorkspace.rootPath);
 
     return {
       status: 'complete',
       ...initializedWorkspace,
-      scan: await scanWorkspaceFolder(initializedWorkspace.rootPath),
+      scan,
     };
   } finally {
     pendingWorkspaceInitializations.delete(previewId);
@@ -275,6 +293,40 @@ ipcMain.handle('context-package:preview-folder', (_event, request) =>
 
 ipcMain.handle('context-package:generate-folder', (_event, request) =>
   generateFolderContextPackage(assertFolderContextPackageRequest(request)),
+);
+
+const assertSearchWorkspaceRequest = (request: unknown): SearchWorkspaceRequest => {
+  if (!request || typeof request !== 'object') {
+    throw new Error('A search request is required.');
+  }
+
+  const { rootPath, query, limit } = request as Partial<SearchWorkspaceRequest>;
+
+  if (typeof query !== 'string') {
+    throw new Error('Search query must be text.');
+  }
+
+  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 50)) {
+    throw new Error('Search limit must be between 1 and 50.');
+  }
+
+  return {
+    rootPath: assertKnownWorkspaceRoot(rootPath),
+    query,
+    limit,
+  };
+};
+
+ipcMain.handle('search-index:get-status', (_event, rootPath) =>
+  searchIndexManager.getStatus(assertKnownWorkspaceRoot(rootPath)),
+);
+
+ipcMain.handle('search-index:refresh', (_event, rootPath) =>
+  searchIndexManager.refresh(assertKnownWorkspaceRoot(rootPath)),
+);
+
+ipcMain.handle('search-index:search', (_event, request) =>
+  searchIndexManager.search(assertSearchWorkspaceRequest(request)),
 );
 
 ipcMain.handle('transcription:preview-import', async (event, rootPath) => {
@@ -642,6 +694,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('before-quit', () => {
+  void searchIndexManager.close();
 });
 
 app.on('activate', () => {

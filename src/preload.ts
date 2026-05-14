@@ -1,5 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { CodexCompletionEvent, CodexOutputEvent, SidekickApi } from './shared/sidekick-api';
+import type {
+  CodexCompletionEvent,
+  CodexOutputEvent,
+  SearchIndexStatus,
+  SidekickApi,
+} from './shared/sidekick-api';
 
 // Keep the renderer on a typed, task-specific surface. It never receives raw
 // ipcRenderer, filesystem, process, or shell access.
@@ -33,6 +38,9 @@ const sidekickApi: SidekickApi = {
     ipcRenderer.invoke('transcription:preview-summary-batch', rootPath),
   confirmTranscriptionSummaryBatch: (previewId) =>
     ipcRenderer.invoke('transcription:confirm-summary-batch', previewId),
+  getSearchIndexStatus: (rootPath) => ipcRenderer.invoke('search-index:get-status', rootPath),
+  refreshSearchIndex: (rootPath) => ipcRenderer.invoke('search-index:refresh', rootPath),
+  searchWorkspace: (request) => ipcRenderer.invoke('search-index:search', request),
   getCodexStatus: (rootPath) => ipcRenderer.invoke('codex:get-status', rootPath),
   startCodexLogin: (rootPath) => ipcRenderer.invoke('codex:start-login', rootPath),
   startCodexRun: (request) => ipcRenderer.invoke('codex:start-run', request),
@@ -60,6 +68,16 @@ const sidekickApi: SidekickApi = {
 
     return () => {
       ipcRenderer.off('codex:completion', handler);
+    };
+  },
+  onSearchIndexStatus: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, status: SearchIndexStatus) => {
+      listener(status);
+    };
+    ipcRenderer.on('search-index:status', handler);
+
+    return () => {
+      ipcRenderer.off('search-index:status', handler);
     };
   },
 };

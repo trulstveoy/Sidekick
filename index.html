@@ -119,6 +119,28 @@
               <p>Sidekick fant ingen filer eller undermapper i dette arbeidsområdet.</p>
             </section>
 
+            <section class="search-panel" aria-label="Søk i arbeidsområde" data-search-panel hidden>
+              <div class="search-row">
+                <label class="section-label" for="workspace-search">Søk</label>
+                <input
+                  id="workspace-search"
+                  type="search"
+                  data-search-query
+                  placeholder="Søk i støttede tekstfiler..."
+                  autocomplete="off"
+                />
+                <button class="btn btn-secondary btn-sm" type="button" data-search-refresh>
+                  Oppdater indeks
+                </button>
+              </div>
+              <div class="search-status-row">
+                <span class="status-chip" data-search-status>Indeks ikke sjekket</span>
+                <span data-search-count></span>
+              </div>
+            </section>
+
+            <section class="search-results" aria-label="Søkeresultater" data-search-results hidden></section>
+
             <section class="tree-panel" aria-label="Mappestruktur">
               <ol class="folder-tree" data-folder-tree role="tree" aria-label="Skannet mappetre"></ol>
             </section>

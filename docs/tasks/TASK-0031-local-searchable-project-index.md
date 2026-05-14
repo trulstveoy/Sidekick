@@ -1,7 +1,7 @@
 # Task: Local Searchable Workspace Index
 
 ID: TASK-0031
-Status: Planned
+Status: Done
 Class: Major
 Owner: Pair
 Created: 2026-05-12
@@ -42,22 +42,22 @@ The index should make supported local content searchable without Codex. The firs
 
 ## Current Phase
 
-Plan
+Close
 
-Specification and implementation plan are updated. Human approval is required before build.
+Build, automated verification, human verification, and closeout are complete.
 
 ## Progress Checklist
 
 - [x] Explore complete
 - [x] Spec complete
 - [x] Plan complete
-- [ ] Worktree created or reused, if required
-- [ ] Human approval received, if required
-- [ ] Build complete
-- [ ] Verification complete
-- [ ] Review complete
-- [ ] Documentation complete
-- [ ] Closeout complete
+- [x] Worktree created or reused, if required
+- [x] Human approval received, if required
+- [x] Build complete
+- [x] Verification complete
+- [x] Review complete
+- [x] Documentation complete
+- [x] Closeout complete
 
 ## Backlog Source
 
@@ -74,6 +74,9 @@ Related docs:
 Related tasks:
 - `closed/TASK-0028-generate-summaries-for-existing-transcriptions.md`
 - `closed/TASK-0030-generate-thematic-context-packages.md` (canceled)
+
+Related decisions:
+- `../decisions/0006-local-search-index.md`
 
 ## Explore Notes
 
@@ -323,7 +326,7 @@ Planned. Stop before build until human approval is explicitly received.
 - `tests/unit`
 - `tests/integration`
 - `tests/e2e`
-- `docs/decisions/0005-local-search-index.md`
+- `docs/decisions/0006-local-search-index.md`
 - `docs/tasks/TASK-0031-local-searchable-project-index.md`
 
 ### Dependency Plan
@@ -480,7 +483,7 @@ Planned. Stop before build until human approval is explicitly received.
      - result selection updating normal context.
 
 10. Add decision record
-    - Add `docs/decisions/0005-local-search-index.md`.
+    - Add `docs/decisions/0006-local-search-index.md`.
     - Record MiniSearch, workspace-local `.sidekick/search-index/` storage, index-on-establishment behavior, and first-version update model.
 
 ### Verification
@@ -517,25 +520,56 @@ Planned. Stop before build until human approval is explicitly received.
 ### Human Gate
 
 - Required.
-- Approval status: Pending.
-- Do not start build until the human explicitly approves this plan.
+- Approval status: Approved 2026-05-14.
+- Approval source: human said “gjør build for 31”.
 
 ## Build Log
 
-Not started.
+- Created worktree `../Sidekick-worktrees/TASK-0031-local-searchable-workspace-index` on branch `task/TASK-0031-local-searchable-workspace-index`.
+- Added `minisearch@7.2.0`.
+- Added main-process `SearchIndexManager` in `src/main/search-index.ts`.
+- Added workspace-local index storage under `.sidekick/search-index/` with `index.json` and `manifest.json`.
+- Wired initial indexing from `workspace:choose-and-scan`, `workspace:create`, and `workspace:confirm-initialization`.
+- Added typed IPC/preload APIs for status, refresh, search, and status events.
+- Added renderer search field, compact index status, manual `Oppdater indeks`, dense result list, empty/error states, and result selection back into normal workspace context.
+- Added tests for index build/search, skip reporting, refresh behavior, and unsafe path rejection.
+- Added UI smoke coverage for search status, search results, empty results, stale status, refresh, and result selection.
+- Added decision record `docs/decisions/0006-local-search-index.md`.
 
 ## Verification Log
 
-Not started.
+- `npm run typecheck` passed after initial implementation fixes.
+- `npm test` passed: 24 files, 104 tests.
+- `npm run test:ui` passed: 32 tests.
+- `npm run check` passed.
+- `npm test -- --runInBand` was attempted first, but Vitest does not support `--runInBand`; reran with `npm test`.
 
 ## Review Notes
 
-Not started.
+- Human verified the implemented search workflow on 2026-05-14 and reported that it works.
+
+### Human Verification Instructions
+
+1. Start Sidekick from the task worktree with `npm start`.
+2. Select an existing workspace with at least one `.md` or `.txt` file.
+3. Confirm that the search status becomes `Indeks klar` without pressing a first-time build button.
+4. Search for text that exists in one of the supported files.
+5. Confirm that results show path, snippet, and rank/score metadata.
+6. Click a result and confirm the normal file context opens in the right context surface.
+7. Add or edit a supported text file while the workspace is open, wait briefly, and search for the new text.
+8. Press `Oppdater indeks` and confirm search still works after refresh.
+9. Confirm that `.sidekick/` and `*.context-package.md` content do not appear in search results.
 
 ## Documentation Notes
 
-Not started.
+- Added `docs/decisions/0006-local-search-index.md`.
+- Updated this task record with approval, build, and verification notes.
 
 ## Closeout
 
-Not started.
+- Completed local searchable workspace index for supported text files.
+- Initial indexing is connected to workspace establishment.
+- Search index refresh and selected-workspace search are exposed through typed APIs only.
+- Search results can select normal workspace file context.
+- Index metadata is stored as generated workspace-local data under `.sidekick/search-index/`.
+- Verification passed: `npm run check`, `npm test`, and `npm run test:ui`.

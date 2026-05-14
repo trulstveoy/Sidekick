@@ -20,6 +20,8 @@ import type {
   WorkspaceInitializationPreview,
   WorkspaceInitializationResult,
   ScanWarning,
+  SearchIndexStatus,
+  SearchWorkspaceResult,
   TranscriptionImportPreview,
   TranscriptionImportResult,
   TranscriptionSummaryBatchItemStatus,
@@ -108,6 +110,13 @@ type DocumentRelationshipsState =
   | { status: 'generating'; rootPath: string; previousReport?: DocumentRelationshipsSnapshot }
   | { status: 'complete'; rootPath: string; result: DocumentRelationshipsGenerationResult }
   | { status: 'failed'; rootPath: string; message: string; previousReport?: DocumentRelationshipsSnapshot };
+
+type SearchState =
+  | { status: 'unavailable' }
+  | { status: 'idle'; rootPath: string; indexStatus: SearchIndexStatus }
+  | { status: 'searching'; rootPath: string; query: string; indexStatus: SearchIndexStatus }
+  | { status: 'results'; rootPath: string; query: string; result: SearchWorkspaceResult }
+  | { status: 'error'; rootPath: string; query: string; indexStatus?: SearchIndexStatus; message: string };
 
 type DetailRow = [string, string];
 
@@ -247,6 +256,12 @@ const treeToolbarTarget = document.querySelector<HTMLElement>('[data-tree-toolba
 const treeTarget = document.querySelector<HTMLOListElement>('[data-folder-tree]');
 const expandAllButton = document.querySelector<HTMLButtonElement>('[data-expand-all]');
 const collapseAllButton = document.querySelector<HTMLButtonElement>('[data-collapse-all]');
+const searchPanelTarget = document.querySelector<HTMLElement>('[data-search-panel]');
+const searchQueryInput = document.querySelector<HTMLInputElement>('[data-search-query]');
+const searchRefreshButton = document.querySelector<HTMLButtonElement>('[data-search-refresh]');
+const searchStatusTarget = document.querySelector<HTMLElement>('[data-search-status]');
+const searchCountTarget = document.querySelector<HTMLElement>('[data-search-count]');
+const searchResultsTarget = document.querySelector<HTMLElement>('[data-search-results]');
 const summaryTarget = document.querySelector<HTMLElement>('[data-summary]');
 const contextPackageTitleTarget = document.querySelector<HTMLElement>('[data-context-package-title]');
 const contextPackageMessageTarget = document.querySelector<HTMLElement>('[data-context-package-message]');
@@ -385,6 +400,8 @@ let overviewContextPackageStatus: OverviewContextPackageStatus = { status: 'unav
 let transcriptionImportState: TranscriptionImportState = { status: 'unavailable' };
 let transcriptionSummaryBatchState: TranscriptionSummaryBatchState = { status: 'unavailable' };
 let documentRelationshipsState: DocumentRelationshipsState = { status: 'unavailable' };
+let searchState: SearchState = { status: 'unavailable' };
+let searchDebounceTimer: number | undefined;
 let workspaceCreationState: WorkspaceCreationState = {
   status: 'closed',
   message: '',
@@ -656,6 +673,26 @@ const setDocumentRelationshipsStateForScan = (scan?: WorkspaceScan) => {
     scan && window.sidekick ? { status: 'checking', rootPath: scan.rootPath } : { status: 'unavailable' };
 };
 
+const createMissingSearchStatus = (rootPath: string): SearchIndexStatus => ({
+  rootPath,
+  state: 'missing',
+  documentCount: 0,
+  skippedCounts: {
+    unsupported: 0,
+    binary: 0,
+    oversized: 0,
+    'read-error': 0,
+  },
+  skippedFiles: [],
+});
+
+const setSearchStateForScan = (scan?: WorkspaceScan) => {
+  searchState =
+    scan && window.sidekick?.getSearchIndexStatus
+      ? { status: 'idle', rootPath: scan.rootPath, indexStatus: createMissingSearchStatus(scan.rootPath) }
+      : { status: 'unavailable' };
+};
+
 const setCodexStateForScan = (scan?: WorkspaceScan) => {
   codexState =
     scan && window.sidekick
@@ -676,11 +713,13 @@ const setActiveScan = (scan: WorkspaceScan) => {
   setTranscriptionImportStateForScan(scan);
   setTranscriptionSummaryBatchStateForScan(scan);
   setDocumentRelationshipsStateForScan(scan);
+  setSearchStateForScan(scan);
   setCodexStateForScan(scan);
   state = scan.status === 'partial' ? { status: 'partial', scan } : { status: 'ready', scan };
   workspaceInfoState = null;
   void refreshWorkspaceInfo(scan);
   void refreshDocumentRelationships(scan);
+  void refreshSearchIndexStatus(scan);
 };
 
 const getActiveScan = () =>
@@ -3355,6 +3394,324 @@ const renderTree = (scan?: WorkspaceScan) => {
   treeTarget.append(renderTreeNode(scan.tree));
 };
 
+const searchStatusLabel = (status?: SearchIndexStatus) => {
+  switch (status?.state) {
+    case 'indexing':
+      return 'Bygger indeks';
+    case 'updating':
+      return 'Oppdaterer indeks';
+    case 'ready':
+      return `Indeks klar (${status.documentCount})`;
+    case 'stale':
+      return 'Indeks må oppdateres';
+    case 'failed':
+      return 'Indeks feilet';
+    case 'missing':
+      return 'Indeks mangler';
+    default:
+      return 'Indeks ikke sjekket';
+  }
+};
+
+const searchStatusTone = (status?: SearchIndexStatus) => {
+  if (!status) {
+    return 'neutral';
+  }
+
+  if (status.state === 'ready') {
+    return 'success';
+  }
+
+  if (status.state === 'stale' || status.state === 'missing' || status.state === 'indexing' || status.state === 'updating') {
+    return 'warning';
+  }
+
+  if (status.state === 'failed') {
+    return 'error';
+  }
+
+  return 'neutral';
+};
+
+const currentSearchIndexStatus = () => {
+  if (searchState.status === 'idle' || searchState.status === 'searching') {
+    return searchState.indexStatus;
+  }
+
+  if (searchState.status === 'results') {
+    return searchState.result.status;
+  }
+
+  if (searchState.status === 'error') {
+    return searchState.indexStatus;
+  }
+
+  return undefined;
+};
+
+const renderSearchResults = (scan?: WorkspaceScan) => {
+  clear(searchResultsTarget);
+  const query = searchQueryInput?.value.trim() ?? '';
+  const indexStatus = currentSearchIndexStatus();
+  const hasQuery = Boolean(query);
+
+  searchPanelTarget?.toggleAttribute('hidden', !scan);
+  searchResultsTarget?.toggleAttribute('hidden', !scan || !hasQuery);
+  treeTarget?.parentElement?.toggleAttribute('hidden', Boolean(scan && hasQuery));
+  searchQueryInput?.toggleAttribute('disabled', !scan || !window.sidekick?.searchWorkspace);
+
+  if (searchStatusTarget) {
+    searchStatusTarget.textContent = searchStatusLabel(indexStatus);
+    searchStatusTarget.dataset.status = searchStatusTone(indexStatus);
+  }
+
+  const canRefresh =
+    Boolean(scan && window.sidekick?.refreshSearchIndex) &&
+    indexStatus?.state !== 'indexing' &&
+    indexStatus?.state !== 'updating';
+  searchRefreshButton?.toggleAttribute('disabled', !canRefresh);
+
+  const skippedCount = indexStatus
+    ? Object.values(indexStatus.skippedCounts).reduce((sum, count) => sum + count, 0)
+    : 0;
+  const skippedLabel = skippedCount > 0 ? ` · ${skippedCount} hoppet over` : '';
+
+  if (!hasQuery) {
+    setText(searchCountTarget, indexStatus ? `${indexStatus.documentCount} indeksert${skippedLabel}` : '');
+    return;
+  }
+
+  if (searchState.status === 'searching') {
+    setText(searchCountTarget, 'Søker...');
+    searchResultsTarget?.append(createResultBanner('warning', 'Søker', 'Sidekick søker i lokal indeks.'));
+    return;
+  }
+
+  if (searchState.status === 'error') {
+    setText(searchCountTarget, 'Søk feilet');
+    searchResultsTarget?.append(createResultBanner('error', 'Søket feilet', searchState.message));
+    return;
+  }
+
+  if (searchState.status !== 'results') {
+    setText(searchCountTarget, 'Skriv for å søke');
+    return;
+  }
+
+  setText(
+    searchCountTarget,
+    `${searchState.result.results.length} av ${searchState.result.resultCount} treff${skippedLabel}`,
+  );
+
+  if (searchState.result.results.length === 0) {
+    searchResultsTarget?.append(createResultBanner('warning', 'Ingen treff', 'Søket ga ingen treff i indeksen.'));
+    return;
+  }
+
+  const list = document.createElement('ol');
+  list.className = 'search-result-list';
+
+  const resultIndexStatus = searchState.result.status;
+  searchState.result.results.forEach((result) => {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    const title = document.createElement('span');
+    const meta = document.createElement('span');
+    const snippet = document.createElement('span');
+
+    button.type = 'button';
+    button.className = 'search-result-row';
+    button.disabled = !scan || !getNodeByPath(scan.tree, result.relativePath);
+    title.className = 'search-result-title';
+    meta.className = 'search-result-meta';
+    snippet.className = 'search-result-snippet';
+    title.textContent = result.relativePath;
+    meta.textContent = `${result.rank}. treff · score ${result.score.toFixed(2)} · ${artifactLabels[result.artifactType]} · ${formatBytes(result.size)}`;
+    snippet.textContent = result.snippet || 'Ingen tekstutdrag tilgjengelig.';
+    button.append(title, meta, snippet);
+    button.addEventListener('click', () => {
+      const activeScan = getActiveScan();
+      if (!activeScan || !getNodeByPath(activeScan.tree, result.relativePath)) {
+        return;
+      }
+
+      selectedTreePath = result.relativePath;
+      focusedTreePath = result.relativePath;
+      expandedPaths = new Set([
+        ...expandedPaths,
+        ROOT_PATH,
+        ...getPathAncestors(activeScan, result.relativePath).map((node) => node.relativePath),
+      ]);
+      if (searchQueryInput) {
+        searchQueryInput.value = '';
+      }
+      searchState = { status: 'idle', rootPath: activeScan.rootPath, indexStatus: resultIndexStatus };
+      render();
+      focusSelectedTreeRow();
+    });
+    item.append(button);
+    list.append(item);
+  });
+
+  searchResultsTarget?.append(list);
+};
+
+const refreshSearchIndexStatus = async (scan: WorkspaceScan) => {
+  if (!window.sidekick?.getSearchIndexStatus) {
+    searchState = { status: 'unavailable' };
+    render();
+    return;
+  }
+
+  try {
+    const indexStatus = await window.sidekick.getSearchIndexStatus(scan.rootPath);
+    const activeScan = getActiveScan();
+    if (!activeScan || activeScan.rootPath !== scan.rootPath) {
+      return;
+    }
+
+    const query = searchQueryInput?.value.trim() ?? '';
+    if (searchState.status === 'results' && searchState.rootPath === scan.rootPath && query) {
+      searchState = {
+        status: 'results',
+        rootPath: scan.rootPath,
+        query: searchState.query,
+        result: {
+          ...searchState.result,
+          status: indexStatus,
+        },
+      };
+    } else {
+      searchState = { status: 'idle', rootPath: scan.rootPath, indexStatus };
+    }
+  } catch (error) {
+    searchState = {
+      status: 'error',
+      rootPath: scan.rootPath,
+      query: '',
+      message: error instanceof Error ? error.message : 'Kunne ikke lese søkeindeks.',
+    };
+  }
+
+  render();
+};
+
+const runSearch = async () => {
+  const scan = getActiveScan();
+  const query = searchQueryInput?.value.trim() ?? '';
+
+  if (!scan || !window.sidekick?.searchWorkspace) {
+    return;
+  }
+
+  if (!query) {
+    const indexStatus = currentSearchIndexStatus() ?? createMissingSearchStatus(scan.rootPath);
+    searchState = { status: 'idle', rootPath: scan.rootPath, indexStatus };
+    render();
+    return;
+  }
+
+  const indexStatus = currentSearchIndexStatus() ?? createMissingSearchStatus(scan.rootPath);
+  searchState = { status: 'searching', rootPath: scan.rootPath, query, indexStatus };
+  render();
+
+  try {
+    const result = await window.sidekick.searchWorkspace({ rootPath: scan.rootPath, query, limit: 25 });
+    const activeScan = getActiveScan();
+    if (!activeScan || activeScan.rootPath !== scan.rootPath || searchQueryInput?.value.trim() !== query) {
+      return;
+    }
+    searchState = { status: 'results', rootPath: scan.rootPath, query, result };
+  } catch (error) {
+    searchState = {
+      status: 'error',
+      rootPath: scan.rootPath,
+      query,
+      indexStatus,
+      message: error instanceof Error ? error.message : 'Søket kunne ikke gjennomføres.',
+    };
+  }
+
+  render();
+};
+
+const scheduleSearch = () => {
+  if (searchDebounceTimer) {
+    window.clearTimeout(searchDebounceTimer);
+  }
+
+  searchDebounceTimer = window.setTimeout(() => {
+    void runSearch();
+  }, 200);
+};
+
+const refreshSearchIndex = async () => {
+  const scan = getActiveScan();
+
+  if (!scan || !window.sidekick?.refreshSearchIndex) {
+    return;
+  }
+
+  const previousStatus = currentSearchIndexStatus() ?? createMissingSearchStatus(scan.rootPath);
+  searchState = {
+    status: 'idle',
+    rootPath: scan.rootPath,
+    indexStatus: {
+      ...previousStatus,
+      state: 'indexing',
+      message: 'Oppdaterer søkeindeks.',
+    },
+  };
+  render();
+
+  try {
+    const indexStatus = await window.sidekick.refreshSearchIndex(scan.rootPath);
+    const activeScan = getActiveScan();
+    if (!activeScan || activeScan.rootPath !== scan.rootPath) {
+      return;
+    }
+    searchState = { status: 'idle', rootPath: scan.rootPath, indexStatus };
+    await runSearch();
+  } catch (error) {
+    searchState = {
+      status: 'error',
+      rootPath: scan.rootPath,
+      query: searchQueryInput?.value.trim() ?? '',
+      indexStatus: previousStatus,
+      message: error instanceof Error ? error.message : 'Søkeindeksen kunne ikke oppdateres.',
+    };
+  }
+
+  render();
+};
+
+const handleSearchIndexStatus = (status: SearchIndexStatus) => {
+  const scan = getActiveScan();
+
+  if (!scan || scan.rootPath !== status.rootPath) {
+    return;
+  }
+
+  if (searchState.status === 'results') {
+    searchState = {
+      ...searchState,
+      result: {
+        ...searchState.result,
+        status,
+      },
+    };
+  } else if (searchState.status === 'searching') {
+    searchState = {
+      ...searchState,
+      indexStatus: status,
+    };
+  } else {
+    searchState = { status: 'idle', rootPath: status.rootPath, indexStatus: status };
+  }
+
+  render();
+};
+
 const refreshOverviewContextPackageStatus = async (scan: WorkspaceScan) => {
   if (!window.sidekick) {
     overviewContextPackageStatus = { status: 'unavailable' };
@@ -3482,6 +3839,7 @@ const renderNoScanPanels = () => {
   overviewEmptyTarget?.toggleAttribute('hidden', true);
   renderOverviewScanStatus();
   renderOverviewContextPackageStatus();
+  renderSearchResults();
   renderContextPackage();
   renderTranscriptionImport();
   renderTranscriptionSummaryBatch();
@@ -3582,6 +3940,7 @@ const renderReadyState = (scan: WorkspaceScan, status: 'ready' | 'partial') => {
   renderOverviewWarnings(scan);
   renderOverviewScanStatus(scan);
   renderOverviewContextPackageStatus(scan);
+  renderSearchResults(scan);
   renderSelectedTreeContext(scan);
   renderContextPackage(scan);
   renderTranscriptionImport(scan);
@@ -3972,6 +4331,7 @@ const generateContextPackage = async () => {
     setTranscriptionImportStateForScan(result.scan);
     setTranscriptionSummaryBatchStateForScan(result.scan);
     setDocumentRelationshipsStateForScan(result.scan);
+    setSearchStateForScan(result.scan);
     contextPackageState = { status: 'complete', result };
     if (result.scope === 'workspace') {
       if (result.workspaceSummary) {
@@ -3995,6 +4355,7 @@ const generateContextPackage = async () => {
     }
     void refreshDocumentRelationships(result.scan);
     void refreshCodexStatus(result.scan);
+    void refreshSearchIndexStatus(result.scan);
   } catch (error) {
     contextPackageState = {
       status: 'error',
@@ -4076,9 +4437,11 @@ const importTranscription = async () => {
     setOverviewContextPackageStatusForScan(result.scan);
     setTranscriptionSummaryBatchStateForScan(result.scan);
     setDocumentRelationshipsStateForScan(result.scan);
+    setSearchStateForScan(result.scan);
     transcriptionImportState = { status: 'complete', result };
     void refreshOverviewContextPackageStatus(result.scan);
     void refreshDocumentRelationships(result.scan);
+    void refreshSearchIndexStatus(result.scan);
   } catch (error) {
     transcriptionImportState = {
       status: 'error',
@@ -4163,10 +4526,12 @@ const generateTranscriptionSummaryBatch = async () => {
     setOverviewContextPackageStatusForScan(result.scan);
     setTranscriptionImportStateForScan(result.scan);
     setDocumentRelationshipsStateForScan(result.scan);
+    setSearchStateForScan(result.scan);
     transcriptionSummaryBatchState = { status: 'complete', result };
     void refreshOverviewContextPackageStatus(result.scan);
     void refreshDocumentRelationships(result.scan);
     void refreshCodexStatus(result.scan);
+    void refreshSearchIndexStatus(result.scan);
   } catch (error) {
     transcriptionSummaryBatchState = {
       status: 'error',
@@ -4427,13 +4792,15 @@ const completeCodexRun = (completion: CodexCompletionEvent) => {
       completion.scan.status === 'partial'
         ? { status: 'partial', scan: completion.scan }
         : { status: 'ready', scan: completion.scan };
-    setContextPackageStateForScan(completion.scan);
-    setOverviewContextPackageStatusForScan(completion.scan);
-    setTranscriptionImportStateForScan(completion.scan);
-    setTranscriptionSummaryBatchStateForScan(completion.scan);
-    setDocumentRelationshipsStateForScan(completion.scan);
-    void refreshOverviewContextPackageStatus(completion.scan);
-    void refreshDocumentRelationships(completion.scan);
+      setContextPackageStateForScan(completion.scan);
+      setOverviewContextPackageStatusForScan(completion.scan);
+      setTranscriptionImportStateForScan(completion.scan);
+      setTranscriptionSummaryBatchStateForScan(completion.scan);
+      setDocumentRelationshipsStateForScan(completion.scan);
+      setSearchStateForScan(completion.scan);
+      void refreshOverviewContextPackageStatus(completion.scan);
+      void refreshDocumentRelationships(completion.scan);
+      void refreshSearchIndexStatus(completion.scan);
   }
 
   const output = codexState.output;
@@ -4477,6 +4844,7 @@ const chooseFolder = async () => {
       setTranscriptionImportStateForScan();
       setTranscriptionSummaryBatchStateForScan();
       setDocumentRelationshipsStateForScan();
+      setSearchStateForScan();
       setCodexStateForScan();
       state = { status: 'empty' };
       render();
@@ -4494,6 +4862,7 @@ const chooseFolder = async () => {
     setTranscriptionImportStateForScan();
     setTranscriptionSummaryBatchStateForScan();
     setDocumentRelationshipsStateForScan();
+    setSearchStateForScan();
     setCodexStateForScan();
     state = {
       status: 'error',
@@ -4830,6 +5199,10 @@ createWorkspaceButton?.addEventListener('click', () => {
 
 expandAllButton?.addEventListener('click', expandAllFolders);
 collapseAllButton?.addEventListener('click', collapseAllFolders);
+searchQueryInput?.addEventListener('input', scheduleSearch);
+searchRefreshButton?.addEventListener('click', () => {
+  void refreshSearchIndex();
+});
 contextPackagePrimaryButton?.addEventListener('click', handleContextPackagePrimary);
 overviewGenerateContextButton?.addEventListener('click', () => {
   openWorkspaceContextPackageWorkflow();
@@ -4876,5 +5249,6 @@ codexSecondaryButton?.addEventListener('click', () => {
 
 window.sidekick?.onCodexOutput?.(appendCodexOutput);
 window.sidekick?.onCodexCompletion?.(completeCodexRun);
+window.sidekick?.onSearchIndexStatus?.(handleSearchIndexStatus);
 
 render();

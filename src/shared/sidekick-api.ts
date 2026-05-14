@@ -248,6 +248,74 @@ export type ContextPackageResult = {
   scan: WorkspaceScan;
 };
 
+export type SearchIndexState =
+  | 'missing'
+  | 'indexing'
+  | 'ready'
+  | 'updating'
+  | 'stale'
+  | 'failed';
+
+export type SearchIndexSkippedReason = 'unsupported' | 'binary' | 'oversized' | 'read-error';
+
+export type SearchIndexSkippedFile = {
+  relativePath: string;
+  reason: SearchIndexSkippedReason;
+  message: string;
+};
+
+export type SearchIndexSkippedCounts = Record<SearchIndexSkippedReason, number>;
+
+export type SearchIndexStatus = {
+  rootPath: string;
+  state: SearchIndexState;
+  message?: string;
+  documentCount: number;
+  skippedCounts: SearchIndexSkippedCounts;
+  skippedFiles: SearchIndexSkippedFile[];
+  updatedAt?: string;
+  indexingStartedAt?: string;
+};
+
+export type SearchWorkspaceRequest = {
+  rootPath: string;
+  query: string;
+  limit?: number;
+};
+
+export type SearchWorkspaceResultItem = {
+  id: string;
+  rank: number;
+  score: number;
+  name: string;
+  relativePath: string;
+  artifactType: ArtifactType;
+  extension: string;
+  size: number;
+  modifiedAt: string;
+  snippet: string;
+};
+
+export type SearchWorkspaceResult = {
+  rootPath: string;
+  query: string;
+  status: SearchIndexStatus;
+  results: SearchWorkspaceResultItem[];
+  resultCount: number;
+};
+
+export type SearchIndexManifestFile = {
+  id: string;
+  relative_path: string;
+  name: string;
+  extension: string;
+  artifact_type: ArtifactType;
+  size: number;
+  modified_at: string;
+  mtime_ms: number;
+  content_sha256: string;
+};
+
 export type TranscriptionImportWarning = {
   path?: string;
   message: string;
@@ -478,6 +546,9 @@ export type SidekickApi = {
   confirmTranscriptionSummaryBatch?: (
     previewId: string,
   ) => Promise<TranscriptionSummaryBatchResult>;
+  getSearchIndexStatus?: (rootPath: string) => Promise<SearchIndexStatus>;
+  refreshSearchIndex?: (rootPath: string) => Promise<SearchIndexStatus>;
+  searchWorkspace?: (request: SearchWorkspaceRequest) => Promise<SearchWorkspaceResult>;
   getCodexStatus: (rootPath: string) => Promise<CodexStatus>;
   startCodexLogin: (rootPath: string) => Promise<CodexRunStartResult>;
   startCodexRun: (request: CodexRunRequest) => Promise<CodexRunStartResult>;
@@ -489,6 +560,9 @@ export type SidekickApi = {
   testCodexPath: (codexPath: string | null) => Promise<CodexPathTestResult>;
   onCodexOutput: (listener: (event: CodexOutputEvent) => void) => CodexEventUnsubscribe;
   onCodexCompletion: (listener: (event: CodexCompletionEvent) => void) => CodexEventUnsubscribe;
+  onSearchIndexStatus?: (
+    listener: (event: SearchIndexStatus) => void,
+  ) => CodexEventUnsubscribe;
 };
 
 declare global {

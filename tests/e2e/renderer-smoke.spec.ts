@@ -805,6 +805,199 @@ test('creates a workspace and displays the required folders', async ({ page }) =
   await expect(page.locator('[data-workflow-panel="codex"]')).toContainText('codex-cli 0.130.0-test');
 });
 
+test('shows search status and workspace search results', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan }) => {
+      const readyStatus = {
+        rootPath: scan.rootPath,
+        state: 'ready',
+        documentCount: 1,
+        skippedCounts: { unsupported: 1, binary: 1, oversized: 0, 'read-error': 0 },
+        skippedFiles: [],
+        updatedAt: '2026-05-09T12:10:00.000Z',
+      };
+
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
+        chooseWorkspaceFolderForInitialization: async () => null,
+        confirmWorkspaceInitialization: async () => {
+          throw new Error('No workspace initialization.');
+        },
+        previewContextPackage: async () => ({
+          scope: 'workspace',
+          rootPath: scan.rootPath,
+          targetPath: scan.rootPath,
+          targetRelativePath: '.',
+          outputPath: `${scan.rootPath}/workspace.context-package.md`,
+          outputFileName: 'workspace.context-package.md',
+          willOverwrite: false,
+          binaryFileWarning: '',
+          selfIgnoreWarning: '',
+        }),
+        generateContextPackage: async () => {
+          throw new Error('No context package result.');
+        },
+        readWorkspaceInfo: async () => ({ status: 'missing', path: '' }),
+        readDocumentRelationships: async () => ({ status: 'missing', path: '' }),
+        generateDocumentRelationships: async () => {
+          throw new Error('No document relationships.');
+        },
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import.');
+        },
+        getSearchIndexStatus: async () => readyStatus,
+        refreshSearchIndex: async () => readyStatus,
+        searchWorkspace: async (request) => ({
+          rootPath: scan.rootPath,
+          query: request.query,
+          status: readyStatus,
+          resultCount: 1,
+          results: [
+            {
+              id: '01-bakgrunn/notes.md',
+              rank: 1,
+              score: 12.4,
+              name: 'notes.md',
+              relativePath: '01-bakgrunn/notes.md',
+              artifactType: 'markdown-text',
+              extension: '.md',
+              size: 512,
+              modifiedAt: '2026-05-09T12:00:00.000Z',
+              snippet: 'Dette notatet beskriver lokal søkbar indeks.',
+            },
+          ],
+        }),
+        getCodexStatus: async () => ({ state: 'unavailable', available: false, loggedIn: false }),
+        startCodexLogin: async () => ({ runId: 'login' }),
+        startCodexRun: async () => ({ runId: 'run' }),
+        cancelCodexRun: async () => undefined,
+        getSettings: async () => ({ settings: { sidekick_codex_path: null }, codexPathSource: 'automatic', effectiveCodexPath: null }),
+        saveCodexPath: async () => ({ settings: { sidekick_codex_path: null }, codexPathSource: 'automatic', effectiveCodexPath: null }),
+        resetCodexPath: async () => ({ settings: { sidekick_codex_path: null }, codexPathSource: 'automatic', effectiveCodexPath: null }),
+        chooseCodexPath: async () => null,
+        testCodexPath: async () => ({ ok: true, message: 'ok' }),
+        onCodexOutput: () => () => undefined,
+        onCodexCompletion: () => () => undefined,
+        onSearchIndexStatus: () => () => undefined,
+      };
+    },
+    { scan: mockScan },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
+  await expect(page.locator('[data-search-status]')).toHaveText('Indeks klar (1)');
+
+  await page.getByRole('searchbox', { name: 'Søk' }).fill('lokal indeks');
+  await expect(page.locator('[data-search-results]')).toContainText('01-bakgrunn/notes.md');
+  await expect(page.locator('[data-search-results]')).toContainText('Dette notatet beskriver lokal søkbar indeks.');
+  await expect(page.locator('.tree-panel')).toBeHidden();
+
+  await page.getByRole('button', { name: /01-bakgrunn\/notes\.md/ }).click();
+  await expect(page.locator('.tree-panel')).toBeVisible();
+  await expect(page.locator('[data-selection-title]')).toHaveText('notes.md');
+});
+
+test('shows search empty and stale refresh states', async ({ page }) => {
+  await page.addInitScript(
+    ({ scan }) => {
+      let refreshed = false;
+      const status = () => ({
+        rootPath: scan.rootPath,
+        state: refreshed ? 'ready' : 'stale',
+        message: refreshed ? undefined : 'Filer er endret.',
+        documentCount: 1,
+        skippedCounts: { unsupported: 0, binary: 0, oversized: 0, 'read-error': 0 },
+        skippedFiles: [],
+        updatedAt: '2026-05-09T12:10:00.000Z',
+      });
+
+      window.sidekick = {
+        getAppInfo: async () => ({
+          name: 'Sidekick',
+          version: '1.0.0',
+          platform: 'linux',
+          isPackaged: false,
+        }),
+        chooseWorkspaceFolder: async () => scan,
+        chooseWorkspaceParentFolder: async () => null,
+        createWorkspaceFolder: async () => null,
+        chooseWorkspaceFolderForInitialization: async () => null,
+        confirmWorkspaceInitialization: async () => {
+          throw new Error('No workspace initialization.');
+        },
+        previewContextPackage: async () => ({
+          scope: 'workspace',
+          rootPath: scan.rootPath,
+          targetPath: scan.rootPath,
+          targetRelativePath: '.',
+          outputPath: `${scan.rootPath}/workspace.context-package.md`,
+          outputFileName: 'workspace.context-package.md',
+          willOverwrite: false,
+          binaryFileWarning: '',
+          selfIgnoreWarning: '',
+        }),
+        generateContextPackage: async () => {
+          throw new Error('No context package result.');
+        },
+        readWorkspaceInfo: async () => ({ status: 'missing', path: '' }),
+        readDocumentRelationships: async () => ({ status: 'missing', path: '' }),
+        generateDocumentRelationships: async () => {
+          throw new Error('No document relationships.');
+        },
+        previewTranscriptionImport: async () => null,
+        confirmTranscriptionImport: async () => {
+          throw new Error('No transcription import.');
+        },
+        getSearchIndexStatus: async () => status(),
+        refreshSearchIndex: async () => {
+          refreshed = true;
+          return status();
+        },
+        searchWorkspace: async (request) => ({
+          rootPath: scan.rootPath,
+          query: request.query,
+          status: status(),
+          resultCount: 0,
+          results: [],
+        }),
+        getCodexStatus: async () => ({ state: 'unavailable', available: false, loggedIn: false }),
+        startCodexLogin: async () => ({ runId: 'login' }),
+        startCodexRun: async () => ({ runId: 'run' }),
+        cancelCodexRun: async () => undefined,
+        getSettings: async () => ({ settings: { sidekick_codex_path: null }, codexPathSource: 'automatic', effectiveCodexPath: null }),
+        saveCodexPath: async () => ({ settings: { sidekick_codex_path: null }, codexPathSource: 'automatic', effectiveCodexPath: null }),
+        resetCodexPath: async () => ({ settings: { sidekick_codex_path: null }, codexPathSource: 'automatic', effectiveCodexPath: null }),
+        chooseCodexPath: async () => null,
+        testCodexPath: async () => ({ ok: true, message: 'ok' }),
+        onCodexOutput: () => () => undefined,
+        onCodexCompletion: () => () => undefined,
+        onSearchIndexStatus: () => () => undefined,
+      };
+    },
+    { scan: mockScan },
+  );
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Velg eksisterende arbeidsområde...' }).click();
+  await expect(page.locator('[data-search-status]')).toHaveText('Indeks må oppdateres');
+
+  await page.getByRole('searchbox', { name: 'Søk' }).fill('mangler');
+  await expect(page.locator('[data-search-results]')).toContainText('Ingen treff');
+
+  await page.getByRole('button', { name: 'Oppdater indeks' }).click();
+  await expect(page.locator('[data-search-status]')).toHaveText('Indeks klar (1)');
+});
+
 test('initializes an existing folder after preview confirmation', async ({ page }) => {
   await page.addInitScript(
     ({ preview, result }) => {
