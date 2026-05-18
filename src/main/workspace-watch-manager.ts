@@ -46,7 +46,7 @@ const toStatus = (
 export const shouldIgnoreWorkspaceRefreshPath = (rootPath: string, absolutePath: string) => {
   const relativePath = path.relative(rootPath, absolutePath);
 
-  if (!relativePath || relativePath === FOLDER_METADATA_FILE_NAME) {
+  if (!relativePath) {
     return false;
   }
 
@@ -54,7 +54,10 @@ export const shouldIgnoreWorkspaceRefreshPath = (rootPath: string, absolutePath:
   const segments = normalized.split('/');
   const fileName = segments[segments.length - 1] ?? '';
 
-  if (segments.some((segment) => ignoredFolderNames.has(segment))) {
+  if (
+    fileName === FOLDER_METADATA_FILE_NAME ||
+    segments.some((segment) => ignoredFolderNames.has(segment))
+  ) {
     return true;
   }
 

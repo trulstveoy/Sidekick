@@ -1,14 +1,12 @@
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   FOLDER_METADATA_FILE_NAME,
-  addFolderTag,
   normalizeFolderTagKey,
-  readFolderMetadataFile,
-  removeFolderTag,
 } from '../../src/main/context-metadata';
+import { openWorkspaceDatabase } from '../../src/main/workspace-database';
 
 const temporaryRoots: string[] = [];
 
@@ -36,10 +34,13 @@ describe('folder context metadata', () => {
     expect(normalizeFolderTagKey('Prosjektmappe!')).toBe('prosjektmappe!');
   });
 
-  it('writes a system tag with stable folder and context ids', async () => {
+  it('stores a system tag in the workspace database with stable folder and context ids', async () => {
     const folderPath = await createFolder();
-    const first = await addFolderTag(folderPath, ' prosjektmappe ');
-    const second = await addFolderTag(folderPath, 'Prosjektmappe');
+    const rootPath = path.dirname(folderPath);
+    const database = await openWorkspaceDatabase(rootPath);
+    const first = database.addFolderTag(folderPath, ' prosjektmappe ');
+    const second = database.addFolderTag(folderPath, 'Prosjektmappe');
+    database.close();
     const tag = second.tags[0];
 
     expect(first.folderId).toBe(second.folderId);
@@ -53,7 +54,9 @@ describe('folder context metadata', () => {
 
   it('stores near matches as free-form tags', async () => {
     const folderPath = await createFolder();
-    const metadata = await addFolderTag(folderPath, 'Prosjekt mappe');
+    const database = await openWorkspaceDatabase(path.dirname(folderPath));
+    const metadata = database.addFolderTag(folderPath, 'Prosjekt mappe');
+    database.close();
     const tag = metadata.tags[0];
 
     expect(tag.label).toBe('Prosjekt mappe');
@@ -61,17 +64,15 @@ describe('folder context metadata', () => {
     expect(tag.systemEffect).toBeUndefined();
   });
 
-  it('keeps the marker file with an empty tag list after removing the last tag', async () => {
+  it('removes tags from the database without creating marker files', async () => {
     const folderPath = await createFolder();
-    await addFolderTag(folderPath, 'Q2');
-    const metadata = await removeFolderTag(folderPath, 'q2');
+    const database = await openWorkspaceDatabase(path.dirname(folderPath));
+    database.addFolderTag(folderPath, 'Q2');
+    const metadata = database.removeFolderTag(folderPath, 'q2');
+    database.close();
     const markerPath = path.join(folderPath, FOLDER_METADATA_FILE_NAME);
-    const raw = await readFile(markerPath, 'utf8');
-    const fromDisk = await readFolderMetadataFile(folderPath);
 
     expect(metadata.tags).toEqual([]);
-    expect(raw).toContain('"tags": []');
-    expect(fromDisk?.folderId).toBe(metadata.folderId);
-    expect(fromDisk?.tags).toEqual([]);
+    await expect(stat(markerPath)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 });

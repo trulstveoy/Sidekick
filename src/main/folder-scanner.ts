@@ -12,11 +12,8 @@ import type {
   ScanWarning,
 } from '../shared/sidekick-api';
 import { deriveContextViews } from '../shared/context-views';
-import {
-  FOLDER_METADATA_FILE_NAME,
-  readFolderMetadataForScan,
-  toFolderMetadataSummary,
-} from './context-metadata';
+import { FOLDER_METADATA_FILE_NAME } from './context-metadata';
+import { openWorkspaceDatabase } from './workspace-database';
 
 const DEFAULT_SCAN_OPTIONS: ScanOptions = {
   maxDepth: 5,
@@ -336,34 +333,6 @@ const createFolderNode = ({ name, relativePath, stats }: ScannedPath, contextHin
   modifiedAt: stats.mtime.toISOString(),
 });
 
-const addFolderMetadata = async (
-  context: ScanContext,
-  node: FolderTreeNode,
-  folderPath: string,
-) => {
-  const result = await readFolderMetadataForScan(folderPath);
-
-  if (result.status === 'none') {
-    return;
-  }
-
-  if (result.status === 'valid') {
-    node.metadata = toFolderMetadataSummary('valid', node.relativePath, result.metadata);
-    return;
-  }
-
-  const warningType =
-    result.status === 'unsupported' ? 'metadata-unsupported' : 'metadata-invalid';
-
-  node.metadata = toFolderMetadataSummary(result.status, node.relativePath, undefined, result.message);
-  addWarning(context.state, {
-    path: node.relativePath,
-    type: warningType,
-    severity: 'error',
-    message: result.message,
-  });
-};
-
 const addDepthLimitWarning = (
   { options, state }: ScanContext,
   relativePath: string,
@@ -462,7 +431,6 @@ const scanDirectory = async (
   const ownSignals = getFolderSignals(name);
   const contextHints = [...new Set([...inheritedHints, ...ownSignals])];
   const node = createFolderNode(scannedPath, contextHints);
-  await addFolderMetadata(context, node, entryPath);
 
   if (relativePath !== '.') {
     context.state.folderCount += 1;
@@ -590,7 +558,6 @@ const markDuplicateFolderMetadata = (rootNode: FolderTreeNode, state: ScanState)
       folder.metadata = {
         status: 'conflict',
         tags: [],
-        markerRelativePath: folder.metadata?.markerRelativePath,
         folderId,
         message: `Duplicate folder metadata id "${folderId}" found.`,
       };
@@ -626,6 +593,14 @@ export const scanWorkspaceFolder = async (
 
   if (!rootNode) {
     throw new Error('Unable to scan selected folder.');
+  }
+
+  const database = await openWorkspaceDatabase(rootPath);
+  try {
+    database.syncTree(rootNode);
+    database.annotateTree(rootNode);
+  } finally {
+    database.close();
   }
 
   markDuplicateFolderMetadata(rootNode, state);

@@ -142,8 +142,8 @@ Core model:
 - Other tags are free-form user labels with no system effect, for example `Follow up` or `Q2`.
 - System-effect tags and free-form tags work the same way for the user. The distinction is visual and behavioral under the hood, not a separate interaction model.
 - System-effect tags use blue pills. Free-form tags use gray pills.
-- Tagging is stored as Sidekick metadata in a small hidden marker file inside the tagged folder: `.sidekick-folder.json`.
-- The marker file is not user content and should be hidden from normal Sidekick content views, context packages, summaries, and search indexes.
+- Tagging is stored as Sidekick metadata in the workspace-local database: `.sidekick/sidekick.db`.
+- Tag metadata is not user content and should be hidden from normal Sidekick content views, context packages, summaries, and search indexes.
 
 Primary interaction:
 
@@ -153,7 +153,7 @@ Primary interaction:
 4. Clicking the tag field opens a small suggestion dropdown.
 5. Suggestions include system-effect tags and tags the user has used elsewhere in the workspace.
 6. The user chooses a suggestion or types a new tag and presses Enter.
-7. The tag is added immediately as a chip and saved to `.sidekick-folder.json` inside the selected folder.
+7. The tag is added immediately as a chip and saved to `.sidekick/sidekick.db` for the current workspace.
 8. Clicking `x` on a chip removes the tag and saves the change.
 
 Context surface requirements:
@@ -163,7 +163,7 @@ Context surface requirements:
 - If a file is selected, do not show folder-tag editing as an available action.
 - The tag field should behave like a compact token input, not a large form.
 - The dropdown should be small, anchored to the field, and limited to relevant suggestions.
-- The UI should include quiet metadata reassurance, for example `Lagres som skjult Sidekick-metadata i mappen - ikke i dokumentene dine`.
+- The UI should include quiet metadata reassurance, for example `Lagres som skjult Sidekick-metadata i arbeidsområdet - ikke i dokumentene dine`.
 - Tag write errors should appear near the tag field and should not clear the user's selection or entered text.
 
 Tree display requirements:
@@ -306,7 +306,7 @@ Inline metadata edits:
 - Folder tagging is an inline Sidekick-metadata write, not a full workflow surface.
 - Adding or removing a tag is the explicit user action. It may autosave immediately after the chip is added or removed.
 - Inline metadata edits still need visible saved, saving, and failed states.
-- The UI must make clear that tagging writes `.sidekick-folder.json` as hidden Sidekick metadata in the tagged folder and does not change the user's own documents.
+- The UI must make clear that tagging writes hidden Sidekick metadata in `.sidekick/sidekick.db` and does not change the user's own documents.
 - Failed tag saves should leave the tag field usable and should not silently discard the attempted change.
 
 Folder-scoped context packages, when introduced, should be a contextual folder action. The action starts from the selected folder context, opens the shared context-package workflow in the primary workspace, writes the generated Markdown file to the selected folder, and keeps the selected folder visible in the context surface.
@@ -382,7 +382,7 @@ Use this checklist before merging UI changes:
 - [ ] Repeated information has been removed or moved to selection-specific detail.
 - [ ] Primary and secondary actions are visually distinct.
 - [ ] Write operations use the shared write-operation indicator and show the target path before execution.
-- [ ] Inline metadata edits such as folder tagging show saved/saving/error state and identify `.sidekick-folder.json` as the metadata target.
+- [ ] Inline metadata edits such as folder tagging show saved/saving/error state and identify `.sidekick/sidekick.db` as the metadata target.
 - [ ] Long folder names, filenames, and paths behave correctly.
 - [ ] Empty, loading, success, warning, and error states are covered.
 - [ ] Keyboard navigation and focus states work for new controls.

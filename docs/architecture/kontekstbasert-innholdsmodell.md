@@ -52,7 +52,7 @@ Den kontekstbaserte modellen bør følge disse prinsippene:
 - Sidekick kan legge til metadata, sammendrag, indekser og kontekstpakker, men dette skal være lokalt og transparent.
 - Sidekick bør være forsiktig med å skrive metadata inn i brukerens egne innholdsfiler.
 - Intern organiseringsmetadata bør i første omgang ligge under `.sidekick/`.
-- Metadata som skal følge en mappe ved rename eller flytting kan ligge som en liten skjult Sidekick-markør i selve mappen, for eksempel `.sidekick-folder.json`.
+- Sidekick-eid metadata bør ligge i en workspace-lokal database under `.sidekick/sidekick.db`.
 - Brukeren skal kunne forstå forskjellen mellom hvor en fil fysisk ligger og hvilke kontekster den er koblet til.
 - Modellen må tåle at filer opprettes, leses og redigeres i andre verktøy.
 
@@ -1033,61 +1033,51 @@ Derfor bør `.sidekick/` skille mellom:
 - genererte rapporter;
 - brukerbekreftede koblinger.
 
-### Foldermarkører
+### Workspace-lokal metadatadatabase
 
-Noe metadata bør følge en mappe når brukeren renamer eller flytter mappen.
-
-For mapper som brukeren tagger i Sidekick, for eksempel med `Prosjektmappe`, kan Sidekick skrive en liten skjult marker-fil direkte i mappen:
+Sidekick-eid metadata skal i første versjon ligge i en workspace-lokal SQLite-database:
 
 ```text
-Strategi/.sidekick-folder.json
+.sidekick/sidekick.db
 ```
 
-Dette er ikke brukerinnhold. Det er Sidekick-metadata på samme måte som `.sidekick/`, men plassert i mappen fordi identiteten bør følge mappen.
+Dette er ikke brukerinnhold. Databasen er intern Sidekick-tilstand for tagger, systemeffekter, konseptuelle kontekster og sist kjente fysisk scan. Filsystemet er fortsatt sannheten for hvilke mapper og filer som finnes.
 
-Marker-filen kan inneholde:
+En folder tagget med `Prosjektmappe` kan for eksempel representeres som rader i `filesystem_entry`, `tag`, `filesystem_entry_tag` og `context`, heller enn som en fil i den taggede mappen:
 
-```json
-{
-  "sidekickSchema": "folder-metadata.v1",
-  "folderId": "folder-strategy-7f3b",
-  "tags": [
-    {
-      "label": "Prosjektmappe",
-      "kind": "system",
-      "systemEffect": "project-root"
-    }
-  ]
-}
+```text
+filesystem_entry: Strategi/
+tag: Prosjektmappe
+filesystem_entry_tag: Strategi + Prosjektmappe
+context: project, root = Strategi/
 ```
 
-Denne tilnærmingen gjør folder-tagging mindre skjør enn en ren path-basert indeks under `.sidekick/`.
+Denne tilnærmingen gjør persisteringsmodellen renere: Sidekick-metadata ligger samlet under `.sidekick/`, mens brukerens mapper slipper skjulte Sidekick-filer.
 
 Regler:
 
-- `.sidekick-folder.json` skal skjules fra normal mappevisning, kontekstpakker, sammendrag og søkeindeks.
-- Den skal ikke skrives inn i brukerens Markdown-filer.
-- Den skal kunne skjules i editorer som Obsidian.
-- Hvis marker-filen slettes, mister Sidekick folderens tagger, men brukerens innhold påvirkes ikke.
-- Hvis en mappe kopieres og marker-filen følger med, må Sidekick kunne oppdage duplisert `folderId` og be om avklaring.
-- En workspace-level `content-index` kan senere cache eller referere til foldermarkører, men marker-filen bør være autoritativ for selve foldertaggen.
+- `.sidekick/sidekick.db` skal skjules fra normal mappevisning, kontekstpakker, sammendrag og søkeindeks.
+- Metadata skal ikke skrives inn i brukerens Markdown-filer.
+- `.sidekick-folder.json` er ikke lenger et autoritativt metadata-konsept.
+- Hvis brukeren flytter eller renamer en tagget mappe utenfor Sidekick, kan V1 ikke garantere at metadata følger mappen. Sidekick bør heller ikke gjette aggressivt. En tryggere fremtidig løsning kan legge til eksplisitt relinking, brukerbekreftet match eller annen identitetsmekanisme.
+- Hvis en mappe slettes, blir DB-raden stående som `missing` til Sidekick eventuelt rydder den eller brukeren reetablerer koblingen.
 
 ## Metadata
 
 ### Anbefalt første retning
 
-Første versjon av den kontekstbaserte modellen bør bruke to komplementære metadataformer:
+Første versjon av den kontekstbaserte modellen bør bruke to komplementære persistensformer:
 
-- foldermarkører i taggede mapper når metadata må følge mappen ved rename eller flytting;
-- sentral metadataindeks under `.sidekick/` for arbeidsområdeoversikt, koblinger, cache og metadata som ikke naturlig eies av én mappe.
+- workspace-lokal database under `.sidekick/sidekick.db` for Sidekick-eid metadata;
+- vanlige filer under `.sidekick/` for brukerlesbare genererte rapporter, der Markdown fortsatt er nyttig som artefakt.
 
-Anbefalt fil:
+Tidligere kandidat:
 
 ```text
 .sidekick/content-index.yml
 ```
 
-Dette gir Sidekick kontrollert metadata uten å skrive i brukerens egne innholdsfiler. Foldermarkører er et bevisst unntak: de skriver en skjult Sidekick-metadatafil i den taggede mappen, men ikke i brukerens dokumenter.
+Denne er erstattet av SQLite for metadata som trenger konsistens, spørring og relasjoner. Det gir Sidekick kontrollert metadata uten å skrive i brukerens egne innholdsfiler eller i den taggede folderen.
 
 ### Eksempel på content-index
 

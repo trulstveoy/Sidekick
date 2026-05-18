@@ -25,7 +25,7 @@ describe('workspace watch manager', () => {
     }
   });
 
-  it('ignores generated Sidekick paths but keeps folder metadata marker changes visible', () => {
+  it('ignores generated Sidekick paths and legacy folder metadata markers', () => {
     const root = path.join(os.tmpdir(), 'sidekick-watch-root');
 
     expect(shouldIgnoreWorkspaceRefreshPath(root, path.join(root, '.sidekick', 'search-index', 'index.json'))).toBe(
@@ -35,7 +35,7 @@ describe('workspace watch manager', () => {
       true,
     );
     expect(shouldIgnoreWorkspaceRefreshPath(root, path.join(root, 'Strategi', '.sidekick-folder.json'))).toBe(
-      false,
+      true,
     );
     expect(shouldIgnoreWorkspaceRefreshPath(root, path.join(root, 'Strategi', 'notat.md'))).toBe(false);
   });

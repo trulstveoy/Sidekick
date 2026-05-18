@@ -216,7 +216,6 @@ const mockProjectScan: WorkspaceScan = withContextViews({
             relativePath: 'Strategi',
             metadata: {
               status: 'valid',
-              markerRelativePath: 'Strategi/.sidekick-folder.json',
               folderId: 'folder-strategi',
               tags: [
                 {
@@ -1622,7 +1621,6 @@ test('edits folder tags from the right panel and shows tree pills', async ({ pag
             ...node,
             metadata: {
               status: 'valid',
-              markerRelativePath: `${relativePath}/.sidekick-folder.json`,
               folderId: 'folder-01-bakgrunn',
               tags,
             },

@@ -58,7 +58,6 @@ export type FolderMetadataStatus =
 export type FolderMetadataSummary = {
   status: FolderMetadataStatus;
   tags: FolderTag[];
-  markerRelativePath?: string;
   folderId?: string;
   message?: string;
 };

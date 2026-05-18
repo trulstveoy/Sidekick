@@ -15,6 +15,7 @@ import type {
   TranscriptionImportPreview,
   SearchWorkspaceRequest,
   FolderTagEditRequest,
+  FolderMetadataSummary,
   WorkspaceScan,
 } from './shared/sidekick-api';
 import {
@@ -32,10 +33,8 @@ import { scanWorkspaceFolder } from './main/folder-scanner';
 import {
   FOLDER_METADATA_FILE_NAME,
   ROOT_RELATIVE_PATH,
-  addFolderTag,
-  removeFolderTag,
-  toFolderMetadataSummary,
 } from './main/context-metadata';
+import { openWorkspaceDatabase } from './main/workspace-database';
 import { readWorkspaceInfo } from './main/workspace-info';
 import { createWorkspaceFolder } from './main/workspace-creator';
 import {
@@ -379,18 +378,49 @@ const resolveFolderTagRequest = async (request: unknown): Promise<FolderTagEditR
 
 const createFolderTagEditResult = async (
   request: FolderTagEditRequest & { folderPath: string },
-  operation: typeof addFolderTag | typeof removeFolderTag,
+  operation: 'add' | 'remove',
 ) => {
-  const metadata = await operation(request.folderPath, request.label);
+  const database = await openWorkspaceDatabase(request.rootPath);
+  let metadata: { tags: FolderMetadataSummary['tags']; folderId: string };
+  try {
+    metadata =
+      operation === 'add'
+        ? database.addFolderTag(request.folderPath, request.label)
+        : database.removeFolderTag(request.folderPath, request.label);
+  } finally {
+    database.close();
+  }
   const scan = await scanWorkspaceFolder(request.rootPath);
 
   return {
     status: 'complete' as const,
     rootPath: request.rootPath,
     folderRelativePath: request.folderRelativePath,
-    metadata: toFolderMetadataSummary('valid', request.folderRelativePath, metadata),
+    metadata: databaseMetadataFromScan(scan.tree, request.folderRelativePath) ?? {
+      status: 'valid' as const,
+      tags: metadata.tags,
+      folderId: metadata.folderId,
+    },
     scan,
   };
+};
+
+const databaseMetadataFromScan = (
+  node: WorkspaceScan['tree'],
+  relativePath: string,
+): FolderMetadataSummary | undefined => {
+  if (node.relativePath === relativePath) {
+    return node.metadata;
+  }
+
+  for (const child of node.children ?? []) {
+    const metadata = databaseMetadataFromScan(child, relativePath);
+    if (metadata) {
+      return metadata;
+    }
+  }
+
+  return undefined;
 };
 
 ipcMain.handle('context-package:preview', (_event, rootPath) =>
@@ -445,11 +475,11 @@ ipcMain.handle('context-package:generate-folder', (_event, request) =>
 );
 
 ipcMain.handle('folder-tags:add', async (_event, request) =>
-  createFolderTagEditResult(await resolveFolderTagRequest(request), addFolderTag),
+  createFolderTagEditResult(await resolveFolderTagRequest(request), 'add'),
 );
 
 ipcMain.handle('folder-tags:remove', async (_event, request) =>
-  createFolderTagEditResult(await resolveFolderTagRequest(request), removeFolderTag),
+  createFolderTagEditResult(await resolveFolderTagRequest(request), 'remove'),
 );
 
 const assertSearchWorkspaceRequest = (request: unknown): SearchWorkspaceRequest => {

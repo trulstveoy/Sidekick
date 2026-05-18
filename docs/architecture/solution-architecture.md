@@ -8,7 +8,7 @@ Grunnlag: Static analysis dokumentert i `../static-analysis/2026-05-18-static-an
 
 Dette dokumentet beskriver hvordan Sidekick er bygget teknisk. Det skal gi utviklere, konsulenter og design-/produktarbeid et felles bilde av komponenter, lagdeling, API-er, persistens og dataflyt.
 
-Sidekick er en lokal-first Electron desktop-applikasjon. Det finnes ingen serverbackend og ingen klassisk database. "Backend" i Sidekick betyr Electron main process, som kjører lokalt på brukerens maskin og har kontrollert tilgang til filsystem, native dialoger, eksterne prosesser og lokal persistens.
+Sidekick er en lokal-first Electron desktop-applikasjon. Det finnes ingen serverbackend. "Backend" i Sidekick betyr Electron main process, som kjører lokalt på brukerens maskin og har kontrollert tilgang til filsystem, native dialoger, eksterne prosesser og lokal persistens. Hvert arbeidsområde har i tillegg en lokal SQLite-database under `.sidekick/sidekick.db` for Sidekick-eid metadata.
 
 ## Overordnet Runtime
 
@@ -34,7 +34,7 @@ flowchart TB
   Bridge["Bridge/API-lag\nsrc/preload.ts\nsrc/shared/sidekick-api.ts"]
   App["Applikasjonslag\nsrc/main.ts\nIPC, dialoger, sesjonstilstand"]
   Domain["Domene- og tjenestelag\nsrc/main/*.ts"]
-  Persistence["Persistenslag\nworkspace-filer\n.sidekick\n.sidekick-folder.json\nuserData/settings.json"]
+  Persistence["Persistenslag\nworkspace-filer\n.sidekick/sidekick.db\n.sidekick-genererte filer\nuserData/settings.json"]
   Tools["Eksterne verktøy\nCodex CLI\nRepomix\nMiniSearch\nElectron Forge/Vite"]
 
   UI --> Bridge
@@ -82,8 +82,9 @@ Main-process tjenester har ansvar for filsystem, analyser, metadata, prosesser o
 
 | Modul | Ansvar |
 | --- | --- |
-| `folder-scanner.ts` | Leser arbeidsområdet, klassifiserer filer og mapper, leser folder metadata, lager `WorkspaceScan`. |
-| `context-metadata.ts` | Leser og skriver `.sidekick-folder.json`, normaliserer tagger og systemtagger. |
+| `folder-scanner.ts` | Leser arbeidsområdet, klassifiserer filer og mapper, synkroniserer fysisk tre til DB og lager `WorkspaceScan`. |
+| `workspace-database.ts` | Eier workspace-lokal SQLite, schema, migrering, folder tags, kontekstmetadata og scan-synkronisering. |
+| `context-metadata.ts` | Normaliserer tagger og systemtagger. Leser eller skriver ikke filsystem. |
 | `shared/context-views.ts` | Lager konseptuelle visninger som `Mapper` og `Prosjekter` fra samme fysiske scan. |
 | `workspace-creator.ts` | Oppretter nytt arbeidsområde med standardmapper. |
 | `workspace-initializer.ts` | Initierer eksisterende mappe som arbeidsområde. |
@@ -109,13 +110,16 @@ sequenceDiagram
   participant M as Main
   participant S as Service
   participant F as Filesystem
+  participant D as Workspace DB
 
   R->>P: window.sidekick.chooseWorkspaceFolder()
   P->>M: ipcRenderer.invoke("workspace:choose-and-scan")
   M->>M: Native folder dialog
   M->>S: scanWorkspaceFolder(path)
-  S->>F: readdir/lstat/read .sidekick-folder.json
-  F-->>S: folders, files, metadata
+  S->>F: readdir/lstat
+  S->>D: sync fysisk tre og hent metadata
+  F-->>S: folders, files
+  D-->>S: folder tags og kontekstmetadata
   S-->>M: WorkspaceScan
   M-->>P: WorkspaceScan
   P-->>R: WorkspaceScan
@@ -163,13 +167,13 @@ Main process registrerer tilsvarende `ipcMain.handle(...)` og sender eventer med
 
 ## Persistens og Databaser
 
-Sidekick bruker ingen database-server, SQLite eller embedded objektstore i dagens løsning. Persistens er filbasert.
+Sidekick bruker ingen database-server. Persistens er lokal og består av brukerens filsystem, en workspace-lokal SQLite-database og appinnstillinger i Electron `userData`.
 
 ```mermaid
 flowchart TB
   Workspace["Arbeidsområde valgt av bruker"]
   SidekickFolder[".sidekick/"]
-  FolderMarkers["folder/.sidekick-folder.json"]
+  WorkspaceDb[".sidekick/sidekick.db\nmetadata og kontekster"]
   SearchIndex[".sidekick/search-index/\nindex.json\nmanifest.json"]
   WorkspaceInfo[".sidekick/workspace-info.md"]
   Relationships[".sidekick/document-relationships.md"]
@@ -178,8 +182,8 @@ flowchart TB
   UserData["Electron userData/settings.json"]
 
   Workspace --> SidekickFolder
-  Workspace --> FolderMarkers
   Workspace --> ContextPackages
+  SidekickFolder --> WorkspaceDb
   SidekickFolder --> SearchIndex
   SidekickFolder --> WorkspaceInfo
   SidekickFolder --> Relationships
@@ -203,6 +207,7 @@ Arbeidsområdet er fortsatt brukerens filstruktur. Sidekick legger metadata og g
 `.sidekick/` er Sidekicks workspace-lokale metadataområde. Det brukes til:
 
 - `workspace-info.md` - generert prosjektsammendrag for hele arbeidsområdet.
+- `sidekick.db` - Sidekick-eid metadata, folder tags, konseptuelle kontekster og scan-synkronisering.
 - `document-relationships.md` - generert relasjonsanalyse på tvers av dokumenter.
 - `search-index/index.json` - serialisert MiniSearch-indeks.
 - `search-index/manifest.json` - manifest med indekserte filer, hash, mtime og skip-årsaker.
@@ -210,17 +215,19 @@ Arbeidsområdet er fortsatt brukerens filstruktur. Sidekick legger metadata og g
 
 `.sidekick/` skjules fra ordinær scanning, context-package-generering og workspace-refresh-støy der det er relevant.
 
-### `.sidekick-folder.json`
+### `.sidekick/sidekick.db`
 
-Mapper kan ha en lokal markerfil:
+`sidekick.db` er source of truth for Sidekick-eid metadata. Filsystemet er fortsatt source of truth for mapper, filer og brukerinnhold, men tagger, systemeffekter og konseptuelle koblinger ligger i databasen.
 
-```text
-<folder>/.sidekick-folder.json
-```
+Første schema inneholder blant annet:
 
-Denne filen er Sidekicks konseptuelle metadata for en mappe. Den inneholder schema, folderId, timestamps og tagger. Systemtaggen `Prosjektmappe` har systemeffekt `project-root`, og gjør at mappen opptrer som et prosjekt i `Prosjekter`-visningen.
+- `workspace` og `workspace_state` for arbeidsområdeidentitet og intern app-tilstand.
+- `filesystem_entry` for siste kjente fysiske scan, keyed på workspace-relativ sti.
+- `tag` og `filesystem_entry_tag` for folder tags.
+- `context` og `context_entry` for konseptuelle kontekster som prosjekt.
+- `generated_artifact` for DB-metadata om Sidekick-genererte artefakter.
 
-Markerfilen ligger i selve mappen fordi metadata skal følge mappen når brukeren flytter den i en ekstern editor. Scanneren oppdager konflikter dersom samme `folderId` finnes flere steder.
+`.sidekick-folder.json` er ikke lenger autoritativ metadata og opprettes ikke. Gamle markerfiler ignoreres og skjules fra normal visning.
 
 ### Context Packages
 
@@ -246,7 +253,8 @@ Dagens innstilling er `sidekick_codex_path`, som kan peke på en eksplisitt Code
 ```mermaid
 flowchart LR
   FS["Fysisk arbeidsområde"] --> Scanner["folder-scanner.ts"]
-  Markers[".sidekick-folder.json"] --> Scanner
+  Scanner --> DB["workspace-database.ts\n.sidekick/sidekick.db"]
+  DB --> Scanner
   Scanner --> Tree["FolderTreeNode\nfysisk tre"]
   Scanner --> Summary["ScanSummary"]
   Tree --> Views["deriveContextViews"]
@@ -299,7 +307,7 @@ sequenceDiagram
 
 Filsystemevents behandles som hint, ikke som sannhet. Etter debounce kjører workspace refresh en full scan og sender ny `WorkspaceScan` til renderer. Search index validerer på nytt før den endrer MiniSearch-indeksen.
 
-Ignorerte områder inkluderer blant annet `.git`, `.sidekick`, `node_modules`, build-output og genererte context packages. `.sidekick-folder.json` ignoreres ikke, fordi den påvirker konseptuelle visninger.
+Ignorerte områder inkluderer blant annet `.git`, `.sidekick`, `node_modules`, build-output, genererte context packages og gamle `.sidekick-folder.json`-filer. Konseptuelle visninger påvirkes av metadata i `.sidekick/sidekick.db`, ikke av markerfiler i mapper.
 
 ## Søk
 
@@ -378,7 +386,7 @@ Sidekick skiller mellom fysisk lagring og konseptuell visning:
 
 - Fysisk lagring er mapper og filer i arbeidsområdet.
 - Konseptuelle visninger er avledede tolkninger av samme innhold.
-- Metadata i `.sidekick-folder.json` kobler fysiske mapper til konsepter.
+- Metadata i `.sidekick/sidekick.db` kobler fysiske mapper til konsepter.
 
 Dagens konseptuelle modell har:
 
@@ -446,7 +454,7 @@ Endringer bør oppdatere dette dokumentet når de påvirker:
 
 - Electron process boundary eller sikkerhetsinnstillinger.
 - `SidekickApi` eller IPC-kanaler.
-- Workspace metadata schema eller `.sidekick-folder.json`.
+- Workspace metadata schema eller `.sidekick/sidekick.db`.
 - Persistente filer under `.sidekick/`.
 - Search index storage eller update-modell.
 - Context package generering.

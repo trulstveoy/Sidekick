@@ -1,13 +1,12 @@
-import { cp, mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   FOLDER_METADATA_FILE_NAME,
-  addFolderTag,
-  readFolderMetadataFile,
 } from '../../src/main/context-metadata';
 import { scanWorkspaceFolder } from '../../src/main/folder-scanner';
+import { openWorkspaceDatabase } from '../../src/main/workspace-database';
 
 const fixturePath = path.resolve(__dirname, '../fixtures/workspace-basic');
 const temporaryRoots: string[] = [];
@@ -30,10 +29,11 @@ describe('folder scanner', () => {
   });
 
   it('scans a workspace and returns summary counts', async () => {
-    const result = await scanWorkspaceFolder(fixturePath);
+    const rootPath = await copyFixtureToTemp();
+    const result = await scanWorkspaceFolder(rootPath);
 
     expect(result.status).toBe('complete');
-    expect(result.rootName).toBe('workspace-basic');
+    expect(result.rootName).toMatch(/^sidekick-folder-scanner-/);
     expect(result.summary.fileCount).toBe(8);
     expect(result.summary.folderCount).toBe(4);
     expect(result.summary.artifactTypeCounts.pdf).toBe(1);
@@ -48,7 +48,8 @@ describe('folder scanner', () => {
   });
 
   it('returns partial results when the file limit is reached', async () => {
-    const result = await scanWorkspaceFolder(fixturePath, { maxFiles: 2 });
+    const rootPath = await copyFixtureToTemp();
+    const result = await scanWorkspaceFolder(rootPath, { maxFiles: 2 });
 
     expect(result.status).toBe('partial');
     expect(result.summary.limitsReached.maxFiles).toBe(true);
@@ -56,10 +57,13 @@ describe('folder scanner', () => {
     expect(result.summary.fileCount).toBe(2);
   });
 
-  it('reads folder metadata markers and hides marker files from the visible tree', async () => {
+  it('reads folder metadata from the workspace database and hides legacy marker files from the visible tree', async () => {
     const rootPath = await copyFixtureToTemp();
     const folderPath = path.join(rootPath, '01-bakgrunn');
-    await addFolderTag(folderPath, 'Prosjektmappe');
+    const database = await openWorkspaceDatabase(rootPath);
+    database.addFolderTag(folderPath, 'Prosjektmappe');
+    database.close();
+    await writeFile(path.join(folderPath, FOLDER_METADATA_FILE_NAME), 'LEGACY_METADATA_SECRET', 'utf8');
     await writeFile(path.join(folderPath, 'visible.json'), '{"visible":true}', 'utf8');
 
     const result = await scanWorkspaceFolder(rootPath);
@@ -78,34 +82,25 @@ describe('folder scanner', () => {
     );
   });
 
-  it('keeps folder metadata when a tagged folder is renamed and moved inside the workspace', async () => {
+  it('keeps folder metadata tied to the original path when a tagged folder is renamed outside Sidekick', async () => {
     const rootPath = await copyFixtureToTemp();
     const originalFolder = path.join(rootPath, '01-bakgrunn');
     const renamedFolder = path.join(rootPath, 'Strategi');
-    const movedFolder = path.join(rootPath, '02-transkripsjoner', 'Strategi');
-    await addFolderTag(originalFolder, 'Q2');
-    const beforeMove = await readFolderMetadataFile(originalFolder);
+    const database = await openWorkspaceDatabase(rootPath);
+    const beforeMove = database.addFolderTag(originalFolder, 'Q2');
+    database.close();
 
-    await rename(originalFolder, renamedFolder);
-    let result = await scanWorkspaceFolder(rootPath);
-    let folder = result.tree.children?.find((child) => child.relativePath === 'Strategi');
-    expect(folder?.metadata?.folderId).toBe(beforeMove?.folderId);
-    expect(folder?.metadata?.tags[0].label).toBe('Q2');
+    await rm(renamedFolder, { recursive: true, force: true });
+    await mkdir(renamedFolder);
+    await rm(originalFolder, { recursive: true, force: true });
+    const result = await scanWorkspaceFolder(rootPath);
+    const renamed = result.tree.children?.find((child) => child.relativePath === 'Strategi');
 
-    await rename(renamedFolder, movedFolder);
-    result = await scanWorkspaceFolder(rootPath);
-    const transcriptFolder = result.tree.children?.find(
-      (child) => child.relativePath === '02-transkripsjoner',
-    );
-    folder = transcriptFolder?.children?.find(
-      (child) => child.relativePath === '02-transkripsjoner/Strategi',
-    );
-
-    expect(folder?.metadata?.folderId).toBe(beforeMove?.folderId);
-    expect(folder?.metadata?.tags[0].label).toBe('Q2');
+    expect(beforeMove.tags[0].label).toBe('Q2');
+    expect(renamed?.metadata).toBeUndefined();
   });
 
-  it('reports corrupt, unsupported, and duplicate marker files without applying tags', async () => {
+  it('ignores legacy marker files as non-authoritative metadata', async () => {
     const rootPath = await copyFixtureToTemp();
     const corruptFolder = path.join(rootPath, 'corrupt');
     const unsupportedFolder = path.join(rootPath, 'unsupported');
@@ -149,18 +144,14 @@ describe('folder scanner', () => {
     const result = await scanWorkspaceFolder(rootPath);
     const byPath = new Map(result.tree.children?.map((child) => [child.relativePath, child]));
 
-    expect(byPath.get('corrupt')?.metadata?.status).toBe('invalid');
-    expect(byPath.get('unsupported')?.metadata?.status).toBe('unsupported');
-    expect(byPath.get('duplicate-a')?.metadata?.status).toBe('conflict');
-    expect(byPath.get('duplicate-b')?.metadata?.status).toBe('conflict');
+    expect(byPath.get('corrupt')?.metadata).toBeUndefined();
+    expect(byPath.get('unsupported')?.metadata).toBeUndefined();
+    expect(byPath.get('duplicate-a')?.metadata).toBeUndefined();
+    expect(byPath.get('duplicate-b')?.metadata).toBeUndefined();
     expect(result.contextViews.projects.contexts).toEqual([]);
     expect(result.contextViews.projects.rows).toEqual([]);
-    expect(result.warnings.map((warning) => warning.type)).toEqual(
-      expect.arrayContaining([
-        'metadata-invalid',
-        'metadata-unsupported',
-        'metadata-conflict',
-      ]),
+    expect(result.warnings.map((warning) => warning.type)).not.toEqual(
+      expect.arrayContaining(['metadata-invalid', 'metadata-unsupported', 'metadata-conflict']),
     );
   });
 });

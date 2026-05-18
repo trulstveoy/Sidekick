@@ -1,7 +1,9 @@
 # Decision: Folder Metadata Marker Files
 
-Status: Accepted
+Status: Superseded by `0007-workspace-local-metadata-database.md`
 Date: 2026-05-14
+
+Superseded: 2026-05-18
 
 ## Context
 
