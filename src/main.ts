@@ -56,6 +56,7 @@ import {
 } from './main/transcription-summary-batch';
 import { AppSettingsStore, normalizeCodexPath, validateCodexPath } from './main/settings-store';
 import { SearchIndexManager } from './main/search-index';
+import { WorkspaceFileEventService } from './main/workspace-file-events';
 import { WorkspaceWatchManager } from './main/workspace-watch-manager';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -87,8 +88,9 @@ const pendingTranscriptionSummaryBatches = new Map<string, TranscriptionSummaryB
 const pendingWorkspaceInitializations = new Map<string, WorkspaceInitializationPreview>();
 let settingsStore: AppSettingsStore | undefined;
 const codexRunner = new CodexRunner();
-const searchIndexManager = new SearchIndexManager();
-const workspaceWatchManager = new WorkspaceWatchManager();
+const workspaceFileEventService = new WorkspaceFileEventService();
+const searchIndexManager = new SearchIndexManager(workspaceFileEventService);
+const workspaceWatchManager = new WorkspaceWatchManager(workspaceFileEventService);
 const codexRuns = new Map<
   string,
   {
@@ -854,6 +856,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   void searchIndexManager.close();
   workspaceWatchManager.close();
+  workspaceFileEventService.close();
 });
 
 app.on('activate', () => {

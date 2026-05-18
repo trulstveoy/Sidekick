@@ -15,6 +15,8 @@ import {
 let rootPath: string;
 let manager: SearchIndexManager;
 
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 beforeEach(async () => {
   rootPath = await mkdtemp(path.join(os.tmpdir(), 'sidekick-search-'));
   manager = new SearchIndexManager();
@@ -99,6 +101,17 @@ describe('search index manager', () => {
     await rm(path.join(rootPath, 'notes/second.md'));
     const status = await manager.refresh(rootPath);
     expect(status.documentCount).toBe(1);
+  });
+
+  it('updates search results from filesystem watcher events', async () => {
+    await writeWorkspaceFile('notes/brief.md', 'Første innhold.');
+    await manager.refresh(rootPath);
+
+    await writeWorkspaceFile('notes/watched.md', 'Dette dokumentet har watcher-søkeord.');
+    await wait(1400);
+
+    const result = await manager.search({ rootPath, query: 'watcher-søkeord' });
+    expect(result.results.map((item) => item.relativePath)).toEqual(['notes/watched.md']);
   });
 
   it('rejects unsafe workspace-relative result paths', () => {

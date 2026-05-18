@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import { watch, type FSWatcher } from 'node:fs';
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import MiniSearch from 'minisearch';
@@ -14,6 +13,11 @@ import type {
 } from '../shared/sidekick-api';
 import { FOLDER_METADATA_FILE_NAME } from './context-metadata';
 import { classifyArtifact } from './folder-scanner';
+import {
+  WorkspaceFileEventService,
+  type WorkspaceFileEvent,
+  type WorkspaceFileWatchStatus,
+} from './workspace-file-events';
 
 export const SEARCH_INDEX_SCHEMA = 'search-index-manifest.v1';
 export const SEARCH_INDEX_FOLDER = '.sidekick/search-index';
@@ -101,7 +105,7 @@ type WorkspaceIndexState = {
   manifest?: SearchManifest;
   index?: MiniSearch<SearchDocument>;
   queue: Promise<unknown>;
-  watchers: FSWatcher[];
+  unsubscribeFileEvents?: () => void;
   pendingPaths: Set<string>;
   updateTimer?: NodeJS.Timeout;
 };
@@ -381,6 +385,36 @@ const createSnippet = (content: string, query: string) => {
 export class SearchIndexManager extends EventEmitter<SearchIndexEvents> {
   private readonly states = new Map<string, WorkspaceIndexState>();
 
+  private readonly fileEvents: WorkspaceFileEventService;
+
+  private readonly ownerId = 'search-index';
+
+  private readonly onFileEvent = (event: WorkspaceFileEvent) => {
+    const state = this.states.get(event.rootPath);
+    if (!state?.unsubscribeFileEvents) {
+      return;
+    }
+
+    this.queueIncrementalUpdate(event.rootPath, event.absolutePath, event.eventType);
+  };
+
+  private readonly onFileWatchStatus = (status: WorkspaceFileWatchStatus) => {
+    const state = this.states.get(status.rootPath);
+
+    if (status.state !== 'error' || !state?.unsubscribeFileEvents) {
+      return;
+    }
+
+    this.markStale(status.rootPath, status.message);
+  };
+
+  constructor(fileEvents = new WorkspaceFileEventService()) {
+    super();
+    this.fileEvents = fileEvents;
+    this.fileEvents.on('event', this.onFileEvent);
+    this.fileEvents.on('status', this.onFileWatchStatus);
+  }
+
   private getState(rootPath: string) {
     let state = this.states.get(rootPath);
 
@@ -389,7 +423,6 @@ export class SearchIndexManager extends EventEmitter<SearchIndexEvents> {
         rootPath,
         status: createStatus(rootPath, 'missing'),
         queue: Promise.resolve(),
-        watchers: [],
         pendingPaths: new Set(),
       };
       this.states.set(rootPath, state);
@@ -430,9 +463,7 @@ export class SearchIndexManager extends EventEmitter<SearchIndexEvents> {
       state.manifest = manifest;
       state.index = MiniSearch.loadJSON<SearchDocument>(indexJson, miniSearchOptions);
       this.setStatus(state, statusFromManifest(rootPath, manifest));
-      this.ensureWatchers(state).catch(() => {
-        this.markStale(rootPath, 'Filovervåking kunne ikke startes. Oppdater indeksen manuelt.');
-      });
+      await this.ensureFileEventSubscription(state);
 
       return state;
     } catch {
@@ -590,13 +621,13 @@ export class SearchIndexManager extends EventEmitter<SearchIndexEvents> {
 
   async close() {
     for (const state of this.states.values()) {
-      this.closeWatchers(state);
+      this.closeFileEventSubscription(state);
     }
   }
 
-  private closeWatchers(state: WorkspaceIndexState) {
-    state.watchers.forEach((watcher) => watcher.close());
-    state.watchers = [];
+  private closeFileEventSubscription(state: WorkspaceIndexState) {
+    state.unsubscribeFileEvents?.();
+    state.unsubscribeFileEvents = undefined;
     if (state.updateTimer) {
       clearTimeout(state.updateTimer);
       state.updateTimer = undefined;
@@ -626,7 +657,7 @@ export class SearchIndexManager extends EventEmitter<SearchIndexEvents> {
     state.index = miniSearch;
     state.manifest = manifest;
     this.setStatus(state, statusFromManifest(rootPath, manifest));
-    await this.ensureWatchers(state);
+    await this.ensureFileEventSubscription(state);
 
     return activeState === 'indexing' ? state.status : statusFromManifest(rootPath, manifest);
   }
@@ -733,65 +764,13 @@ export class SearchIndexManager extends EventEmitter<SearchIndexEvents> {
     }
   }
 
-  private async ensureWatchers(state: WorkspaceIndexState) {
-    this.closeWatchers(state);
-    const folders = await this.collectWatchFolders(state.rootPath);
+  private async ensureFileEventSubscription(state: WorkspaceIndexState) {
+    if (state.unsubscribeFileEvents) {
+      return;
+    }
 
-    folders.forEach((folderPath) => {
-      try {
-        const watcher = watch(folderPath, (eventType, fileName) => {
-          const candidatePath =
-            typeof fileName === 'string' && fileName
-              ? path.join(folderPath, fileName)
-              : folderPath;
-          this.queueIncrementalUpdate(state.rootPath, candidatePath, eventType);
-        });
-        watcher.on('error', () => {
-          this.markStale(state.rootPath, 'Filovervåking feilet. Oppdater indeksen manuelt.');
-        });
-        state.watchers.push(watcher);
-      } catch {
-        this.markStale(state.rootPath, 'Filovervåking kunne ikke startes. Oppdater indeksen manuelt.');
-      }
-    });
-  }
-
-  private async collectWatchFolders(rootPath: string) {
-    const folders: string[] = [];
-
-    const walk = async (directoryPath: string) => {
-      folders.push(directoryPath);
-      let entries: string[];
-
-      try {
-        entries = await readdir(directoryPath);
-      } catch {
-        return;
-      }
-
-      await Promise.all(
-        entries.map(async (entryName) => {
-          if (shouldIgnoreFolder(entryName)) {
-            return;
-          }
-
-          const entryPath = path.join(directoryPath, entryName);
-          try {
-            const stats = await stat(entryPath);
-            if (stats.isDirectory()) {
-              await walk(entryPath);
-            }
-          } catch {
-            // Watchers are opportunistic. Scan/search-open stale checks remain
-            // the fallback if a directory cannot be watched.
-          }
-        }),
-      );
-    };
-
-    await walk(rootPath);
-
-    return folders;
+    state.unsubscribeFileEvents = this.fileEvents.watchWorkspace(state.rootPath, this.ownerId);
+    await this.fileEvents.refreshWorkspaceWatchers(state.rootPath);
   }
 
   private queueIncrementalUpdate(rootPath: string, candidatePath: string, eventType: string) {
@@ -897,6 +876,7 @@ export class SearchIndexManager extends EventEmitter<SearchIndexEvents> {
     }
 
     await this.applyIncrementalUpdates(rootPath, [...changedPaths]);
+    await this.fileEvents.refreshWorkspaceWatchers(rootPath);
   }
 
   private async collectCurrentSupportedPaths(
@@ -1002,7 +982,7 @@ export class SearchIndexManager extends EventEmitter<SearchIndexEvents> {
 
   async deleteIndex(rootPath: string) {
     const state = this.getState(rootPath);
-    this.closeWatchers(state);
+    this.closeFileEventSubscription(state);
     await rm(indexDirectoryPath(rootPath), { recursive: true, force: true });
     state.index = undefined;
     state.manifest = undefined;

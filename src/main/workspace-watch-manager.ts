@@ -1,9 +1,12 @@
 import { EventEmitter } from 'node:events';
-import { watch, type FSWatcher } from 'node:fs';
-import { readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { WorkspaceWatchStatus } from '../shared/sidekick-api';
 import { FOLDER_METADATA_FILE_NAME } from './context-metadata';
+import {
+  WorkspaceFileEventService,
+  type WorkspaceFileEvent,
+  type WorkspaceFileWatchStatus,
+} from './workspace-file-events';
 
 export const WORKSPACE_REFRESH_DEBOUNCE_MS = 800;
 const CONTEXT_PACKAGE_FILE_SUFFIX = 'context-package.md';
@@ -15,8 +18,8 @@ type WorkspaceWatchEvents = {
 
 type WorkspaceWatchState = {
   rootPath: string;
-  watchers: FSWatcher[];
   refreshTimer?: NodeJS.Timeout;
+  unsubscribe: () => void;
 };
 
 const ignoredFolderNames = new Set([
@@ -28,12 +31,6 @@ const ignoredFolderNames = new Set([
   '.vite',
   '.cache',
 ]);
-
-const isPathInside = (parentPath: string, childPath: string) => {
-  const relativePath = path.relative(parentPath, childPath);
-
-  return relativePath === '' || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath));
-};
 
 const toStatus = (
   rootPath: string,
@@ -73,9 +70,36 @@ export class WorkspaceWatchManager extends EventEmitter {
 
   private readonly debounceMs: number;
 
-  constructor(debounceMs = WORKSPACE_REFRESH_DEBOUNCE_MS) {
+  private readonly fileEvents: WorkspaceFileEventService;
+
+  private readonly ownerId = 'workspace-refresh';
+
+  private readonly onFileEvent = (event: WorkspaceFileEvent) => {
+    this.queueRefresh(event);
+  };
+
+  private readonly onFileWatchStatus = (status: WorkspaceFileWatchStatus) => {
+    if (!this.state || this.state.rootPath !== status.rootPath) {
+      return;
+    }
+
+    if (status.state === 'watching') {
+      this.emit('status', toStatus(status.rootPath, 'watching', status.message));
+      return;
+    }
+
+    this.emit('status', toStatus(status.rootPath, 'error', status.message));
+  };
+
+  constructor(
+    fileEvents = new WorkspaceFileEventService(),
+    debounceMs = WORKSPACE_REFRESH_DEBOUNCE_MS,
+  ) {
     super();
+    this.fileEvents = fileEvents;
     this.debounceMs = debounceMs;
+    this.fileEvents.on('event', this.onFileEvent);
+    this.fileEvents.on('status', this.onFileWatchStatus);
   }
 
   override on<EventName extends keyof WorkspaceWatchEvents>(
@@ -89,9 +113,8 @@ export class WorkspaceWatchManager extends EventEmitter {
     this.close();
     this.state = {
       rootPath,
-      watchers: [],
+      unsubscribe: this.fileEvents.watchWorkspace(rootPath, this.ownerId),
     };
-    void this.refreshWatchers(rootPath);
   }
 
   close() {
@@ -103,126 +126,28 @@ export class WorkspaceWatchManager extends EventEmitter {
       clearTimeout(this.state.refreshTimer);
     }
 
-    this.state.watchers.forEach((watcher) => watcher.close());
+    this.state.unsubscribe();
     this.state = undefined;
   }
 
   notifyUpdated(rootPath: string) {
     this.emit('status', toStatus(rootPath, 'updated', 'Arbeidsområde oppdatert.'));
-    void this.refreshWatchers(rootPath);
+    void this.fileEvents.refreshWorkspaceWatchers(rootPath);
   }
 
   notifyRefreshFailed(rootPath: string, message: string) {
     this.emit('status', toStatus(rootPath, 'error', message));
-    void this.refreshWatchers(rootPath);
+    void this.fileEvents.refreshWorkspaceWatchers(rootPath);
   }
 
-  private async refreshWatchers(rootPath: string) {
+  private queueRefresh(event: WorkspaceFileEvent) {
     const state = this.state;
 
-    if (!state || state.rootPath !== rootPath) {
+    if (!state || state.rootPath !== event.rootPath) {
       return;
     }
 
-    state.watchers.forEach((watcher) => watcher.close());
-    state.watchers = [];
-
-    try {
-      const folders = await this.collectWatchFolders(rootPath);
-      const activeState = this.state;
-
-      if (!activeState || activeState.rootPath !== rootPath) {
-        return;
-      }
-
-      folders.forEach((folderPath) => {
-        try {
-          const watcher = watch(folderPath, (_eventType, fileName) => {
-            const candidatePath =
-              typeof fileName === 'string' && fileName
-                ? path.join(folderPath, fileName)
-                : folderPath;
-            this.queueRefresh(rootPath, candidatePath);
-          });
-          watcher.on('error', () => {
-            this.emit(
-              'status',
-              toStatus(rootPath, 'error', 'Filovervåking feilet. Oppdater arbeidsområdet manuelt.'),
-            );
-          });
-          activeState.watchers.push(watcher);
-        } catch {
-          this.emit(
-            'status',
-            toStatus(rootPath, 'error', 'Filovervåking kunne ikke startes for en undermappe.'),
-          );
-        }
-      });
-
-      this.emit('status', toStatus(rootPath, 'watching', 'Filovervåking aktiv.'));
-    } catch {
-      this.emit(
-        'status',
-        toStatus(rootPath, 'error', 'Filovervåking kunne ikke startes. Oppdater arbeidsområdet manuelt.'),
-      );
-    }
-  }
-
-  private async collectWatchFolders(rootPath: string) {
-    const folders: string[] = [];
-
-    const walk = async (directoryPath: string) => {
-      folders.push(directoryPath);
-      let entries: string[];
-
-      try {
-        entries = await readdir(directoryPath);
-      } catch {
-        return;
-      }
-
-      await Promise.all(
-        entries.map(async (entryName) => {
-          if (ignoredFolderNames.has(entryName)) {
-            return;
-          }
-
-          const entryPath = path.join(directoryPath, entryName);
-
-          try {
-            const stats = await stat(entryPath);
-            if (stats.isDirectory()) {
-              await walk(entryPath);
-            }
-          } catch {
-            // Watch coverage is opportunistic. A later full rescan remains the
-            // source of truth when a directory cannot be inspected.
-          }
-        }),
-      );
-    };
-
-    await walk(rootPath);
-
-    return folders;
-  }
-
-  private queueRefresh(rootPath: string, candidatePath: string) {
-    const state = this.state;
-
-    if (!state || state.rootPath !== rootPath) {
-      return;
-    }
-
-    if (!isPathInside(rootPath, candidatePath)) {
-      this.emit(
-        'status',
-        toStatus(rootPath, 'error', 'Filendring utenfor arbeidsområdet ble avvist.'),
-      );
-      return;
-    }
-
-    if (shouldIgnoreWorkspaceRefreshPath(rootPath, candidatePath)) {
+    if (shouldIgnoreWorkspaceRefreshPath(event.rootPath, event.absolutePath)) {
       return;
     }
 
@@ -230,16 +155,16 @@ export class WorkspaceWatchManager extends EventEmitter {
       clearTimeout(state.refreshTimer);
     }
 
-    this.emit('status', toStatus(rootPath, 'refreshing', 'Oppdaterer arbeidsområde...'));
+    this.emit('status', toStatus(event.rootPath, 'refreshing', 'Oppdaterer arbeidsområde...'));
     state.refreshTimer = setTimeout(() => {
       const activeState = this.state;
 
-      if (!activeState || activeState.rootPath !== rootPath) {
+      if (!activeState || activeState.rootPath !== event.rootPath) {
         return;
       }
 
       activeState.refreshTimer = undefined;
-      this.emit('refresh', rootPath);
+      this.emit('refresh', event.rootPath);
     }, this.debounceMs);
   }
 }

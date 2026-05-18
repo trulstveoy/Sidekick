@@ -6,6 +6,7 @@ import {
   WorkspaceWatchManager,
   shouldIgnoreWorkspaceRefreshPath,
 } from '../../src/main/workspace-watch-manager';
+import { WorkspaceFileEventService } from '../../src/main/workspace-file-events';
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -41,7 +42,8 @@ describe('workspace watch manager', () => {
 
   it('emits one debounced refresh for external file changes', async () => {
     rootPath = await mkdtemp(path.join(os.tmpdir(), 'sidekick-watch-'));
-    const manager = new WorkspaceWatchManager(50);
+    const fileEvents = new WorkspaceFileEventService();
+    const manager = new WorkspaceWatchManager(fileEvents, 50);
 
     try {
       manager.watchWorkspace(rootPath);
@@ -53,12 +55,14 @@ describe('workspace watch manager', () => {
       await expect(refresh).resolves.toBe(rootPath);
     } finally {
       manager.close();
+      fileEvents.close();
     }
   });
 
   it('watches newly discovered subfolders after refresh completion', async () => {
     rootPath = await mkdtemp(path.join(os.tmpdir(), 'sidekick-watch-'));
-    const manager = new WorkspaceWatchManager(50);
+    const fileEvents = new WorkspaceFileEventService();
+    const manager = new WorkspaceWatchManager(fileEvents, 50);
 
     try {
       manager.watchWorkspace(rootPath);
@@ -76,6 +80,7 @@ describe('workspace watch manager', () => {
       await expect(fileRefresh).resolves.toBe(rootPath);
     } finally {
       manager.close();
+      fileEvents.close();
     }
   });
 });
