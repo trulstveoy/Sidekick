@@ -87,6 +87,7 @@ Main-process tjenester har ansvar for filsystem, analyser, metadata, prosesser o
 | `shared/context-views.ts` | Lager konseptuelle visninger som `Mapper` og `Prosjekter` fra samme fysiske scan. |
 | `workspace-creator.ts` | Oppretter nytt arbeidsområde med standardmapper. |
 | `workspace-initializer.ts` | Initierer eksisterende mappe som arbeidsområde. |
+| `workspace-file-events.ts` | Felles lavnivålag for `fs.watch`, path-normalisering og watcher-lifecycle per arbeidsområde. |
 | `workspace-watch-manager.ts` | Lytter på filsystemendringer og trigger ny scan for aktivt arbeidsområde. |
 | `context-package.ts` | Forhåndsviser og genererer workspace- eller folder-scoped context packages. |
 | `repomix-runner.ts` | Kjører Repomix in-process med sikkerhetssjekk og Electron-tilpasset tokenmåling. |
@@ -273,22 +274,30 @@ flowchart LR
 ```mermaid
 sequenceDiagram
   participant FS as Filsystem
+  participant E as WorkspaceFileEventService
   participant W as WorkspaceWatchManager
+  participant I as SearchIndexManager
   participant M as Main
   participant S as Scanner
   participant R as Renderer
 
-  FS-->>W: fs.watch event
-  W->>W: valider path og debounce
+  FS-->>E: fs.watch event
+  E->>E: valider root og normaliser path
+  E-->>W: WorkspaceFileEvent
+  E-->>I: WorkspaceFileEvent
+  W->>W: workspace-filter og debounce
   W-->>M: refresh(rootPath)
   M->>S: scanWorkspaceFolder(rootPath)
   S-->>M: WorkspaceScan
   M-->>R: workspace:scan-updated
   M-->>R: workspace:watch-status
+  I->>I: search-filter, debounce og indeksoppdatering
   R->>R: oppdater Mapper, Prosjekter og valgt element
 ```
 
-`workspace-watch-manager.ts` lytter på aktivt arbeidsområde og relevante undermapper. Filsystemevents behandles som hint, ikke som sannhet. Etter debounce kjører main en full scan og sender ny `WorkspaceScan` til renderer.
+`workspace-file-events.ts` eier lavnivå `fs.watch`-dekning for arbeidsområder. Den normaliserer filsystemevents og deler dem til separate konsumenter. `workspace-watch-manager.ts` bruker eventene til å trigge ny `WorkspaceScan`, mens `search-index.ts` bruker de samme eventene til å oppdatere eller markere lokal søkeindeks som stale.
+
+Filsystemevents behandles som hint, ikke som sannhet. Etter debounce kjører workspace refresh en full scan og sender ny `WorkspaceScan` til renderer. Search index validerer på nytt før den endrer MiniSearch-indeksen.
 
 Ignorerte områder inkluderer blant annet `.git`, `.sidekick`, `node_modules`, build-output og genererte context packages. `.sidekick-folder.json` ignoreres ikke, fordi den påvirker konseptuelle visninger.
 
@@ -428,7 +437,7 @@ Applikasjonen pakkes med Electron Forge. Release-flowen bygger artifacts i GitHu
 1. `src/renderer.ts` er den største modulen og bærer mye UI-state. Nye større UI-flater bør vurdere moduloppdeling.
 2. `src/main.ts` er en tydelig orkestrator, men nærmer seg størrelsen der IPC-registrering kan deles per domene.
 3. `src/shared/sidekick-api.ts` er en sentral kontrakt. Endringer her bør behandles som API-endringer mellom renderer, preload og main.
-4. Sidekick har to watcher-mekanismer: workspace refresh og search index. De er separate i dag, men deler prinsippet om at filsystemevents er hint som må valideres.
+4. Sidekick har ett felles lavnivålag for filsystemevents, `WorkspaceFileEventService`, med separate konsumenter for workspace refresh og search index. Dette holder watcher-lifecycle samlet uten å blande domenelogikken for UI-scan og søkeindeks.
 5. `docs/architecture/application-architecture.md` finnes fortsatt, men har noen eldre formuleringer fra prosjektmappe-perioden. Dette dokumentet beskriver dagens workspace-, tagging-, context-view- og live-refresh-arkitektur.
 
 ## Endringsregler
