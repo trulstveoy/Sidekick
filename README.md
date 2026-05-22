@@ -2,6 +2,17 @@
 
 Sidekick is a local-first desktop app for inspecting and organizing project folders. It is built on Electron, Electron Forge, Vite, and TypeScript.
 
+## Setup
+
+Use the Node version declared in `.nvmrc` before installing dependencies:
+
+```bash
+nvm use
+npm ci
+```
+
+The lockfile is maintained with modern npm. If `npm ci` fails with lockfile or comparator errors, confirm that `node` and `npm` both resolve through `~/.nvm`.
+
 ## Scripts
 
 - `npm start` starts the Electron app in development.
