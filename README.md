@@ -1,6 +1,21 @@
 # Sidekick
 
-Sidekick is a local-first desktop app for inspecting and organizing project folders. It is built on Electron, Electron Forge, Vite, and TypeScript.
+Sidekick is a local-first desktop app for working with project material on your own machine. It helps you inspect, organize, search, summarize, and package a workspace so it can be used in agentic workflows without sending project files through a hosted backend.
+
+## What Sidekick Does
+
+- Opens an existing folder as a workspace or creates a new workspace with a simple standard structure.
+- Shows the workspace as both a physical folder tree and a project-oriented context view.
+- Classifies files and folders with practical hints such as transcripts, notes, information models, architecture, and background material.
+- Lets you tag folders, including project folders, so the same workspace can be navigated through richer context views.
+- Watches the active workspace for filesystem changes and refreshes the UI automatically.
+- Builds and updates a local searchable index for supported text-based files.
+- Imports transcription files through a controlled copy workflow that previews the destination and avoids overwriting existing files.
+- Generates and reads local transcription summaries, workspace summaries, and document relationship reports through controlled Codex runs.
+- Creates workspace-level or folder-level context packages with Repomix for use in agent prompts and review workflows.
+- Provides a controlled Codex panel for login, read-only analysis runs, editable workspace runs, streaming output, and cancellation.
+
+All privileged work happens locally in the Electron main process. The renderer receives only a narrow typed API and never gets raw filesystem, shell, process, or IPC access.
 
 ## Setup
 
@@ -44,7 +59,7 @@ The lockfile is maintained with modern npm. If `npm ci` fails with lockfile or c
 
 ## Agentic Development
 
-Use `AGENTS.md` as the working agreement for future agent sessions. The full workflow lives in `docs/workflows/agentic-development.md`.
+Use `AGENTS.md` as the working agreement for future agent sessions. Superpowers is the governing workflow, with Sidekick-specific conventions in `docs/workflows/agentic-development.md`.
 
 ## Static Analysis
 
