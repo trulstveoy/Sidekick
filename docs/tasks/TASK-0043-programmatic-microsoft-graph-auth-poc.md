@@ -11,7 +11,7 @@ Worktree: ../Sidekick-worktrees/TASK-0043-programmatic-microsoft-graph-auth-poc
 Base branch: origin/main
 Write scope:
 - `docs/tasks/TASK-0043-programmatic-microsoft-graph-auth-poc.md`
-- possible throwaway local POC outside committed Sidekick runtime code
+- `scripts/spikes/msgraph-auth-poc.mjs`
 Parallel safety: Coordinate
 
 ## Summary
@@ -80,6 +80,20 @@ Fallback path:
 
 - If browser redirect or tenant policy blocks interactive auth, test device code flow.
 
+Current POC runner:
+
+- `scripts/spikes/msgraph-auth-poc.mjs`
+
+Run shape:
+
+```bash
+MS_GRAPH_CLIENT_ID=<client-id> \
+MS_GRAPH_TENANT_ID=<tenant-id|organizations|common> \
+node scripts/spikes/msgraph-auth-poc.mjs
+```
+
+The script starts a localhost callback server, prints a Microsoft login URL, waits for the browser redirect, exchanges the authorization code for an access token using PKCE, and runs sanitized Graph checks. It does not print access tokens or Graph response content.
+
 ## App Registration Questions
 
 Record these during the spike:
@@ -143,7 +157,10 @@ Do not store tokens or sensitive content.
 
 | Test | Result | Notes |
 | --- | --- | --- |
-| App registration created or selected | Not tested |  |
+| POC runner created | works | `scripts/spikes/msgraph-auth-poc.mjs` uses auth code + PKCE and localhost callback. |
+| POC syntax check | works | `node --check scripts/spikes/msgraph-auth-poc.mjs` |
+| Missing-config behavior | works | Script prints usage and exits when `MS_GRAPH_CLIENT_ID` is not set. |
+| App registration created or selected | not tested | Needs human-created or selected Microsoft Entra app registration. |
 | Redirect URI works | Not tested |  |
 | Browser opens for login | Not tested |  |
 | Login succeeds | Not tested |  |
@@ -189,11 +206,14 @@ Use values:
 Passed:
 - Task record created from Sidekick workflow rules and official Microsoft identity platform documentation.
 - `npm run check`
+- `node --check scripts/spikes/msgraph-auth-poc.mjs`
+- `node scripts/spikes/msgraph-auth-poc.mjs`
+  - Expected result without config: prints usage and exits without starting auth.
 
 Not run:
 - Programmatic POC.
-  Reason: requires Microsoft Entra app registration, browser login, and human account consent.
+  Reason: requires `MS_GRAPH_CLIENT_ID` from a Microsoft Entra app registration, browser login, and human account consent.
 
 ## Closeout
 
-Pending programmatic spike execution.
+POC runner is created and locally validated for syntax and missing-config behavior. Full auth execution is blocked until a Microsoft Entra app registration is available.
