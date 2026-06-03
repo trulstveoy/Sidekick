@@ -1,7 +1,7 @@
 # Task: Microsoft Graph Explorer access spike
 
 ID: TASK-0042
-Status: Planned
+Status: Done
 Class: Major
 Owner: Pair
 Created: 2026-06-03
@@ -233,7 +233,7 @@ Fill this table during the spike. Do not store secrets or content.
 
 | Organization | Sign-in | Token visible | `/me` | Mail | Calendar | Teams | Blocker / notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Primary employer | Not tested | Not tested | Not tested | Not tested | Not tested | Not tested |  |
+| Primary employer | works | works | works | works | works | works | Human confirmed Graph Explorer test works. Detailed tenant identifiers and content intentionally not recorded. |
 | Other org 1 | Not tested | Not tested | Not tested | Not tested | Not tested | Not tested |  |
 | Other org 2 | Not tested | Not tested | Not tested | Not tested | Not tested | Not tested |  |
 
@@ -273,11 +273,18 @@ Use values:
 Passed:
 - Task record created from official Microsoft Graph documentation and Sidekick workflow rules.
 - `npm run check`
+- Human manually confirmed Graph Explorer login, token access, and Graph API access work at a high level.
 
 Not run:
-- Microsoft Graph Explorer manual tests.
-  Reason: requires the human's Microsoft accounts, tenant access, and consent prompts.
+- Programmatic Microsoft Graph auth test.
+  Reason: deferred to `TASK-0043`.
 
 ## Closeout
 
-Pending manual spike execution.
+Graph Explorer access is confirmed at a high level: browser login works, Graph Explorer can obtain an access token, and the user can call Microsoft Graph for the target data through the browser-based tool.
+
+This proves the account/API path is available in at least one real organization, but it does not prove that Sidekick's own app registration and auth flow will receive the same delegated permissions.
+
+Next step:
+
+- `TASK-0043`: create a programmatic Microsoft Graph auth proof-of-concept using Microsoft-supported desktop/Electron auth guidance.
